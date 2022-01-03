@@ -3,4 +3,14 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Filter Include="ThirdParty">
+      <UniqueIdentifier>{7e1c13df-b351-4521-9ee4-8fac14392493}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
+      <Filter>ThirdParty</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
