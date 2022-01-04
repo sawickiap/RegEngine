@@ -12,5 +12,11 @@
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
       <Filter>ThirdParty</Filter>
     </ClInclude>
+    <ClInclude Include="..\ThirdParty\str_view\str_view.hpp">
+      <Filter>ThirdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseUtils.hpp" />
+    <ClInclude Include="WindowsUtils.h" />
+    <ClInclude Include="D3d12Utils.hpp" />
   </ItemGroup>
 </Project>

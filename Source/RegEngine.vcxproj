@@ -100,6 +100,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
+    <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
+    <ClInclude Include="BaseUtils.hpp" />
+    <ClInclude Include="D3d12Utils.hpp" />
+    <ClInclude Include="WindowsUtils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

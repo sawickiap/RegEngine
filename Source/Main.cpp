@@ -1,47 +1,6 @@
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <objbase.h>
-#include <wrl/client.h>
-using Microsoft::WRL::ComPtr;
-
-#include <dxgi1_4.h>
-#include <d3d12.h>
-#include "..\ThirdParty\d3dx12\d3dx12.h"
-
-#include <exception>
-#include <stdexcept>
-
-#include <cstdio>
-#include <cassert>
-
-#define STRINGIZE(x) STRINGIZE2(x)
-#define STRINGIZE2(x) #x
-#define LINE_STRING STRINGIZE(__LINE__)
-#define FAIL(msgStr)  do { \
-        assert(0 && msgStr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): " msgStr); \
-    } while(false)
-#define CHECK_BOOL(expr)  do { if(!(expr)) { \
-        assert(0 && #expr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): ( " #expr " ) == false"); \
-    } } while(false)
-#define CHECK_HR(expr)  do { if(FAILED(expr)) { \
-        assert(0 && #expr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): FAILED( " #expr " )"); \
-    } } while(false)
-
-#define CATCH_PRINT_ERROR(extraCatchCode) \
-    catch(const std::exception& ex) \
-    { \
-        fwprintf(stderr, L"ERROR: %hs\n", ex.what()); \
-        extraCatchCode \
-    } \
-    catch(...) \
-    { \
-        fwprintf(stderr, L"UNKNOWN ERROR.\n"); \
-        extraCatchCode \
-    }
+#include "WindowsUtils.h"
+#include "D3d12Utils.hpp"
+#include "BaseUtils.hpp"
 
 enum EXIT_CODE
 {
@@ -54,36 +13,113 @@ static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 static const int SIZE_X = 1024;
 static const int SIZE_Y = 576;
 
-static HINSTANCE g_Instance;
-static HWND g_Wnd;
+class Application
+{
+public:
+    Application();
+    void Init();
+    int Run();
 
-static ComPtr<IDXGIAdapter1> SelectAdapter(IDXGIFactory4* dxgiFactory)
+private:
+    HINSTANCE m_Instance = NULL;
+    HWND m_Wnd = NULL;
+    ComPtr<IDXGIFactory4> m_DxgiFactory;
+    ComPtr<IDXGIAdapter1> m_Adapter;
+
+    static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    void SelectAdapter();
+    void RegisterWindowClass();
+    void CreateWindow_();
+    LRESULT WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    void OnKeyDown(WPARAM key);
+};
+
+static Application* g_App;
+
+Application::Application()
+{
+    m_Instance = (HINSTANCE)GetModuleHandle(NULL);
+}
+
+void Application::Init()
+{
+    CHECK_HR(CoInitialize(NULL));
+    CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DxgiFactory)));
+    SelectAdapter();
+    assert(m_Adapter);
+    RegisterWindowClass();
+    CreateWindow_();
+}
+
+void Application::SelectAdapter()
 {
     ComPtr<IDXGIAdapter1> tmpAdapter;
-    for(UINT i = 0; dxgiFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
+    for(UINT i = 0; m_DxgiFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
     {
         DXGI_ADAPTER_DESC1 desc;
         tmpAdapter->GetDesc1(&desc);
         if((desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0)
-            return tmpAdapter;
+        {
+            m_Adapter = std::move(tmpAdapter);
+            return;
+        }
     }
     FAIL("Couldn't find suitable DXGI adapter.");
 }
 
-static void OnKeyDown(WPARAM key)
+LRESULT WINAPI Application::GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    switch (key)
-    {
-    case VK_ESCAPE:
-        PostMessage(g_Wnd, WM_CLOSE, 0, 0);
-        break;
-    }
+    assert(g_App);
+    return g_App->WndProc(wnd, msg, wParam, lParam);
 }
 
-static LRESULT WINAPI WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
+void Application::RegisterWindowClass()
 {
+    WNDCLASSEX wndClass = {};
+    wndClass.cbSize = sizeof(wndClass);
+    wndClass.style = CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS;
+    wndClass.hbrBackground = NULL;
+    wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+    wndClass.hInstance = m_Instance;
+    wndClass.lpfnWndProc = &GlobalWndProc;
+    wndClass.lpszClassName = CLASS_NAME;
+
+    ATOM classR = RegisterClassEx(&wndClass);
+    assert(classR);
+}
+
+void Application::CreateWindow_()
+{
+    assert(m_Instance);
+    constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
+    constexpr DWORD exStyle = 0;
+    RECT rect = { 0, 0, SIZE_X, SIZE_Y };
+    AdjustWindowRectEx(&rect, style, FALSE, exStyle);
+    m_Wnd = CreateWindowEx(
+        exStyle,
+        CLASS_NAME,
+        WINDOW_TITLE,
+        style,
+        CW_USEDEFAULT, CW_USEDEFAULT,
+        rect.right - rect.left, rect.bottom - rect.top,
+        NULL,
+        NULL,
+        m_Instance,
+        NULL);
+    assert(m_Wnd);
+}
+
+LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    if(m_Wnd == NULL)
+        m_Wnd = wnd;
+
     switch(msg)
     {
+    case WM_CREATE:
+        return 0;
+
     case WM_DESTROY:
         try
         {
@@ -98,68 +134,25 @@ static LRESULT WINAPI WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             OnKeyDown(wParam);
         }
-        CATCH_PRINT_ERROR(DestroyWindow(wnd);)
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
     }
 
     return DefWindowProc(wnd, msg, wParam, lParam);
 }
 
-static void RegisterWindowClass()
+void Application::OnKeyDown(WPARAM key)
 {
-    WNDCLASSEX wndClass = {};
-    wndClass.cbSize = sizeof(wndClass);
-    wndClass.style = CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS;
-    wndClass.hbrBackground = NULL;
-    wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wndClass.hInstance = g_Instance;
-    wndClass.lpfnWndProc = &WndProc;
-    wndClass.lpszClassName = CLASS_NAME;
-
-    ATOM classR = RegisterClassEx(&wndClass);
-    assert(classR);
+    switch (key)
+    {
+    case VK_ESCAPE:
+        PostMessage(m_Wnd, WM_CLOSE, 0, 0);
+        break;
+    }
 }
 
-static void CreateWindow_()
+int Application::Run()
 {
-    constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
-    constexpr DWORD exStyle = 0;
-    RECT rect = { 0, 0, SIZE_X, SIZE_Y };
-    AdjustWindowRectEx(&rect, style, FALSE, exStyle);
-    g_Wnd = CreateWindowEx(
-        exStyle,
-        CLASS_NAME,
-        WINDOW_TITLE,
-        style,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        rect.right - rect.left, rect.bottom - rect.top,
-        NULL,
-        NULL,
-        g_Instance,
-        0);
-    assert(g_Wnd);
-}
-
-static int main2()
-{
-    g_Instance = (HINSTANCE)GetModuleHandle(NULL);
-    
-    CoInitialize(NULL);
-    
-    ComPtr<IDXGIFactory4> dxgiFactory;
-    CHECK_HR( CreateDXGIFactory1(IID_PPV_ARGS(&dxgiFactory)) );
-
-    ComPtr<IDXGIAdapter1> adapter = SelectAdapter(dxgiFactory.Get());
-
-    RegisterWindowClass();
-    
-    CreateWindow_();
-
-    /*InitD3D();
-    g_TimeOffset = GetTickCount64();
-    */
-
     MSG msg;
     for (;;)
     {
@@ -189,7 +182,12 @@ int wmain(int argc, wchar_t** argv)
 {
 	try
 	{
-		return main2();
+        Application app;
+        g_App = &app;
+        app.Init();
+        const int result = app.Run();
+        g_App = nullptr;
+        return result;
 	}
 	CATCH_PRINT_ERROR(return EXIT_CODE_RUNTIME_ERROR;);
 }
