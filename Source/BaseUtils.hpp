@@ -2,11 +2,17 @@
 
 #include "../ThirdParty/str_view/str_view.hpp"
 
+#include <memory>
 #include <exception>
 #include <stdexcept>
+#include <array>
 
 #include <cstdio>
+#include <cstdint>
 #include <cassert>
+
+using std::unique_ptr;
+using std::make_unique;
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
