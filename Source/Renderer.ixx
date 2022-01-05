@@ -6,6 +6,8 @@ module;
 
 export module Renderer;
 
+import BaseUtils;
+
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const uint32_t FRAME_COUNT = 3;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -52,12 +54,15 @@ private:
 	std::array<FrameResources, FRAME_COUNT> m_frameResources;
 	UINT m_frameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_fenceEvent;
+	ComPtr<ID3D12RootSignature> m_rootSignature;
+	ComPtr<ID3D12PipelineState> m_pipelineState;
 
 	void CreateDevice();
 	void LoadCapabilities();
 	void CreateCommandQueues();
 	void CreateSwapChain();
 	void CreateFrameResources();
+	void CreateResources();
 };
 
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
@@ -74,6 +79,7 @@ void Renderer::Init()
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();
+	CreateResources();
 }
 
 Renderer::~Renderer()
@@ -108,7 +114,8 @@ void Renderer::Render()
 		D3D12_RESOURCE_STATE_RENDER_TARGET);
 	cmdList->ResourceBarrier(1, &presentToRenderTargetBarrier);
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
+		m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
 		(INT)m_frameIndex, m_capabilities.m_descriptorSize_RTV};
 
 	float time = (float)GetTickCount() * 1e-3f;
@@ -118,9 +125,27 @@ void Renderer::Render()
 	const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
 	cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
 
+	cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
+
+	cmdList->SetPipelineState(m_pipelineState.Get());
+
+	cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+    D3D12_VIEWPORT viewport = {0.f, 0.f, (float)SIZE_X, (float)SIZE_Y, 0.f, 1.f};
+    cmdList->RSSetViewports(1, &viewport);
+
+	const D3D12_RECT scissorRect = {0, 0, SIZE_X, SIZE_Y};
+	cmdList->RSSetScissorRects(1, &scissorRect);
+
+	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	cmdList->DrawInstanced(3, 1, 0, 0);
+
+	/*
 	const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
 	const D3D12_RECT clearRect = {(int)pos, 32, (int)pos + 32, 32 + 32};
 	cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
+	*/
 
 	CD3DX12_RESOURCE_BARRIER renderTargetToPresentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
 		frameRes.m_backBuffer.Get(),
@@ -205,5 +230,91 @@ void Renderer::CreateFrameResources()
 		m_device->CreateRenderTargetView(m_frameResources[i].m_backBuffer.Get(), nullptr, backBufferRtvHandle);
 		
 		backBufferRtvHandle.ptr += m_capabilities.m_descriptorSize_RTV;
+	}
+}
+
+static void SetDefaultRasterizerDesc(D3D12_RASTERIZER_DESC& outDesc)
+{
+    outDesc.FillMode = D3D12_FILL_MODE_SOLID;
+    outDesc.CullMode = D3D12_CULL_MODE_NONE;
+    outDesc.FrontCounterClockwise = FALSE;
+    outDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
+    outDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
+    outDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+    outDesc.DepthClipEnable = TRUE;
+    outDesc.MultisampleEnable = FALSE;
+    outDesc.AntialiasedLineEnable = FALSE;
+    outDesc.ForcedSampleCount = 0;
+    outDesc.ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+}
+
+static void SetDefaultBlendDesc(D3D12_BLEND_DESC& outDesc)
+{
+    outDesc.AlphaToCoverageEnable = FALSE;
+    outDesc.IndependentBlendEnable = FALSE;
+    const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
+        FALSE,FALSE,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_LOGIC_OP_NOOP,
+        D3D12_COLOR_WRITE_ENABLE_ALL };
+    for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        outDesc.RenderTarget[i] = defaultRenderTargetBlendDesc;
+}
+
+static void SetDefaultDepthStencilDesc(D3D12_DEPTH_STENCIL_DESC& outDesc)
+{
+    outDesc.DepthEnable = FALSE;
+    outDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    outDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    outDesc.StencilEnable = FALSE;
+    outDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    outDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
+        D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+    outDesc.FrontFace = defaultStencilOp;
+    outDesc.BackFace = defaultStencilOp;
+}
+
+void Renderer::CreateResources()
+{
+	// Root signature
+	{
+		D3D12_ROOT_SIGNATURE_DESC desc = {};
+		desc.NumParameters = 0;
+		desc.NumStaticSamplers = 0;
+		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+		ComPtr<ID3DBlob> blob;
+		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
+		CHECK_HR(m_device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+			__uuidof(ID3D12RootSignature), &m_rootSignature));
+	}
+
+	// Pipeline state
+	{
+		std::vector<char> vsCode = LoadFile(L"Data\\VS");
+		std::vector<char> psCode = LoadFile(L"Data\\PS");
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+		//desc.InputLayout.NumElements = 0;
+		//desc.InputLayout.pInputElementDescs = 
+		desc.pRootSignature = m_rootSignature.Get();
+		desc.VS.BytecodeLength = vsCode.size();
+		desc.VS.pShaderBytecode = vsCode.data();
+		desc.PS.BytecodeLength = psCode.size();
+		desc.PS.pShaderBytecode = psCode.data();
+		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		desc.NumRenderTargets = 1;
+		desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
+		desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+		desc.SampleDesc.Count = 1;
+		desc.SampleMask = UINT32_MAX;
+		SetDefaultRasterizerDesc(desc.RasterizerState);
+		SetDefaultBlendDesc(desc.BlendState);
+		SetDefaultDepthStencilDesc(desc.DepthStencilState);
+		CHECK_HR(m_device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_pipelineState));
 	}
 }

@@ -96,6 +96,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="BaseUtils.ixx" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Renderer.ixx" />
   </ItemGroup>

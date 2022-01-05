@@ -3,6 +3,7 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Renderer.ixx" />
+    <ClCompile Include="BaseUtils.ixx" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">

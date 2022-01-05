@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <array>
 #include <limits>
+#include <vector>
 
 #include <cstdio>
 #include <cstdint>
