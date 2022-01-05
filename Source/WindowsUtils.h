@@ -6,3 +6,9 @@
 #include <objbase.h>
 #include <wrl/client.h>
 using Microsoft::WRL::ComPtr;
+
+struct CloseHandleDeleter
+{
+    typedef HANDLE pointer;
+    void operator()(HANDLE handle) const { CloseHandle(handle); }
+};

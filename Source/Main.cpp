@@ -54,6 +54,7 @@ void Application::Init()
     RegisterWindowClass();
     CreateWindow_();
     m_renderer = make_unique<Renderer>(m_dxgiFactory.Get(), m_adapter.Get(), m_wnd);
+    m_renderer->Init();
 }
 
 void Application::SelectAdapter()
@@ -179,10 +180,11 @@ int Application::Run()
             g_TimeDelta = (float)(newTimeValue - g_TimeValue) * 0.001f;
             g_TimeValue = newTimeValue;
             g_Time = (float)newTimeValue * 0.001f;
-
-            Update();
-            Render();
             */
+
+            //Update();
+            if(m_renderer)
+                m_renderer->Render();
         }
     }
     return (int)msg.wParam;

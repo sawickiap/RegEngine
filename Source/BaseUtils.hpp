@@ -6,10 +6,12 @@
 #include <exception>
 #include <stdexcept>
 #include <array>
+#include <limits>
 
 #include <cstdio>
 #include <cstdint>
 #include <cassert>
+#include <cmath>
 
 using std::unique_ptr;
 using std::make_unique;
