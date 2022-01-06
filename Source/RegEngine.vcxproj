@@ -99,6 +99,7 @@
     <ClCompile Include="BaseUtils.ixx" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Renderer.ixx" />
+    <ClCompile Include="WindowsUtils.ixx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />

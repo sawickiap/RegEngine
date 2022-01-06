@@ -6,7 +6,7 @@ module;
 
 export module Renderer;
 
-import BaseUtils;
+import WindowsUtils;
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const uint32_t FRAME_COUNT = 3;
