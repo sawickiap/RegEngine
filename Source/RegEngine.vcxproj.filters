@@ -5,6 +5,7 @@
     <ClCompile Include="Renderer.ixx" />
     <ClCompile Include="BaseUtils.ixx" />
     <ClCompile Include="WindowsUtils.ixx" />
+    <ClCompile Include="baseUtils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">

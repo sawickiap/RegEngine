@@ -41,3 +41,6 @@ using std::wstring;
         fwprintf(stderr, L"UNKNOWN ERROR.\n"); \
         extraCatchCode \
     }
+
+wstring VFormat(const wstr_view& format, va_list argList);
+wstring Format(const wstr_view& format, ...);
