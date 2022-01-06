@@ -96,10 +96,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="baseUtils.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="BaseUtils.hpp" />
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
