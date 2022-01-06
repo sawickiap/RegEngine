@@ -97,20 +97,9 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="baseUtils.cpp" />
-    <ClCompile Include="BaseUtils.ixx" />
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Renderer.ixx" />
-    <ClCompile Include="WindowsUtils.ixx" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
-    <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="BaseUtils.hpp" />
-    <ClInclude Include="D3d12Utils.hpp" />
-    <ClInclude Include="WindowsUtils.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="..\ThirdParty\str_view\str_view.natvis" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
