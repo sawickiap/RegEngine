@@ -108,6 +108,9 @@
     <ClInclude Include="D3d12Utils.hpp" />
     <ClInclude Include="WindowsUtils.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\ThirdParty\str_view\str_view.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

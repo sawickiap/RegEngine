@@ -10,16 +10,27 @@
     <Filter Include="ThirdParty">
       <UniqueIdentifier>{7e1c13df-b351-4521-9ee4-8fac14392493}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThirdParty\d3dx12">
+      <UniqueIdentifier>{e47cafda-65f6-429b-87f5-cb97f2e66658}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\str_view">
+      <UniqueIdentifier>{e84a03cf-1687-49f4-9ea0-f72017fe4431}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
-      <Filter>ThirdParty</Filter>
-    </ClInclude>
-    <ClInclude Include="..\ThirdParty\str_view\str_view.hpp">
-      <Filter>ThirdParty</Filter>
-    </ClInclude>
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="WindowsUtils.h" />
     <ClInclude Include="D3d12Utils.hpp" />
+    <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
+      <Filter>ThirdParty\d3dx12</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ThirdParty\str_view\str_view.hpp">
+      <Filter>ThirdParty\str_view</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
+      <Filter>ThirdParty\str_view</Filter>
+    </Natvis>
   </ItemGroup>
 </Project>

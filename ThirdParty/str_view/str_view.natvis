@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="str_view_template&lt;char&gt;">
+		<Intrinsic Name="size" Expression="m_Length==0xFFFFFFFFFFFFFFFF?strlen(m_Begin):m_Length" />
+		<DisplayString>{m_Begin,[m_Length==0xFFFFFFFFFFFFFFFF?strlen(m_Begin):m_Length]}</DisplayString>
+		<Expand>
+			<Item Name="[length]" ExcludeView="simple">m_Length==0xFFFFFFFFFFFFFFFF?strlen(m_Begin):m_Length</Item>
+			<ArrayItems>
+				<Size>m_Length==0xFFFFFFFFFFFFFFFF?strlen(m_Begin):m_Length</Size>
+				<ValuePointer>m_Begin</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	<Type Name="str_view_template&lt;wchar_t&gt;">
+		<Intrinsic Name="size" Expression="m_Length==0xFFFFFFFFFFFFFFFF?wcslen(m_Begin):m_Length" />
+		<DisplayString>{m_Begin,[m_Length==0xFFFFFFFFFFFFFFFF?wcslen(m_Begin):m_Length]}</DisplayString>
+		<Expand>
+			<Item Name="[length]" ExcludeView="simple">m_Length==0xFFFFFFFFFFFFFFFF?wcslen(m_Begin):m_Length</Item>
+			<ArrayItems>
+				<Size>m_Length==0xFFFFFFFFFFFFFFFF?wcslen(m_Begin):m_Length</Size>
+				<ValuePointer>m_Begin</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+</AutoVisualizer>
