@@ -33,4 +33,7 @@
       <Filter>ThirdParty\str_view</Filter>
     </Natvis>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
 </Project>

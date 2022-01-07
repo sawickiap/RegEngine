@@ -3,9 +3,11 @@ module;
 #include "BaseUtils.hpp"
 #include "WindowsUtils.h"
 #include "D3d12Utils.hpp"
+#include <pix3.h>
 
 export module Renderer;
 
+import BaseUtils;
 import WindowsUtils;
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
@@ -13,6 +15,29 @@ static const uint32_t FRAME_COUNT = 3;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 static const int SIZE_X = 1024; // TODO: unify with same in Main.cpp
 static const int SIZE_Y = 576; // TODO: unify with same in Main.cpp
+
+export class PixEventScope
+{
+public:
+    // Warning! msg is actually a formatting string, so don't use '%'!
+    PixEventScope(ID3D12GraphicsCommandList* cmdList, const wstr_view& msg) :
+        m_cmdList{cmdList}
+    {
+        PIXBeginEvent(m_cmdList, 0, msg.c_str());
+    }
+    ~PixEventScope()
+    {
+        PIXEndEvent(m_cmdList);
+    }
+
+private:
+    ID3D12GraphicsCommandList* m_cmdList;
+};
+
+#define HELPER_CAT_1(a, b) a ## b
+#define HELPER_CAT_2(a, b) HELPER_CAT_1(a, b)
+#define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
+#define PIX_EVENT_SCOPE(cmdList, msg) PixEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
 export class Renderer
 {
@@ -99,6 +124,8 @@ void Renderer::Render()
 	FrameResources& frameRes = m_frameResources[m_frameIndex];
 	ID3D12GraphicsCommandList* const cmdList = frameRes.m_cmdList.Get();
 
+    PIX_EVENT_SCOPE(cmdList, L"FRAME");
+
 	if(m_fence->GetCompletedValue() < frameRes.m_submittedFenceValue)
 	{
 		CHECK_HR(m_fence->SetEventOnCompletion(frameRes.m_submittedFenceValue, m_fenceEvent.get()));
@@ -118,12 +145,14 @@ void Renderer::Render()
 		m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
 		(INT)m_frameIndex, m_capabilities.m_descriptorSize_RTV};
 
-	float time = (float)GetTickCount() * 1e-3f;
+    float time = (float)GetTickCount() * 1e-3f;
 	float color = sin(time) * 0.5f + 0.5f;
 	float pos = fmod(time * 100.f, (float)SIZE_X);
-
-	const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
-	cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+    {
+        PIX_EVENT_SCOPE(cmdList, L"Clear");
+	    const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
+	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+    }
 
 	cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
 
@@ -167,6 +196,7 @@ void Renderer::Render()
 void Renderer::CreateDevice()
 {
     CHECK_HR( D3D12CreateDevice(m_adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_device)) );
+    m_device->SetName(L"Device");
 }
 
 void Renderer::LoadCapabilities()
@@ -184,8 +214,10 @@ void Renderer::CreateCommandQueues()
 	queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
 	CHECK_HR(m_device->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), &m_cmdQueue));
+    m_cmdQueue->SetName(L"Main command queue");
 	
 	CHECK_HR(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_fence));
+    m_fence->SetName(L"Main fence");
 }
 
 void Renderer::CreateSwapChain()
@@ -212,6 +244,7 @@ void Renderer::CreateFrameResources()
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	desc.NumDescriptors = FRAME_COUNT;
 	CHECK_HR(m_device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_swapChainRtvDescriptors));
+    m_swapChainRtvDescriptors->SetName(L"Swap chain RTV descriptors");
 
 	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	CHECK_BOOL(fenceEvent);
@@ -222,11 +255,16 @@ void Renderer::CreateFrameResources()
 	{
 		CHECK_HR(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
 			&m_frameResources[i].m_cmdAllocator));
+        m_frameResources[i].m_cmdAllocator->SetName(Format(L"Command allocator %u", i).c_str());
+
 		CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
 			m_frameResources[i].m_cmdAllocator.Get(), NULL,
 			__uuidof(ID3D12CommandList), &m_frameResources[i].m_cmdList));
+        m_frameResources[i].m_cmdList->SetName(Format(L"Command list %u", i).c_str());
 		CHECK_HR(m_frameResources[i].m_cmdList->Close());
+
 		CHECK_HR(m_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_frameResources[i].m_backBuffer));
+
 		m_device->CreateRenderTargetView(m_frameResources[i].m_backBuffer.Get(), nullptr, backBufferRtvHandle);
 		
 		backBufferRtvHandle.ptr += m_capabilities.m_descriptorSize_RTV;
@@ -291,6 +329,7 @@ void Renderer::CreateResources()
 		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
 		CHECK_HR(m_device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
 			__uuidof(ID3D12RootSignature), &m_rootSignature));
+        m_rootSignature->SetName(L"Test root signature");
 	}
 
 	// Pipeline state
@@ -316,5 +355,6 @@ void Renderer::CreateResources()
 		SetDefaultBlendDesc(desc.BlendState);
 		SetDefaultDepthStencilDesc(desc.DepthStencilState);
 		CHECK_HR(m_device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_pipelineState));
+        m_pipelineState->SetName(L"Test pipeline state");
 	}
 }

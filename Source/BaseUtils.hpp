@@ -18,6 +18,7 @@
 using std::unique_ptr;
 using std::make_unique;
 using std::wstring;
+using std::string;
 
 #define STRINGIZE(x) STRINGIZE2(x)
 #define STRINGIZE2(x) #x
