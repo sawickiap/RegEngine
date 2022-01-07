@@ -20,8 +20,9 @@ export wstring VFormat(const wstr_view& format, va_list argList)
 
 export wstring Format(const wstr_view& format, ...)
 {
+	auto formatStr = format.c_str();
     va_list argList;
-    va_start(argList, format.c_str());
+    va_start(argList, formatStr);
     auto result = VFormat(format, argList);
     va_end(argList);
     return result;

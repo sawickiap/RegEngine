@@ -2,6 +2,7 @@
 #include "D3d12Utils.hpp"
 #include "BaseUtils.hpp"
 
+import WindowsUtils;
 import Renderer;
 
 enum EXIT_CODE
@@ -43,6 +44,7 @@ static Application* g_app;
 Application::Application()
 {
     m_instance = (HINSTANCE)GetModuleHandle(NULL);
+    SetThreadName(GetCurrentThreadId(), "MAIN");
 }
 
 void Application::Init()
