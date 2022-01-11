@@ -5,6 +5,7 @@
     <ClCompile Include="Renderer.ixx" />
     <ClCompile Include="BaseUtils.ixx" />
     <ClCompile Include="WindowsUtils.ixx" />
+    <ClCompile Include="MathUtils.ixx" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -27,6 +28,7 @@
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp">
       <Filter>ThirdParty\str_view</Filter>
     </ClInclude>
+    <ClInclude Include="MathUtils.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
