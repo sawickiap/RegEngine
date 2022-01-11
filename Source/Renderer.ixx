@@ -2,6 +2,7 @@ module;
 
 #include "BaseUtils.hpp"
 #include "WindowsUtils.h"
+#include "MathUtils.hpp"
 #include "D3d12Utils.hpp"
 #include <pix3.h>
 
@@ -147,7 +148,7 @@ void Renderer::Render()
 
     float time = (float)GetTickCount() * 1e-3f;
 	float color = sin(time) * 0.5f + 0.5f;
-	float pos = fmod(time * 100.f, (float)SIZE_X);
+	//float pos = fmod(time * 100.f, (float)SIZE_X);
     {
         PIX_EVENT_SCOPE(cmdList, L"Clear");
 	    const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
@@ -167,6 +168,10 @@ void Renderer::Render()
 	cmdList->RSSetScissorRects(1, &scissorRect);
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    vec2 shift = vec2(glm::mod(time, 1.f), glm::mod(time, 1.f));
+
+    cmdList->SetGraphicsRoot32BitConstants(0, 2, glm::value_ptr(shift), 0);
 
 	cmdList->DrawInstanced(3, 1, 0, 0);
 
@@ -318,8 +323,15 @@ void Renderer::CreateResources()
 {
 	// Root signature
 	{
+        D3D12_ROOT_PARAMETER param = {};
+        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        param.Constants.ShaderRegister = 0;
+        param.Constants.Num32BitValues = 4;
+        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
-		desc.NumParameters = 0;
+		desc.NumParameters = 1;
+        desc.pParameters = &param;
 		desc.NumStaticSamplers = 0;
 		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
