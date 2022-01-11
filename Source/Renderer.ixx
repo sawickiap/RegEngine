@@ -169,9 +169,19 @@ void Renderer::Render()
 
 	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    vec2 shift = vec2(glm::mod(time, 1.f), glm::mod(time, 1.f));
+    const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
+    const mat4x4 view = glm::lookAtLH(
+        vec3(0.f, 2.f, 0.5f), // eye
+        vec3(0.f), // center
+        vec3(0.f, 0.f, 1.f)); // up
+    const mat4x4 proj = glm::perspectiveFovLH(
+        glm::radians(80.0f), // fov
+        (float)SIZE_X, (float)SIZE_Y,
+        0.5f, // zNear
+        100.f); // zFar
+    mat4x4 worldViewProj = proj * view * world;
 
-    cmdList->SetGraphicsRoot32BitConstants(0, 2, glm::value_ptr(shift), 0);
+    cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
 	cmdList->DrawInstanced(3, 1, 0, 0);
 
@@ -326,7 +336,7 @@ void Renderer::CreateResources()
         D3D12_ROOT_PARAMETER param = {};
         param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
         param.Constants.ShaderRegister = 0;
-        param.Constants.Num32BitValues = 4;
+        param.Constants.Num32BitValues = 16;
         param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
