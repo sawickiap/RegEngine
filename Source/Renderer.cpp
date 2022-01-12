@@ -51,7 +51,7 @@ void Font::Init()
     // Create WinFontRender object.
     WinFontRender::SFontDesc fontDesc = {};
     fontDesc.FaceName = L"Segoe UI";
-    fontDesc.Height = 9;
+    fontDesc.Height = 32;
     CHECK_BOOL(m_WinFont.Init(fontDesc));
 
     // Fetch texture data.
@@ -131,8 +131,15 @@ void Font::Init()
             0, 0, 0, // DstX, DstY, DstZ
             &src, &srcBox);
 
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        cmdList->ResourceBarrier(1, &barrier);
+
         g_renderer->CompleteUploadCommandList();
     }
+
+    // Setup texture SRV descriptor
+    g_renderer->SetTexture(m_Texture.Get());
 }
 
 Font::~Font()
@@ -188,6 +195,13 @@ void Renderer::CompleteUploadCommandList()
 	CHECK_HR(m_cmdQueue->Signal(m_fence.Get(), m_uploadCmdListSubmittedFenceValue));
 
     WaitForFenceOnCpu(m_uploadCmdListSubmittedFenceValue);
+}
+
+void Renderer::SetTexture(ID3D12Resource* res)
+{
+    m_device->CreateShaderResourceView(res,
+        nullptr, // pDesc
+        m_descriptorHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Renderer::Render()
@@ -246,6 +260,10 @@ void Renderer::Render()
             0.5f, // zNear
             100.f); // zFar
         mat4x4 worldViewProj = proj * view * world;
+
+        ID3D12DescriptorHeap* const descriptorHeap = m_descriptorHeap.Get();
+        cmdList->SetDescriptorHeaps(1, &descriptorHeap);
+        cmdList->SetGraphicsRootDescriptorTable(1, m_descriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
         cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
@@ -405,16 +423,26 @@ void Renderer::CreateResources()
 {
 	// Root signature
 	{
-        D3D12_ROOT_PARAMETER param = {};
-        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        param.Constants.ShaderRegister = 0;
-        param.Constants.Num32BitValues = 16;
-        param.ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        D3D12_ROOT_PARAMETER params[2] = {};
+        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        params[0].Constants.ShaderRegister = 0;
+        params[0].Constants.Num32BitValues = 16;
+        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+
+        CD3DX12_DESCRIPTOR_RANGE textureDescriptorRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[1].DescriptorTable.NumDescriptorRanges = 1;
+        params[1].DescriptorTable.pDescriptorRanges = &textureDescriptorRange;
+        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+        CD3DX12_STATIC_SAMPLER_DESC staticSampler{0};
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
-		desc.NumParameters = 1;
-        desc.pParameters = &param;
+		desc.NumParameters = 2;
 		desc.NumStaticSamplers = 0;
+        desc.pParameters = params;
+        desc.NumStaticSamplers = 1;
+        desc.pStaticSamplers = &staticSampler;
 		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
@@ -452,8 +480,21 @@ void Renderer::CreateResources()
         m_pipelineState->SetName(L"Test pipeline state");
 	}
 
-    m_Font = std::make_unique<Font>();
-    m_Font->Init();
+    // Descriptor heap
+    {
+        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
+        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+        desc.NumDescriptors = 1;
+        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        CHECK_HR(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_descriptorHeap)));
+        m_descriptorHeap->SetName(L"Descriptor heap");
+    }
+
+    // Font
+    {
+        m_Font = std::make_unique<Font>();
+        m_Font->Init();
+    }
 }
 
 void Renderer::WaitForFenceOnCpu(UINT64 value)

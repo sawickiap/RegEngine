@@ -15,6 +15,7 @@ public:
     ID3D12GraphicsCommandList* BeginUploadCommandList();
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList();
+    void SetTexture(ID3D12Resource* res);
 
 	void Render();
 
@@ -54,6 +55,7 @@ private:
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
     unique_ptr<Font> m_Font;
+    ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
 
 	void CreateDevice();
 	void LoadCapabilities();
