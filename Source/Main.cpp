@@ -1,4 +1,5 @@
 #include "BaseUtils.hpp"
+#include "Settings.hpp"
 #include "Renderer.hpp"
 
 enum EXIT_CODE
@@ -45,6 +46,7 @@ Application::Application()
 
 void Application::Init()
 {
+    ERR_TRY;
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
     SelectAdapter();
@@ -53,6 +55,7 @@ void Application::Init()
     CreateWindow_();
     m_renderer = make_unique<Renderer>(m_dxgiFactory.Get(), m_adapter.Get(), m_wnd);
     m_renderer->Init();
+    ERR_CATCH_MSG(L"Failed to initialize application.");
 }
 
 void Application::SelectAdapter()
@@ -68,7 +71,7 @@ void Application::SelectAdapter()
             return;
         }
     }
-    FAIL("Couldn't find suitable DXGI adapter.");
+    FAIL(L"Couldn't find suitable DXGI adapter.");
 }
 
 LRESULT WINAPI Application::GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)

@@ -48,6 +48,8 @@ private:
 
 void Font::Init()
 {
+    ERR_TRY;
+
     // Create WinFontRender object.
     WinFontRender::SFontDesc fontDesc = {};
     fontDesc.FaceName = L"Segoe UI";
@@ -140,6 +142,8 @@ void Font::Init()
 
     // Setup texture SRV descriptor
     g_renderer->SetTexture(m_Texture.Get());
+    
+    ERR_CATCH_FUNC;
 }
 
 Font::~Font()
@@ -156,12 +160,14 @@ Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd)
 
 void Renderer::Init()
 {
+    ERR_TRY;
 	CreateDevice();
 	LoadCapabilities();
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();
 	CreateResources();
+    ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
 
 Renderer::~Renderer()
@@ -421,6 +427,8 @@ static void SetDefaultDepthStencilDesc(D3D12_DEPTH_STENCIL_DESC& outDesc)
 
 void Renderer::CreateResources()
 {
+    ERR_TRY;
+
 	// Root signature
 	{
         D3D12_ROOT_PARAMETER params[2] = {};
@@ -495,6 +503,8 @@ void Renderer::CreateResources()
         m_Font = std::make_unique<Font>();
         m_Font->Init();
     }
+
+    ERR_CATCH_FUNC;
 }
 
 void Renderer::WaitForFenceOnCpu(UINT64 value)

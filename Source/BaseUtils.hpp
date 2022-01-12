@@ -28,12 +28,14 @@
 #include <limits>
 #include <vector>
 #include <thread>
+#include <initializer_list>
 
 #include <cstdio>
 #include <cstdint>
 #include <cassert>
 #include <cmath>
 #include <cstdarg>
+#include <tchar.h>
 
 using std::unique_ptr;
 using std::make_unique;
@@ -47,23 +49,70 @@ using glm::vec3;
 using glm::vec4;
 using glm::mat4x4;
 
-#define STRINGIZE(x) STRINGIZE2(x)
-#define STRINGIZE2(x) #x
-#define LINE_STRING STRINGIZE(__LINE__)
+struct CloseHandleDeleter
+{
+    typedef HANDLE pointer;
+    void operator()(HANDLE handle) const { CloseHandle(handle); }
+};
+
+struct Exception
+{
+    struct Entry
+    {
+        const wchar_t* m_file; // Can be null.
+        uint32_t m_line;
+        wstring m_message;
+    };
+    std::vector<Entry> m_entries;
+
+    Exception() { }
+    Exception(const wchar_t* file, uint32_t line, const wstr_view& msg)
+    {
+        Push(file, line, msg);
+    }
+    Exception(const wchar_t* file, uint32_t line, std::initializer_list<wstr_view> messages)
+    {
+        for(const auto& msg : messages)
+            Push(file, line, msg);
+    }
+
+    void Push(const wchar_t* file, uint32_t line, const wstr_view& msg)
+    {
+        const wstr_view fileView{file};
+        const size_t lastSlashPos = fileView.find_last_of(L"/\\");
+        m_entries.push_back({file + lastSlashPos + 1, line, wstring(msg.data(), msg.size())});
+    }
+
+    void Print() const;
+};
+
+wstring GetWinApiErrorMessage();
+wstring GetHresultErrorMessage(HRESULT hr);
+
+#define __TFILE__ _T(__FILE__)
 #define FAIL(msgStr)  do { \
-        assert(0 && msgStr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): " msgStr); \
+        throw Exception(__TFILE__, __LINE__, msgStr); \
     } while(false)
 #define CHECK_BOOL(expr)  do { if(!(expr)) { \
-        assert(0 && #expr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): ( " #expr " ) == false"); \
+        throw Exception(__TFILE__, __LINE__, L"(" _T(#expr) L") == false"); \
     } } while(false)
-#define CHECK_HR(expr)  do { if(FAILED(expr)) { \
-        assert(0 && #expr); \
-        throw std::runtime_error(__FILE__ "(" LINE_STRING "): FAILED( " #expr " )"); \
+#define CHECK_BOOL_WINAPI(expr)  do { if(!(expr)) { \
+        throw Exception(__TFILE__, __LINE__, {GetWinApiErrorMessage(), L"(" _T(#expr) L") == false"}); \
+    } } while(false)
+#define CHECK_HR(expr)  do { HRESULT hr__ = (expr); if(FAILED(hr__)) { \
+        throw Exception(__TFILE__, __LINE__, {GetHresultErrorMessage(hr__), L"FAILED(" #expr L")"}); \
     } } while(false)
 
+#define ERR_TRY try {
+#define ERR_CATCH_MSG(msgStr) } catch(Exception& ex) { ex.Push(__TFILE__, __LINE__, (msgStr)); throw; }
+#define ERR_CATCH_FUNC } catch(Exception& ex) { ex.Push(__TFILE__, __LINE__, _T(__FUNCTION__)); throw; }
+
 #define CATCH_PRINT_ERROR(extraCatchCode) \
+    catch(const Exception& ex) \
+    { \
+        ex.Print(); \
+        extraCatchCode \
+    } \
     catch(const std::exception& ex) \
     { \
         fwprintf(stderr, L"ERROR: %hs\n", ex.what()); \
@@ -75,16 +124,10 @@ using glm::mat4x4;
         extraCatchCode \
     }
 
-struct CloseHandleDeleter
-{
-    typedef HANDLE pointer;
-    void operator()(HANDLE handle) const { CloseHandle(handle); }
-};
-
-string VFormat(const str_view& format, va_list argList);
-wstring VFormat(const wstr_view& format, va_list argList);
-string Format(const str_view& format, ...);
-wstring Format(const wstr_view& format, ...);
+string VFormat(const char* format, va_list argList);
+wstring VFormat(const wchar_t* format, va_list argList);
+string Format(const char* format, ...);
+wstring Format(const wchar_t* format, ...);
 
 std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);

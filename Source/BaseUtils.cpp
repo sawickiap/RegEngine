@@ -1,44 +1,103 @@
 #include "BaseUtils.hpp"
 
-string VFormat(const str_view& format, va_list argList)
+void Exception::Print() const
 {
-    const size_t dstLen = (size_t)_vscprintf(format.c_str(), argList);
+    fwprintf(stderr, L"ERROR:\n");
+    for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
+    {
+        if(it->m_file && *it->m_file)
+            fwprintf(stderr, L"%s(%u): %.*s\n", it->m_file, it->m_line, (int)it->m_message.length(), it->m_message.data());
+        else
+            fwprintf(stderr, L"%.*s\n", (int)it->m_message.length(), it->m_message.data());
+    }
+}
+
+wstring GetWinApiErrorMessage()
+{
+    const uint32_t err = GetLastError();
+    wchar_t* msg;
+	uint32_t msgLen = FormatMessage(
+		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, // dwFlags
+		NULL, // lpSource
+		err, // dwMessageId
+		0, // dwLanguageId
+		(LPTSTR)&msg, // lpBuffer (celowe rzutowanie tchar** na tchar* !!!)
+		0, // nSize
+		NULL); // Arguments
+
+    // Trim trailing end of line.
+    while(msgLen && isspace(msg[msgLen-1]))
+        --msgLen;
+
+	wstring result = Format(L"GetLastError() = 0x%08X: %.*s", err, msgLen, msg);
+	LocalFree(msg);
+    return result;
+}
+
+wstring GetHresultErrorMessage(HRESULT hr)
+{
+    const wchar_t* msg = nullptr;
+#define KNOWN_ERROR(symbol) case symbol: msg = _T(#symbol); break;
+    switch(hr)
+    {
+    KNOWN_ERROR(E_ABORT)
+    KNOWN_ERROR(E_ACCESSDENIED)
+    KNOWN_ERROR(E_FAIL)
+    KNOWN_ERROR(E_HANDLE)
+    KNOWN_ERROR(E_INVALIDARG)
+    KNOWN_ERROR(E_NOINTERFACE)
+    KNOWN_ERROR(E_NOTIMPL)
+    KNOWN_ERROR(E_OUTOFMEMORY)
+    KNOWN_ERROR(E_PENDING)
+    KNOWN_ERROR(E_POINTER)
+    KNOWN_ERROR(E_UNEXPECTED)
+    KNOWN_ERROR(S_FALSE)
+    KNOWN_ERROR(S_OK)
+    }
+#undef KNOWN_SYMBOL
+    if(msg)
+        return Format(L"HRESULT = 0x%08X (%s)", hr, msg);
+    else
+        return Format(L"HRESULT = 0x08X", hr);
+}
+
+string VFormat(const char* format, va_list argList)
+{
+    const size_t dstLen = (size_t)_vscprintf(format, argList);
     if(dstLen)
     {
         std::vector<char> buf(dstLen + 1);
-        vsprintf_s(&buf[0], dstLen + 1, format.c_str(), argList);
+        vsprintf_s(&buf[0], dstLen + 1, format, argList);
         return string{buf.data(), buf.data() + dstLen};
     }
     else
         return {};
 }
-wstring VFormat(const wstr_view& format, va_list argList)
+wstring VFormat(const wchar_t* format, va_list argList)
 {
-    const size_t dstLen = (size_t)_vscwprintf(format.c_str(), argList);
+    const size_t dstLen = (size_t)_vscwprintf(format, argList);
     if(dstLen)
     {
         std::vector<wchar_t> buf(dstLen + 1);
-        vswprintf_s(&buf[0], dstLen + 1, format.c_str(), argList);
+        vswprintf_s(&buf[0], dstLen + 1, format, argList);
         return wstring{buf.data(), buf.data() + dstLen};
     }
     else
         return {};
 }
 
-string Format(const str_view& format, ...)
+string Format(const char* format, ...)
 {
-	auto formatStr = format.c_str();
     va_list argList;
-    va_start(argList, formatStr);
+    va_start(argList, format);
     auto result = VFormat(format, argList);
     va_end(argList);
     return result;
 }
-wstring Format(const wstr_view& format, ...)
+wstring Format(const wchar_t* format, ...)
 {
-	auto formatStr = format.c_str();
     va_list argList;
-    va_start(argList, formatStr);
+    va_start(argList, format);
     auto result = VFormat(format, argList);
     va_end(argList);
     return result;
@@ -46,6 +105,8 @@ wstring Format(const wstr_view& format, ...)
 
 std::vector<char> LoadFile(const wstr_view& path)
 {
+    ERR_TRY;
+
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName
 		GENERIC_READ, // dwDesiredAccess
@@ -54,7 +115,7 @@ std::vector<char> LoadFile(const wstr_view& path)
 		OPEN_EXISTING, // dwCreationDisposition
 		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, // dwFlagsAndAttributes
 		NULL); // hTemplateFile
-	CHECK_BOOL(handle != INVALID_HANDLE_VALUE);
+	CHECK_BOOL_WINAPI(handle != INVALID_HANDLE_VALUE);
 	unique_ptr<HANDLE, CloseHandleDeleter> handlePtr(handle);
 
 	LARGE_INTEGER sizeInt = {};
@@ -70,6 +131,8 @@ std::vector<char> LoadFile(const wstr_view& path)
 	CHECK_BOOL(numberOfBytesRead == numberOfBytesRead);
 	
 	return bytes;
+
+    ERR_CATCH_MSG(Format(L"Cannot load file \"%s\".", path.c_str()));
 }
 
 // For C++ threads as threadId you can use:
