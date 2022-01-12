@@ -22,3 +22,4 @@ The project uses following thirt-party libraries:
 - **[d3dx12.h](https://github.com/microsoft/DirectX-Headers)** - D3D12 helpers by Microsoft. License: MIT. Directory: ThirdParty/d3dx12.
 - **[GLM](https://github.com/g-truc/glm)** - mathematics library for graphics software by G-Truc Creation. License: The Happy Bunny License or MIT. Directory: ThirdParty/glm.
 - **[str_view](https://github.com/sawickiap/str_view)** - "Null-termination-aware string-view class for C++" by Adam Sawicki. License: MIT. Directory: ThirdParty/str_view.
+- **[WinFontRender](https://github.com/sawickiap/WinFontRender)** - a library that renders Windows fonts in graphics applications by Adam Sawicki. License: Modified MIT. Directory: ThirdParty/WinFontRender.

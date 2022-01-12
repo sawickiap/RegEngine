@@ -1,11 +1,14 @@
 #include "BaseUtils.hpp"
 #include "Renderer.hpp"
 #include <pix3.h>
+#include "../ThirdParty/WinFontRender/WinFontRender.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 static const int SIZE_X = 1024; // TODO: unify with same in Main.cpp
 static const int SIZE_Y = 576; // TODO: unify with same in Main.cpp
+
+static Renderer* g_renderer;
 
 class PixEventScope
 {
@@ -30,11 +33,118 @@ private:
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PixEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
+class Font
+{
+public:
+    void Init();
+    ~Font();
+
+private:
+    static const DXGI_FORMAT FORMAT = DXGI_FORMAT_R8_UNORM;
+
+    WinFontRender::CFont m_WinFont;
+    ComPtr<ID3D12Resource> m_Texture;
+};
+
+void Font::Init()
+{
+    // Create WinFontRender object.
+    WinFontRender::SFontDesc fontDesc = {};
+    fontDesc.FaceName = L"Segoe UI";
+    fontDesc.Height = 9;
+    CHECK_BOOL(m_WinFont.Init(fontDesc));
+
+    // Fetch texture data.
+    WinFontRender::uvec2 textureDataSize = WinFontRender::uvec2(0, 0);
+    size_t textureDataRowPitch = SIZE_MAX;
+    const void* textureDataPtr = nullptr;
+    m_WinFont.GetTextureData(textureDataPtr, textureDataSize, textureDataRowPitch);
+
+    // Create source buffer.
+    const uint32_t srcBufRowPitch = std::max<uint32_t>(textureDataSize.x, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    const uint32_t srcBufSize = srcBufRowPitch * textureDataSize.y;
+    ComPtr<ID3D12Resource> srcBuf;
+    {
+        const CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
+        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
+        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &desc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, // pOptimizedClearValue
+            IID_PPV_ARGS(&srcBuf)));
+        srcBuf->SetName(L"Font texture source buffer");
+    }
+
+    // Fill source buffer.
+    {
+        CD3DX12_RANGE readEmptyRange{0, 0};
+        void* srcBufMappedPtr = nullptr;
+        CHECK_HR(srcBuf->Map(
+            0, // Subresource
+            &readEmptyRange, // pReadRange
+            &srcBufMappedPtr));
+        for(uint32_t y = 0; y < textureDataSize.y; ++y)
+        {
+            memcpy(srcBufMappedPtr, textureDataPtr, textureDataSize.x);
+            textureDataPtr = (char*)textureDataPtr + textureDataSize.x;
+            srcBufMappedPtr = (char*)srcBufMappedPtr + textureDataSize.x;
+        }
+        srcBuf->Unmap(0, // Subresource
+            nullptr); // pWrittenRange
+    }
+    m_WinFont.FreeTextureData();
+
+    // Create destination texture.
+    {
+        CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+            FORMAT, // format
+            textureDataSize.x, // width
+            textureDataSize.y, // height
+            1, // arraySize
+            1); // mipLevels
+        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_DEFAULT};
+        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &resDesc,
+            D3D12_RESOURCE_STATE_COPY_DEST,
+            nullptr, // pOptimizedClearValue
+            IID_PPV_ARGS(&m_Texture)));
+        m_Texture->SetName(L"Font");
+    }
+
+    // Copy the data.
+    {
+        auto cmdList = g_renderer->BeginUploadCommandList();
+
+        CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
+            {FORMAT, textureDataSize.x, textureDataSize.y, 1, srcBufRowPitch}};
+        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
+        CD3DX12_BOX srcBox{
+            0, 0, 0, // Left, Top, Front
+            (LONG)textureDataSize.x, (LONG)textureDataSize.y, 1}; // Right, Bottom, Back
+
+        cmdList->CopyTextureRegion(&dst,
+            0, 0, 0, // DstX, DstY, DstZ
+            &src, &srcBox);
+
+        g_renderer->CompleteUploadCommandList();
+    }
+}
+
+Font::~Font()
+{
+}
+
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
 	m_dxgiFactory{dxgiFactory},
 	m_adapter{adapter},
 	m_wnd(wnd)
 {
+    g_renderer = this;
 }
 
 void Renderer::Init()
@@ -49,6 +159,8 @@ void Renderer::Init()
 
 Renderer::~Renderer()
 {
+    g_renderer = nullptr;
+
 	try
 	{
 		m_cmdQueue->Signal(m_fence.Get(), m_nextFenceValue);
@@ -58,84 +170,99 @@ Renderer::~Renderer()
 	CATCH_PRINT_ERROR(;);
 }
 
+ID3D12GraphicsCommandList* Renderer::BeginUploadCommandList()
+{
+    WaitForFenceOnCpu(m_uploadCmdListSubmittedFenceValue);
+    CHECK_HR(m_uploadCmdList->Reset(m_cmdAllocator.Get(), NULL));
+    return m_uploadCmdList.Get();
+}
+
+void Renderer::CompleteUploadCommandList()
+{
+    CHECK_HR(m_uploadCmdList->Close());
+
+	ID3D12CommandList* const baseCmdList = m_uploadCmdList.Get();
+	m_cmdQueue->ExecuteCommandLists(1, &baseCmdList);
+
+	m_uploadCmdListSubmittedFenceValue = m_nextFenceValue++;
+	CHECK_HR(m_cmdQueue->Signal(m_fence.Get(), m_uploadCmdListSubmittedFenceValue));
+
+    WaitForFenceOnCpu(m_uploadCmdListSubmittedFenceValue);
+}
+
 void Renderer::Render()
 {
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	FrameResources& frameRes = m_frameResources[m_frameIndex];
 	ID3D12GraphicsCommandList* const cmdList = frameRes.m_cmdList.Get();
 
-    PIX_EVENT_SCOPE(cmdList, L"FRAME");
+    WaitForFenceOnCpu(frameRes.m_submittedFenceValue);
 
-	if(m_fence->GetCompletedValue() < frameRes.m_submittedFenceValue)
-	{
-		CHECK_HR(m_fence->SetEventOnCompletion(frameRes.m_submittedFenceValue, m_fenceEvent.get()));
-		WaitForSingleObject(m_fenceEvent.get(), INFINITE);
-	}
-
-	CHECK_HR(frameRes.m_cmdAllocator->Reset());
-	CHECK_HR(cmdList->Reset(frameRes.m_cmdAllocator.Get(), NULL));
-
-	CD3DX12_RESOURCE_BARRIER presentToRenderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		frameRes.m_backBuffer.Get(),
-		D3D12_RESOURCE_STATE_PRESENT,
-		D3D12_RESOURCE_STATE_RENDER_TARGET);
-	cmdList->ResourceBarrier(1, &presentToRenderTargetBarrier);
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
-		m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
-		(INT)m_frameIndex, m_capabilities.m_descriptorSize_RTV};
-
-    float time = (float)GetTickCount() * 1e-3f;
-	float color = sin(time) * 0.5f + 0.5f;
-	//float pos = fmod(time * 100.f, (float)SIZE_X);
+	CHECK_HR(cmdList->Reset(m_cmdAllocator.Get(), NULL));
     {
-        PIX_EVENT_SCOPE(cmdList, L"Clear");
-	    const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
-	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+        PIX_EVENT_SCOPE(cmdList, L"FRAME");
+
+        CD3DX12_RESOURCE_BARRIER presentToRenderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		    frameRes.m_backBuffer.Get(),
+		    D3D12_RESOURCE_STATE_PRESENT,
+		    D3D12_RESOURCE_STATE_RENDER_TARGET);
+	    cmdList->ResourceBarrier(1, &presentToRenderTargetBarrier);
+
+	    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
+		    m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
+		    (INT)m_frameIndex, m_capabilities.m_descriptorSize_RTV};
+
+        float time = (float)GetTickCount() * 1e-3f;
+	    float color = sin(time) * 0.5f + 0.5f;
+	    //float pos = fmod(time * 100.f, (float)SIZE_X);
+        {
+            PIX_EVENT_SCOPE(cmdList, L"Clear");
+	        const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
+	        cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+        }
+
+	    cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
+
+	    cmdList->SetPipelineState(m_pipelineState.Get());
+
+	    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
+
+        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)SIZE_X, (float)SIZE_Y, 0.f, 1.f};
+        cmdList->RSSetViewports(1, &viewport);
+
+	    const D3D12_RECT scissorRect = {0, 0, SIZE_X, SIZE_Y};
+	    cmdList->RSSetScissorRects(1, &scissorRect);
+
+	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
+        const mat4x4 view = glm::lookAtLH(
+            vec3(0.f, 2.f, 0.5f), // eye
+            vec3(0.f), // center
+            vec3(0.f, 0.f, 1.f)); // up
+        const mat4x4 proj = glm::perspectiveFovLH(
+            glm::radians(80.0f), // fov
+            (float)SIZE_X, (float)SIZE_Y,
+            0.5f, // zNear
+            100.f); // zFar
+        mat4x4 worldViewProj = proj * view * world;
+
+        cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
+
+	    cmdList->DrawInstanced(3, 1, 0, 0);
+
+	    /*
+	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
+	    const D3D12_RECT clearRect = {(int)pos, 32, (int)pos + 32, 32 + 32};
+	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
+	    */
+
+	    CD3DX12_RESOURCE_BARRIER renderTargetToPresentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+		    frameRes.m_backBuffer.Get(),
+		    D3D12_RESOURCE_STATE_RENDER_TARGET,
+		    D3D12_RESOURCE_STATE_PRESENT);
+	    cmdList->ResourceBarrier(1, &renderTargetToPresentBarrier);
     }
-
-	cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
-
-	cmdList->SetPipelineState(m_pipelineState.Get());
-
-	cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
-
-    D3D12_VIEWPORT viewport = {0.f, 0.f, (float)SIZE_X, (float)SIZE_Y, 0.f, 1.f};
-    cmdList->RSSetViewports(1, &viewport);
-
-	const D3D12_RECT scissorRect = {0, 0, SIZE_X, SIZE_Y};
-	cmdList->RSSetScissorRects(1, &scissorRect);
-
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
-    const mat4x4 view = glm::lookAtLH(
-        vec3(0.f, 2.f, 0.5f), // eye
-        vec3(0.f), // center
-        vec3(0.f, 0.f, 1.f)); // up
-    const mat4x4 proj = glm::perspectiveFovLH(
-        glm::radians(80.0f), // fov
-        (float)SIZE_X, (float)SIZE_Y,
-        0.5f, // zNear
-        100.f); // zFar
-    mat4x4 worldViewProj = proj * view * world;
-
-    cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
-
-	cmdList->DrawInstanced(3, 1, 0, 0);
-
-	/*
-	const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
-	const D3D12_RECT clearRect = {(int)pos, 32, (int)pos + 32, 32 + 32};
-	cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
-	*/
-
-	CD3DX12_RESOURCE_BARRIER renderTargetToPresentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		frameRes.m_backBuffer.Get(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET,
-		D3D12_RESOURCE_STATE_PRESENT);
-	cmdList->ResourceBarrier(1, &renderTargetToPresentBarrier);
-	
 	CHECK_HR(cmdList->Close());
 
 	ID3D12CommandList* const baseCmdList = cmdList;
@@ -172,6 +299,16 @@ void Renderer::CreateCommandQueues()
 	
 	CHECK_HR(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_fence));
     m_fence->SetName(L"Main fence");
+
+	CHECK_HR(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
+		&m_cmdAllocator));
+    m_cmdAllocator->SetName(L"Command allocator");
+
+	CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+		m_cmdAllocator.Get(), NULL,
+		IID_PPV_ARGS(&m_uploadCmdList)));
+	CHECK_HR(m_uploadCmdList->Close());
+    m_uploadCmdList->SetName(L"Upload command list");
 }
 
 void Renderer::CreateSwapChain()
@@ -207,15 +344,11 @@ void Renderer::CreateFrameResources()
 	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart();
 	for(uint32_t i = 0; i < FRAME_COUNT; ++i)
 	{
-		CHECK_HR(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
-			&m_frameResources[i].m_cmdAllocator));
-        m_frameResources[i].m_cmdAllocator->SetName(Format(L"Command allocator %u", i).c_str());
-
 		CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			m_frameResources[i].m_cmdAllocator.Get(), NULL,
-			__uuidof(ID3D12CommandList), &m_frameResources[i].m_cmdList));
-        m_frameResources[i].m_cmdList->SetName(Format(L"Command list %u", i).c_str());
+			m_cmdAllocator.Get(), NULL,
+			IID_PPV_ARGS(&m_frameResources[i].m_cmdList)));
 		CHECK_HR(m_frameResources[i].m_cmdList->Close());
+        m_frameResources[i].m_cmdList->SetName(Format(L"Command list %u", i).c_str());
 
 		CHECK_HR(m_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_frameResources[i].m_backBuffer));
 
@@ -317,5 +450,17 @@ void Renderer::CreateResources()
 		SetDefaultDepthStencilDesc(desc.DepthStencilState);
 		CHECK_HR(m_device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_pipelineState));
         m_pipelineState->SetName(L"Test pipeline state");
+	}
+
+    m_Font = std::make_unique<Font>();
+    m_Font->Init();
+}
+
+void Renderer::WaitForFenceOnCpu(UINT64 value)
+{
+	if(m_fence->GetCompletedValue() < value)
+	{
+		CHECK_HR(m_fence->SetEventOnCompletion(value, m_fenceEvent.get()));
+		WaitForSingleObject(m_fenceEvent.get(), INFINITE);
 	}
 }

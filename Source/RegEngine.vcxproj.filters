@@ -4,6 +4,7 @@
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="BaseUtils.cpp" />
+    <ClCompile Include="WinFontRenderImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -15,6 +16,9 @@
     <Filter Include="ThirdParty\str_view">
       <UniqueIdentifier>{e84a03cf-1687-49f4-9ea0-f72017fe4431}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThirdParty\WinFontRender">
+      <UniqueIdentifier>{995b9c9c-45b3-4942-bd5c-8d79a34055d5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
@@ -25,6 +29,9 @@
     </ClInclude>
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="Renderer.hpp" />
+    <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h">
+      <Filter>ThirdParty\WinFontRender</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
