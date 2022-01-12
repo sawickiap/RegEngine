@@ -12,7 +12,7 @@ The project is open source under MIT license. See file [LICENSE.txt](LICENSE.txt
 
 The project depends on:
 
-- C++ standard library, including the latest C++20 features like modules
+- C++ standard library, including some of the latest C++11/14/17/20 features
 - WinAPI from Windows 10 with some reasonably new Windows SDK
 - Direct3D 12
 - Visual Studio 2022
