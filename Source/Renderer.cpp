@@ -1,23 +1,13 @@
-module;
-
 #include "BaseUtils.hpp"
-#include "WindowsUtils.h"
-#include "MathUtils.hpp"
-#include "D3d12Utils.hpp"
+#include "Renderer.hpp"
 #include <pix3.h>
 
-export module Renderer;
-
-import BaseUtils;
-import WindowsUtils;
-
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
-static const uint32_t FRAME_COUNT = 3;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 static const int SIZE_X = 1024; // TODO: unify with same in Main.cpp
 static const int SIZE_Y = 576; // TODO: unify with same in Main.cpp
 
-export class PixEventScope
+class PixEventScope
 {
 public:
     // Warning! msg is actually a formatting string, so don't use '%'!
@@ -39,57 +29,6 @@ private:
 #define HELPER_CAT_2(a, b) HELPER_CAT_1(a, b)
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PixEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
-
-export class Renderer
-{
-public:
-	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
-	void Init();
-	~Renderer();
-
-	void Render();
-
-private:
-	struct FrameResources
-	{
-		ComPtr<ID3D12CommandAllocator> m_cmdAllocator;
-		ComPtr<ID3D12GraphicsCommandList> m_cmdList;
-		ComPtr<ID3D12Resource> m_backBuffer;
-		UINT64 m_submittedFenceValue = 0;
-	};
-
-	struct Capabilities
-	{
-		UINT m_descriptorSize_CVB_SRV_UAV = UINT32_MAX;
-		UINT m_descriptorSize_sampler = UINT32_MAX;
-		UINT m_descriptorSize_RTV = UINT32_MAX;
-		UINT m_descriptorSize_DSV = UINT32_MAX;
-	};
-
-	IDXGIFactory4* const m_dxgiFactory;
-	IDXGIAdapter1* const m_adapter;
-	const HWND m_wnd;
-
-	ComPtr<ID3D12Device> m_device;
-	Capabilities m_capabilities;
-	ComPtr<ID3D12CommandQueue> m_cmdQueue;
-	ComPtr<ID3D12Fence> m_fence;
-	UINT64 m_nextFenceValue = 1;
-	ComPtr<IDXGISwapChain3> m_swapChain;
-	ComPtr<ID3D12DescriptorHeap> m_swapChainRtvDescriptors;
-	std::array<FrameResources, FRAME_COUNT> m_frameResources;
-	UINT m_frameIndex = UINT32_MAX;
-	unique_ptr<HANDLE, CloseHandleDeleter> m_fenceEvent;
-	ComPtr<ID3D12RootSignature> m_rootSignature;
-	ComPtr<ID3D12PipelineState> m_pipelineState;
-
-	void CreateDevice();
-	void LoadCapabilities();
-	void CreateCommandQueues();
-	void CreateSwapChain();
-	void CreateFrameResources();
-	void CreateResources();
-};
 
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
 	m_dxgiFactory{dxgiFactory},

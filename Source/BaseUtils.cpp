@@ -1,14 +1,50 @@
-module;
-
-#include "WindowsUtils.h"
 #include "BaseUtils.hpp"
-#include <vector>
 
-export module WindowsUtils;
+string VFormat(const str_view& format, va_list argList)
+{
+    const size_t dstLen = (size_t)_vscprintf(format.c_str(), argList);
+    if(dstLen)
+    {
+        std::vector<char> buf(dstLen + 1);
+        vsprintf_s(&buf[0], dstLen + 1, format.c_str(), argList);
+        return string{buf.data(), buf.data() + dstLen};
+    }
+    else
+        return {};
+}
+wstring VFormat(const wstr_view& format, va_list argList)
+{
+    const size_t dstLen = (size_t)_vscwprintf(format.c_str(), argList);
+    if(dstLen)
+    {
+        std::vector<wchar_t> buf(dstLen + 1);
+        vswprintf_s(&buf[0], dstLen + 1, format.c_str(), argList);
+        return wstring{buf.data(), buf.data() + dstLen};
+    }
+    else
+        return {};
+}
 
-import BaseUtils;
+string Format(const str_view& format, ...)
+{
+	auto formatStr = format.c_str();
+    va_list argList;
+    va_start(argList, formatStr);
+    auto result = VFormat(format, argList);
+    va_end(argList);
+    return result;
+}
+wstring Format(const wstr_view& format, ...)
+{
+	auto formatStr = format.c_str();
+    va_list argList;
+    va_start(argList, formatStr);
+    auto result = VFormat(format, argList);
+    va_end(argList);
+    return result;
+}
 
-export std::vector<char> LoadFile(const wstr_view& path)
+std::vector<char> LoadFile(const wstr_view& path)
 {
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName
@@ -38,7 +74,7 @@ export std::vector<char> LoadFile(const wstr_view& path)
 
 // For C++ threads as threadId you can use:
 // GetThreadId((HANDLE)t.native_handle());
-export void SetThreadName(DWORD threadId, const str_view& name)
+void SetThreadName(DWORD threadId, const str_view& name)
 {
     // Code found in: https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
 

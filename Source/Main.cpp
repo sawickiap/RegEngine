@@ -1,9 +1,5 @@
-#include "WindowsUtils.h"
-#include "D3d12Utils.hpp"
 #include "BaseUtils.hpp"
-
-import WindowsUtils;
-import Renderer;
+#include "Renderer.hpp"
 
 enum EXIT_CODE
 {

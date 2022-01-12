@@ -19,6 +19,6 @@ The project depends on:
 
 The project uses following thirt-party libraries:
 
-- [d3dx12.h](https://github.com/microsoft/DirectX-Headers) D3D12 helpers by Microsoft. License: MIT. Directory: ThirdParty/d3dx12.
-- [GLM](https://github.com/g-truc/glm) OpenGL mathematics library for graphics software by G-Truc Creation. License: The Happy Bunny License or MIT. Directory: ThirdParty/glm.
-- [str_view](https://github.com/sawickiap/str_view) "Null-termination-aware string-view class for C++" by Adam Sawicki. License: MIT. Directory: ThirdParty/str_view.
+- **[d3dx12.h](https://github.com/microsoft/DirectX-Headers)** - D3D12 helpers by Microsoft. License: MIT. Directory: ThirdParty/d3dx12.
+- **[GLM](https://github.com/g-truc/glm)** - mathematics library for graphics software by G-Truc Creation. License: The Happy Bunny License or MIT. Directory: ThirdParty/glm.
+- **[str_view](https://github.com/sawickiap/str_view)** - "Null-termination-aware string-view class for C++" by Adam Sawicki. License: MIT. Directory: ThirdParty/str_view.
