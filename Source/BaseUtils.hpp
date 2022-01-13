@@ -128,6 +128,19 @@ wstring GetHresultErrorMessage(HRESULT hr);
         extraCatchCode \
     }
 
+template<typename CharT>
+void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_template<CharT>& str, size_t offset)
+{
+    outRow = outCol = 1;
+    for(size_t i = 0; i < offset; ++i)
+    {
+        if(str[i] == (CharT)'\n')
+            ++outRow, outCol = 1;
+        else
+            ++outCol;
+    }
+}
+
 // As codePage use e.g. CP_ACP (system ASCII code page), CP_UTF8, 125 for Windows-1250.
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage);
 wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);

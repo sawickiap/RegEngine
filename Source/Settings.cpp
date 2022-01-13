@@ -4,6 +4,17 @@
 #include "../ThirdParty/rapidjson/include/rapidjson/document.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/stringbuffer.h"
+#include "../ThirdParty/rapidjson/include/rapidjson/error/en.h"
+
+static void ThrowParseError(const rapidjson::Document& doc, const str_view& str)
+{
+    assert(doc.HasParseError());
+    const auto errorCode = doc.GetParseError();
+    const char* const errorMsg = rapidjson::GetParseError_En(errorCode);
+    uint32_t row, col;
+    StringOffsetToRowCol(row, col, str, doc.GetErrorOffset());
+    FAIL(Format(L"RapidJSON parsing error: row=%u, column=%u, code=%i \"%hs\"", row, col, (int)errorCode, errorMsg));
+}
 
 class SettingCollection
 {
@@ -49,9 +60,11 @@ void SettingCollection::LoadFromFile(const wstr_view& filePath)
     using namespace rapidjson;
     auto fileContents = LoadFile(filePath);
     Document doc;
-    doc.Parse<kParseCommentsFlag | kParseTrailingCommasFlag | kParseNanAndInfFlag | kParseEscapedApostropheFlag | kParseValidateEncodingFlag>(
+    doc.Parse<kParseCommentsFlag | kParseTrailingCommasFlag | kParseNanAndInfFlag | kParseValidateEncodingFlag>(
         fileContents.data(), fileContents.size());
-    // TODO check error
+    if(doc.HasParseError())
+        ThrowParseError(doc, str_view{fileContents.data(), fileContents.size()});
+    CHECK_BOOL(doc.IsObject());
     for(Setting* setting : m_settings)
     {
         const auto memberIt = doc.FindMember(setting->GetName().c_str());
