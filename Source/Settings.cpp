@@ -5,38 +5,6 @@
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/stringbuffer.h"
 
-using namespace rapidjson;
-void foo()
-{
-    auto fileContents = LoadFile(L"StartupSettings.json");
-
-    Document doc;
-    doc.Parse<kParseCommentsFlag | kParseTrailingCommasFlag | kParseNanAndInfFlag | kParseEscapedApostropheFlag>(
-        fileContents.data(), fileContents.size());
-    assert(doc.IsObject());
-    assert(doc.HasMember("foo"));
-    assert(doc["foo"].IsNumber());
-    assert(doc["foo"].GetInt() == 1);
-
-    /*
-    // 1. Parse a JSON string into DOM.
-    const char* json = "{\"project\":\"rapidjson\",\"stars\":10}";
-    Document d;
-    d.Parse(json);
- 
-    // 2. Modify it by DOM.
-    Value& s = d["stars"];
-    s.SetInt(s.GetInt() + 1);
- 
-    // 3. Stringify the DOM
-    StringBuffer buffer;
-    Writer<StringBuffer> writer(buffer);
-    d.Accept(writer);
- 
-    // Output {"project":"rapidjson","stars":11}
-    */
-}
-
 class SettingCollection
 {
 public:
@@ -44,6 +12,8 @@ public:
     {
         m_settings.push_back(setting);
     }
+
+    void LoadFromFile(const wstr_view& filePath);
 private:
     std::vector<Setting*> m_settings;
 };
@@ -61,9 +31,42 @@ public:
             assert(0);
     }
 
+    void LoadStartupSettings();
+
 private:
     SettingCollection m_startupSettings;
 };
+
+Setting::Setting(SettingCategory category, const str_view& name) :
+    m_name{name.data(), name.size()}
+{
+    SettingManager::GetSingleton().Register(category, this);
+}
+
+void SettingCollection::LoadFromFile(const wstr_view& filePath)
+{
+    ERR_TRY;
+    using namespace rapidjson;
+    auto fileContents = LoadFile(filePath);
+    Document doc;
+    doc.Parse<kParseCommentsFlag | kParseTrailingCommasFlag | kParseNanAndInfFlag | kParseEscapedApostropheFlag | kParseValidateEncodingFlag>(
+        fileContents.data(), fileContents.size());
+    // TODO check error
+    for(Setting* setting : m_settings)
+    {
+        const auto memberIt = doc.FindMember(setting->GetName().c_str());
+        if(memberIt != doc.MemberEnd())
+        {
+            setting->LoadFromJson(&memberIt->value);
+        }
+        else
+        {
+            wprintf(L"WARNING: Setting \"%.*hs\" not found. Leaving current value.\n",
+                (int)setting->GetName().size(), setting->GetName().data());
+        }
+    }
+    ERR_CATCH_MSG(Format(L"Cannot load settings from file \"%.*s\".", (int)filePath.size(), filePath.data()));
+}
 
 SettingManager& SettingManager::GetSingleton()
 {
@@ -71,23 +74,51 @@ SettingManager& SettingManager::GetSingleton()
     return mgr;
 }
 
-Setting::Setting(SettingCategory category, const wstr_view& name) :
-    m_name{name.data(), name.size()}
+void SettingManager::LoadStartupSettings()
 {
-    SettingManager::GetSingleton().Register(category, this);
+    ERR_TRY;
+    wprintf(L"Loading statup settings...\n");
+    m_startupSettings.LoadFromFile(L"StartupSettings.json");
+    ERR_CATCH_MSG(L"Cannot load startup settings.");
 }
 
-template<typename T>
-ScalarSetting<T>::ScalarSetting(SettingCategory category, const wstr_view& name, T defaultValue) :
-    Setting(category, name),
-    m_value(defaultValue)
+void FloatSetting::LoadFromJson(const void* jsonVal)
 {
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsFloat())
+        m_value = realVal->GetFloat();
+    else
+        wprintf(Format(L"WARNING: Invalid float setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
 }
 
-template<typename T>
-NumericSetting<T>::NumericSetting(SettingCategory category, const wstr_view& name, T defaultValue, T minValue, T maxValue) :
-    ScalarSetting<T>(category, name, defaultValue),
-    m_minValue{minValue},
-    m_maxValue{maxValue}
+void UintSetting::LoadFromJson(const void* jsonVal)
 {
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsUint())
+        m_value = realVal->GetUint();
+    else
+        wprintf(Format(L"WARNING: Invalid uint setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
+}
+
+void IntSetting::LoadFromJson(const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsInt())
+        m_value = realVal->GetInt();
+    else
+        wprintf(Format(L"WARNING: Invalid int setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
+}
+
+void StringSetting::LoadFromJson(const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsString())
+        m_value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
+    else
+        wprintf(Format(L"WARNING: Invalid string setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
+}
+
+void LoadStartupSettings()
+{
+    SettingManager::GetSingleton().LoadStartupSettings();
 }

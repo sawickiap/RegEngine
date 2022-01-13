@@ -47,8 +47,10 @@ Application::Application()
 void Application::Init()
 {
     ERR_TRY;
+    wprintf(L"Application starting.\n");
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
+    LoadStartupSettings();
     SelectAdapter();
     assert(m_adapter);
     RegisterWindowClass();

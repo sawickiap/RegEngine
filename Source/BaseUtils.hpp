@@ -29,6 +29,7 @@
 #include <vector>
 #include <thread>
 #include <initializer_list>
+#include <limits>
 
 #include <cstdio>
 #include <cstdint>
@@ -78,9 +79,12 @@ struct Exception
 
     void Push(const wchar_t* file, uint32_t line, const wstr_view& msg)
     {
-        const wstr_view fileView{file};
-        const size_t lastSlashPos = fileView.find_last_of(L"/\\");
-        m_entries.push_back({file + lastSlashPos + 1, line, wstring(msg.data(), msg.size())});
+        if(!msg.empty())
+        {
+            const wstr_view fileView{file};
+            const size_t lastSlashPos = fileView.find_last_of(L"/\\");
+            m_entries.push_back({file + lastSlashPos + 1, line, wstring(msg.data(), msg.size())});
+        }
     }
 
     void Print() const;
@@ -123,6 +127,10 @@ wstring GetHresultErrorMessage(HRESULT hr);
         fwprintf(stderr, L"UNKNOWN ERROR.\n"); \
         extraCatchCode \
     }
+
+// As codePage use e.g. CP_ACP (system ASCII code page), CP_UTF8, 125 for Windows-1250.
+string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage);
+wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);
 
 string VFormat(const char* format, va_list argList);
 wstring VFormat(const wchar_t* format, va_list argList);

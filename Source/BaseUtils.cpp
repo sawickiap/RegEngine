@@ -61,6 +61,34 @@ wstring GetHresultErrorMessage(HRESULT hr)
         return Format(L"HRESULT = 0x08X", hr);
 }
 
+string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage)
+{
+    if(str.empty())
+        return string{};
+    const int size = WideCharToMultiByte(codePage, 0, str.data(), (int)str.size(), NULL, 0, NULL, FALSE);
+    if(size == 0)
+        return string{};
+    std::vector<char> buf((size_t)size);
+    const int result = WideCharToMultiByte(codePage, 0, str.data(), (int)str.size(), buf.data(), size, NULL, FALSE);
+    if(result == 0)
+        return string{};
+    return string{buf.data(), buf.size()};
+}
+
+wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage)
+{
+    if(str.empty())
+        return wstring{};
+    const int size = MultiByteToWideChar(codePage, 0, str.data(), (int)str.size(), NULL, 0);
+    if(size == 0)
+        return wstring{};
+    std::vector<wchar_t> buf((size_t)size);
+    const int result = MultiByteToWideChar(codePage, 0, str.data(), (int)str.size(), buf.data(), size);
+    if(result == 0)
+        return wstring{};
+    return wstring{buf.data(), buf.size()};
+}
+
 string VFormat(const char* format, va_list argList)
 {
     const size_t dstLen = (size_t)_vscprintf(format, argList);
@@ -106,6 +134,8 @@ wstring Format(const wchar_t* format, ...)
 std::vector<char> LoadFile(const wstr_view& path)
 {
     ERR_TRY;
+
+    wprintf(Format(L"Loading file \"%.*s\"...\n", (int)path.size(), path.data()).c_str());
 
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName
