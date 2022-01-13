@@ -93,6 +93,10 @@ struct Exception
 wstring GetWinApiErrorMessage();
 wstring GetHresultErrorMessage(HRESULT hr);
 
+// Use this macro to pass the 2 parameters to formatting function matching formatting string like "%.*s", "%.*hs" etc.
+// for s of type like std::string, std::wstring, str_view, wstr_view.
+#define STR_TO_FORMAT(s) (int)(s).size(), (s).data()
+
 #define __TFILE__ _T(__FILE__)
 #define FAIL(msgStr)  do { \
         throw Exception(__TFILE__, __LINE__, msgStr); \

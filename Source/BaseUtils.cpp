@@ -10,9 +10,9 @@ void Exception::Print() const
     for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
     {
         if(it->m_file && *it->m_file)
-            fwprintf(stderr, L"%s(%u): %.*s\n", it->m_file, it->m_line, (int)it->m_message.length(), it->m_message.data());
+            fwprintf(stderr, L"%s(%u): %.*s\n", it->m_file, it->m_line, STR_TO_FORMAT(it->m_message));
         else
-            fwprintf(stderr, L"%.*s\n", (int)it->m_message.length(), it->m_message.data());
+            fwprintf(stderr, L"%.*s\n", STR_TO_FORMAT(it->m_message));
     }
 }
 
@@ -33,7 +33,7 @@ wstring GetWinApiErrorMessage()
     while(msgLen && isspace(msg[msgLen-1]))
         --msgLen;
 
-	wstring result = Format(L"GetLastError() = 0x%08X: %.*s", err, msgLen, msg);
+	wstring result = Format(L"GetLastError() = 0x%08X: %.*s", err, (int)msgLen, msg);
 	LocalFree(msg);
     return result;
 }
@@ -139,7 +139,7 @@ std::vector<char> LoadFile(const wstr_view& path)
 {
     ERR_TRY;
 
-    wprintf(Format(L"Loading file \"%.*s\"...\n", (int)path.size(), path.data()).c_str());
+    wprintf(Format(L"Loading file \"%.*s\"...\n", STR_TO_FORMAT(path)).c_str());
 
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName
