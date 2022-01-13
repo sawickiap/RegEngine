@@ -9,6 +9,14 @@ static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 
 extern VecSetting<glm::uvec2> g_size;
 
+static UintSetting g_frameCount(SettingCategory::Startup, "FrameCount", 3);
+static StringSetting g_fontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
+static IntSetting g_fontHeight(SettingCategory::Startup, "Font.Height", 32);
+static UintSetting g_fontFlags(SettingCategory::Startup, "Font.Flags", 0);
+
+static BoolSetting g_usePixEvents(SettingCategory::Load, "UsePixEvents", true);
+static UintSetting g_syncInterval(SettingCategory::Load, "SyncInterval", 1);
+
 static Renderer* g_renderer;
 
 class PixEventScope
@@ -18,11 +26,13 @@ public:
     PixEventScope(ID3D12GraphicsCommandList* cmdList, const wstr_view& msg) :
         m_cmdList{cmdList}
     {
-        PIXBeginEvent(m_cmdList, 0, msg.c_str());
+        if(g_usePixEvents.GetValue())
+            PIXBeginEvent(m_cmdList, 0, msg.c_str());
     }
     ~PixEventScope()
     {
-        PIXEndEvent(m_cmdList);
+        if(g_usePixEvents.GetValue())
+            PIXEndEvent(m_cmdList);
     }
 
 private:
@@ -53,8 +63,9 @@ void Font::Init()
 
     // Create WinFontRender object.
     WinFontRender::SFontDesc fontDesc = {};
-    fontDesc.FaceName = L"Segoe UI";
-    fontDesc.Height = 32;
+    fontDesc.FaceName = g_fontFaceName.GetValue();
+    fontDesc.Height = g_fontHeight.GetValue();
+    fontDesc.Flags = g_fontFlags.GetValue();
     CHECK_BOOL(m_WinFont.Init(fontDesc));
 
     // Fetch texture data.
@@ -77,7 +88,7 @@ void Font::Init()
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
             IID_PPV_ARGS(&srcBuf)));
-        srcBuf->SetName(L"Font texture source buffer");
+        SetD3d12ObjectName(srcBuf, L"Font texture source buffer");
     }
 
     // Fill source buffer.
@@ -115,7 +126,7 @@ void Font::Init()
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, // pOptimizedClearValue
             IID_PPV_ARGS(&m_Texture)));
-        m_Texture->SetName(L"Font");
+        SetD3d12ObjectName(m_Texture, L"Font");
     }
 
     // Copy the data.
@@ -162,6 +173,7 @@ Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd)
 void Renderer::Init()
 {
     ERR_TRY;
+    CHECK_BOOL(g_frameCount.GetValue() >= 2 && g_frameCount.GetValue() <= MAX_FRAME_COUNT);
 	CreateDevice();
 	LoadCapabilities();
 	CreateCommandQueues();
@@ -175,13 +187,15 @@ Renderer::~Renderer()
 {
     g_renderer = nullptr;
 
-	try
-	{
-		m_cmdQueue->Signal(m_fence.Get(), m_nextFenceValue);
-		CHECK_HR(m_fence->SetEventOnCompletion(m_nextFenceValue, m_fenceEvent.get()));
-		WaitForSingleObject(m_fenceEvent.get(), INFINITE);
-	}
-	CATCH_PRINT_ERROR(;);
+    if(m_cmdQueue)
+    {
+	    try
+	    {
+		    m_cmdQueue->Signal(m_fence.Get(), m_nextFenceValue);
+            WaitForFenceOnCpu(m_nextFenceValue);
+	    }
+	    CATCH_PRINT_ERROR(;);
+    }
 }
 
 ID3D12GraphicsCommandList* Renderer::BeginUploadCommandList()
@@ -296,13 +310,13 @@ void Renderer::Render()
 	frameRes.m_submittedFenceValue = m_nextFenceValue++;
 	CHECK_HR(m_cmdQueue->Signal(m_fence.Get(), frameRes.m_submittedFenceValue));
 
-	CHECK_HR(m_swapChain->Present(1, 0));
+	CHECK_HR(m_swapChain->Present(g_syncInterval.GetValue(), 0));
 }
 
 void Renderer::CreateDevice()
 {
     CHECK_HR( D3D12CreateDevice(m_adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_device)) );
-    m_device->SetName(L"Device");
+    SetD3d12ObjectName(m_device, L"Device");
 }
 
 void Renderer::LoadCapabilities()
@@ -320,26 +334,26 @@ void Renderer::CreateCommandQueues()
 	queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
 	CHECK_HR(m_device->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), &m_cmdQueue));
-    m_cmdQueue->SetName(L"Main command queue");
+    SetD3d12ObjectName(m_cmdQueue, L"Main command queue");
 	
 	CHECK_HR(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_fence));
-    m_fence->SetName(L"Main fence");
+    SetD3d12ObjectName(m_fence, L"Main fence");
 
 	CHECK_HR(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
 		&m_cmdAllocator));
-    m_cmdAllocator->SetName(L"Command allocator");
+    SetD3d12ObjectName(m_cmdAllocator, L"Command allocator");
 
 	CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
 		m_cmdAllocator.Get(), NULL,
 		IID_PPV_ARGS(&m_uploadCmdList)));
 	CHECK_HR(m_uploadCmdList->Close());
-    m_uploadCmdList->SetName(L"Upload command list");
+    SetD3d12ObjectName(m_uploadCmdList, L"Upload command list");
 }
 
 void Renderer::CreateSwapChain()
 {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-	swapChainDesc.BufferCount = FRAME_COUNT;
+	swapChainDesc.BufferCount = g_frameCount.GetValue();
 	swapChainDesc.BufferDesc.Width = g_size.GetValue().x;
 	swapChainDesc.BufferDesc.Height = g_size.GetValue().y;
 	swapChainDesc.BufferDesc.Format = RENDER_TARGET_FORMAT;
@@ -358,22 +372,22 @@ void Renderer::CreateFrameResources()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	desc.NumDescriptors = FRAME_COUNT;
+	desc.NumDescriptors = g_frameCount.GetValue();
 	CHECK_HR(m_device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_swapChainRtvDescriptors));
-    m_swapChainRtvDescriptors->SetName(L"Swap chain RTV descriptors");
+    SetD3d12ObjectName(m_swapChainRtvDescriptors, L"Swap chain RTV descriptors");
 
 	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	CHECK_BOOL(fenceEvent);
 	m_fenceEvent.reset(fenceEvent);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart();
-	for(uint32_t i = 0; i < FRAME_COUNT; ++i)
+	for(uint32_t i = 0; i < g_frameCount.GetValue(); ++i)
 	{
 		CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
 			m_cmdAllocator.Get(), NULL,
 			IID_PPV_ARGS(&m_frameResources[i].m_cmdList)));
 		CHECK_HR(m_frameResources[i].m_cmdList->Close());
-        m_frameResources[i].m_cmdList->SetName(Format(L"Command list %u", i).c_str());
+        SetD3d12ObjectName(m_frameResources[i].m_cmdList, Format(L"Command list %u", i).c_str());
 
 		CHECK_HR(m_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_frameResources[i].m_backBuffer));
 
@@ -460,7 +474,7 @@ void Renderer::CreateResources()
 		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
 		CHECK_HR(m_device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
 			__uuidof(ID3D12RootSignature), &m_rootSignature));
-        m_rootSignature->SetName(L"Test root signature");
+        SetD3d12ObjectName(m_rootSignature, L"Test root signature");
 	}
 
 	// Pipeline state
@@ -486,7 +500,7 @@ void Renderer::CreateResources()
 		SetDefaultBlendDesc(desc.BlendState);
 		SetDefaultDepthStencilDesc(desc.DepthStencilState);
 		CHECK_HR(m_device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_pipelineState));
-        m_pipelineState->SetName(L"Test pipeline state");
+        SetD3d12ObjectName(m_pipelineState, L"Test pipeline state");
 	}
 
     // Descriptor heap
@@ -496,7 +510,7 @@ void Renderer::CreateResources()
         desc.NumDescriptors = 1;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         CHECK_HR(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_descriptorHeap)));
-        m_descriptorHeap->SetName(L"Descriptor heap");
+        SetD3d12ObjectName(m_descriptorHeap, L"Descriptor heap");
     }
 
     // Font

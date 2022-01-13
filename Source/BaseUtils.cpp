@@ -2,6 +2,7 @@
 #include "Settings.hpp"
 
 static BoolSetting g_UseThreadNames(SettingCategory::Startup, "UseThreadNames", true);
+static BoolSetting g_UseD3d12ObjectNames(SettingCategory::Startup, "UseD3d12ObjectNames", true);
 
 void Exception::Print() const
 {
@@ -202,4 +203,11 @@ void SetThreadName(DWORD threadId, const str_view& name)
     __except(EXCEPTION_EXECUTE_HANDLER)
     {
     }
+}
+
+void SetD3d12ObjectName(ID3D12Object* obj, const wstr_view& name)
+{
+    if(!g_UseD3d12ObjectNames.GetValue())
+        return;
+    obj->SetName(name.c_str());
 }

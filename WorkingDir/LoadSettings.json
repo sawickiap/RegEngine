@@ -1,3 +1,4 @@
 {
-    "UseThreadNames": true
+    "UsePixEvents": true,
+    "SyncInterval": 1,
 }

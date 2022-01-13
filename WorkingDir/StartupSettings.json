@@ -1,4 +1,12 @@
 {
     "UseThreadNames": true,
-    "Size": [1024, 576]
+    "UseD3d12ObjectNames": true,
+    "FrameCount": 3,
+    "Size": [1024, 576],
+    
+    "Font.FaceName": "Segoe UI",
+    "Font.Height": 32,
+    // Use a combination of values of WinFontRender::SFontDesc::FLAGS:
+    // 1 = bold, 2 = italic
+    "Font.Flags": 0
 }

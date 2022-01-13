@@ -152,3 +152,5 @@ wstring Format(const wchar_t* format, ...);
 
 std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);
+void SetD3d12ObjectName(ID3D12Object* obj, const wstr_view& name);
+inline void SetD3d12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3d12ObjectName(obj.Get(), name); }

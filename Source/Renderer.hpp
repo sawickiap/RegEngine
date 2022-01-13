@@ -1,6 +1,6 @@
 #pragma once
 
-static const uint32_t FRAME_COUNT = 3;
+static const uint32_t MAX_FRAME_COUNT = 10;
 
 class Font;
 
@@ -49,7 +49,7 @@ private:
 	UINT64 m_nextFenceValue = 1;
 	ComPtr<IDXGISwapChain3> m_swapChain;
 	ComPtr<ID3D12DescriptorHeap> m_swapChainRtvDescriptors;
-	std::array<FrameResources, FRAME_COUNT> m_frameResources;
+	std::array<FrameResources, MAX_FRAME_COUNT> m_frameResources;
 	UINT m_frameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_fenceEvent;
 	ComPtr<ID3D12RootSignature> m_rootSignature;
