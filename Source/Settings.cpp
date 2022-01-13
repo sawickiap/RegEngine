@@ -168,10 +168,14 @@ void SettingManager::LoadStartupSettings()
 
 void SettingManager::LoadLoadSettings()
 {
-    ERR_TRY;
-    LogMessage(L"Loading load settings...");
-    m_loadSettings.LoadFromFile(L"LoadSettings.json");
-    ERR_CATCH_MSG(L"Cannot load load settings.");
+    try
+    {
+        ERR_TRY;
+        LogMessage(L"Loading load settings...");
+        m_loadSettings.LoadFromFile(L"LoadSettings.json");
+        ERR_CATCH_MSG(L"Cannot load load settings.");
+    }
+    CATCH_PRINT_ERROR(;);
 }
 
 void BoolSetting::LoadFromJson(const void* jsonVal)

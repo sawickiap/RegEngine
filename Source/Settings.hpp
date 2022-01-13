@@ -144,6 +144,7 @@ private:
     wstring m_value;
 };
 
-
+// On error throws Exception.
 void LoadStartupSettings();
+// On error prints error.
 void LoadLoadSettings();
