@@ -47,7 +47,7 @@ Application::Application()
 void Application::Init()
 {
     ERR_TRY;
-    wprintf(L"Application starting.\n");
+    LogMessage(L"Application starting.");
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
     LoadStartupSettings();
@@ -172,7 +172,7 @@ void Application::OnKeyDown(WPARAM key)
 
 int Application::Run()
 {
-    wprintf(L"Application initialized, running...\n");
+    LogMessage(L"Application initialized, running...");
     MSG msg;
     for (;;)
     {
@@ -196,7 +196,7 @@ int Application::Run()
                 m_renderer->Render();
         }
     }
-    wprintf(L"Application exiting.\n");
+    LogMessage(L"Application exiting.");
     return (int)msg.wParam;
 }
 

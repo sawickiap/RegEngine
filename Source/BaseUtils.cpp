@@ -6,13 +6,13 @@ static BoolSetting g_UseD3d12ObjectNames(SettingCategory::Startup, "UseD3d12Obje
 
 void Exception::Print() const
 {
-    fwprintf(stderr, L"ERROR:\n");
+    LogErrorF(L"ERROR:");
     for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
     {
         if(it->m_file && *it->m_file)
-            fwprintf(stderr, L"%s(%u): %.*s\n", it->m_file, it->m_line, STR_TO_FORMAT(it->m_message));
+            LogErrorF(L"%s(%u): %.*s", it->m_file, it->m_line, STR_TO_FORMAT(it->m_message));
         else
-            fwprintf(stderr, L"%.*s\n", STR_TO_FORMAT(it->m_message));
+            LogErrorF(L"%.*s", STR_TO_FORMAT(it->m_message));
     }
 }
 
@@ -135,11 +135,57 @@ wstring Format(const wchar_t* format, ...)
     return result;
 }
 
+static void SetConsoleColor(LogLevel level)
+{
+    WORD attr = 0;
+    switch(level)
+    {
+    case LogLevel::Info:
+        attr = FOREGROUND_INTENSITY;
+        break;
+    case LogLevel::Message:
+        attr = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+        break;
+    case LogLevel::Warning:
+        attr = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+        break;
+    case LogLevel::Error:
+        attr = FOREGROUND_RED | FOREGROUND_INTENSITY;
+        break;
+    default:
+        assert(0);
+    }
+
+    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(out, attr);
+}
+
+void Log(LogLevel level, const wstr_view& msg)
+{
+    wstr_view finalMsg = msg;
+    // Trim trailing end of line.
+    if(finalMsg.ends_with(L'\n', true))
+        finalMsg = finalMsg.substr(0, finalMsg.length() - 1);
+    else if(finalMsg.ends_with(L"\r\n", true))
+        finalMsg = finalMsg.substr(0, finalMsg.length() - 2);
+
+    if(level != LogLevel::Message)
+        SetConsoleColor(level);
+    wprintf(L"%.*s\n", STR_TO_FORMAT(finalMsg));
+    if (level != LogLevel::Message)
+        SetConsoleColor(LogLevel::Message);
+}
+
+void LogV(LogLevel level, const wchar_t* format, va_list argList)
+{
+    Log(level, VFormat(format, argList));
+}
+
 std::vector<char> LoadFile(const wstr_view& path)
 {
     ERR_TRY;
 
-    wprintf(Format(L"Loading file \"%.*s\"...\n", STR_TO_FORMAT(path)).c_str());
+    LogInfoF(L"Loading file \"%.*s\"...", STR_TO_FORMAT(path));
 
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName

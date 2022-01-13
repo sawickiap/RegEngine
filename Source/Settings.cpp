@@ -147,7 +147,7 @@ void SettingCollection::LoadFromFile(const wstr_view& filePath)
         if(memberIt != doc.MemberEnd())
             setting->LoadFromJson(&memberIt->value);
         else
-            wprintf(L"WARNING: Setting \"%.*hs\" not found. Leaving current value.\n", STR_TO_FORMAT(setting->GetName()));
+            LogWarningF(L"Setting \"%.*hs\" not found. Leaving current value.", STR_TO_FORMAT(setting->GetName()));
     }
     ERR_CATCH_MSG(Format(L"Cannot load settings from file \"%.*s\".", STR_TO_FORMAT(filePath)));
 }
@@ -161,7 +161,7 @@ SettingManager& SettingManager::GetSingleton()
 void SettingManager::LoadStartupSettings()
 {
     ERR_TRY;
-    wprintf(L"Loading statup settings...\n");
+    LogMessage(L"Loading statup settings...");
     m_startupSettings.LoadFromFile(L"StartupSettings.json");
     ERR_CATCH_MSG(L"Cannot load startup settings.");
 }
@@ -169,7 +169,7 @@ void SettingManager::LoadStartupSettings()
 void SettingManager::LoadLoadSettings()
 {
     ERR_TRY;
-    wprintf(L"Loading load settings...\n");
+    LogMessage(L"Loading load settings...");
     m_loadSettings.LoadFromFile(L"LoadSettings.json");
     ERR_CATCH_MSG(L"Cannot load load settings.");
 }
@@ -178,28 +178,28 @@ void BoolSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJson(m_value, *realVal))
-        wprintf(Format(L"WARNING: Invalid bool setting \"%.*hs\".\n", STR_TO_FORMAT(GetName())).c_str());
+        LogWarningF(L"Invalid bool setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
 void FloatSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJson(m_value, *realVal))
-        wprintf(Format(L"WARNING: Invalid float setting \"%.*hs\".\n", STR_TO_FORMAT(GetName())).c_str());
+        LogWarningF(L"Invalid float setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
 void UintSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJson(m_value, *realVal))
-        wprintf(Format(L"WARNING: Invalid uint setting \"%.*hs\".\n", STR_TO_FORMAT(GetName())).c_str());
+        LogWarningF(L"Invalid uint setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
 void IntSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJson(m_value, *realVal))
-        wprintf(Format(L"WARNING: Invalid int setting \"%.*hs\".\n", STR_TO_FORMAT(GetName())).c_str());
+        LogWarningF(L"Invalid int setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
 void StringSetting::LoadFromJson(const void* jsonVal)
@@ -208,7 +208,7 @@ void StringSetting::LoadFromJson(const void* jsonVal)
     if(realVal->IsString())
         m_value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
     else
-        wprintf(Format(L"WARNING: Invalid string setting \"%.*hs\".\n", STR_TO_FORMAT(GetName())).c_str());
+        LogWarningF(L"Invalid string setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
 void LoadStartupSettings()

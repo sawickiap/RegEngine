@@ -123,12 +123,12 @@ wstring GetHresultErrorMessage(HRESULT hr);
     } \
     catch(const std::exception& ex) \
     { \
-        fwprintf(stderr, L"ERROR: %hs\n", ex.what()); \
+        LogErrorF(L"ERROR: %hs", ex.what()); \
         extraCatchCode \
     } \
     catch(...) \
     { \
-        fwprintf(stderr, L"UNKNOWN ERROR.\n"); \
+        LogError(L"UNKNOWN ERROR."); \
         extraCatchCode \
     }
 
@@ -153,6 +153,24 @@ string VFormat(const char* format, va_list argList);
 wstring VFormat(const wchar_t* format, va_list argList);
 string Format(const char* format, ...);
 wstring Format(const wchar_t* format, ...);
+
+enum class LogLevel { Info, Message, Warning, Error, Count };
+void Log(LogLevel level, const wstr_view& msg);
+void LogV(LogLevel level, const wchar_t* format, va_list argList);
+inline void LogF(LogLevel level, const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(level, format, argList); va_end(argList); }
+
+inline void LogInfo(const wstr_view& msg) { Log(LogLevel::Info, msg); }
+inline void LogInfoV(const wchar_t* format, va_list argList) { LogV(LogLevel::Info, format, argList); }
+inline void LogInfoF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Info, format, argList); va_end(argList); }
+inline void LogMessage(const wstr_view& msg) { Log(LogLevel::Message, msg); }
+inline void LogMessageV(const wchar_t* format, va_list argList) { LogV(LogLevel::Message, format, argList); }
+inline void LogMessageF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Message, format, argList); va_end(argList); }
+inline void LogWarning(const wstr_view& msg) { Log(LogLevel::Warning, msg); }
+inline void LogWarningV(const wchar_t* format, va_list argList) { LogV(LogLevel::Warning, format, argList); }
+inline void LogWarningF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Warning, format, argList); va_end(argList); }
+inline void LogError(const wstr_view& msg) { Log(LogLevel::Error, msg); }
+inline void LogErrorV(const wchar_t* format, va_list argList) { LogV(LogLevel::Error, format, argList); }
+inline void LogErrorF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Error, format, argList); va_end(argList); }
 
 std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);

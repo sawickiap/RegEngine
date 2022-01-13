@@ -122,7 +122,7 @@ protected:
         if(LoadVecFromJson<VecT>(vec, jsonVal))
             this->m_value = vec;
         else
-            wprintf(Format(L"WARNING: Invalid string setting \"%.*hs\".\n", STR_TO_FORMAT(this->GetName())).c_str());
+            LogWarningF(L"Invalid vector setting \"%.*hs\".", STR_TO_FORMAT(this->GetName()));
     }
 };
 
