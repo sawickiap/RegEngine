@@ -2,7 +2,12 @@
 
 enum class SettingCategory
 {
+    // Loaded from file "StartupSettings.json" on startup, only once.
+    // Should not be changed during runtime. Never saved to a file.
     Startup,
+    // Loaded from file "LoadSettings.json" on startup and after refresh with F5.
+    // Should not be changed during runtime. Never saved to a file.
+    Load,
     Count,
 };
 
@@ -39,13 +44,23 @@ protected:
     T m_value;
 };
 
+class BoolSetting : public ScalarSetting<bool>
+{
+public:
+    BoolSetting(SettingCategory category, const str_view& name, bool defaultValue) :
+        ScalarSetting<bool>(category, name, defaultValue)
+    {
+    }
+
+protected:
+    virtual void LoadFromJson(const void* jsonVal) override;
+};
+
 template<typename T>
 class NumericSetting : public ScalarSetting<T>
 {
 public:
-    NumericSetting(SettingCategory category, const str_view& name, T defaultValue,
-        T minValue = std::numeric_limits<T>::min(),
-        T maxValue = std::numeric_limits<T>::max()) :
+    NumericSetting(SettingCategory category, const str_view& name, T defaultValue) :
         ScalarSetting<T>(category, name, defaultValue)
     {
     }
@@ -60,7 +75,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJson(const void* jsonVal);
+    virtual void LoadFromJson(const void* jsonVal) override;
 };
 
 class UintSetting : public NumericSetting<uint32_t>
@@ -72,7 +87,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJson(const void* jsonVal);
+    virtual void LoadFromJson(const void* jsonVal) override;
 };
 
 class IntSetting : public NumericSetting<int32_t>
@@ -84,7 +99,31 @@ public:
     }
 
 protected:
-    virtual void LoadFromJson(const void* jsonVal);
+    virtual void LoadFromJson(const void* jsonVal) override;
+};
+
+template<typename VecT>
+bool LoadVecFromJson(VecT& outVec, const void* jsonVal);
+
+template<typename VecT>
+class VecSetting : public ScalarSetting<VecT>
+{
+public:
+    VecSetting(SettingCategory category, const str_view& name, const VecT& defaultValue) :
+        ScalarSetting<VecT>(category, name, defaultValue)
+    {
+    }
+
+protected:
+    virtual void LoadFromJson(const void* jsonVal) override
+    {
+        // `this` is needed due to a compiler bug!
+        VecT vec;
+        if(LoadVecFromJson<VecT>(vec, jsonVal))
+            this->m_value = vec;
+        else
+            wprintf(Format(L"WARNING: Invalid string setting \"%.*hs\".\n", (int)this->GetName().size(), this->GetName().data()).c_str());
+    }
 };
 
 class StringSetting : public Setting
@@ -99,7 +138,7 @@ public:
     void SetValue(const wstr_view& v) { v.to_string(m_value); }
 
 protected:
-    virtual void LoadFromJson(const void* jsonVal);
+    virtual void LoadFromJson(const void* jsonVal) override;
 
 private:
     wstring m_value;
@@ -107,3 +146,4 @@ private:
 
 
 void LoadStartupSettings();
+void LoadLoadSettings();

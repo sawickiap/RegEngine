@@ -10,8 +10,8 @@ enum EXIT_CODE
 
 static const wchar_t* const CLASS_NAME = L"REG_ENGINE_1";
 static const wchar_t* const WINDOW_TITLE = L"RegEngine";
-static const int SIZE_X = 1024; // TODO: unify with same in Renderer.ixx
-static const int SIZE_Y = 576; // TODO: unify with same in Renderer.ixx
+
+VecSetting<glm::uvec2> g_size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
 
 class Application
 {
@@ -51,6 +51,7 @@ void Application::Init()
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
     LoadStartupSettings();
+    LoadLoadSettings();
     SelectAdapter();
     assert(m_adapter);
     RegisterWindowClass();
@@ -103,7 +104,7 @@ void Application::CreateWindow_()
     assert(m_instance);
     constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
     constexpr DWORD exStyle = 0;
-    RECT rect = { 0, 0, SIZE_X, SIZE_Y };
+    RECT rect = {0, 0, (int)g_size.GetValue().x, (int)g_size.GetValue().y};
     AdjustWindowRectEx(&rect, style, FALSE, exStyle);
     m_wnd = CreateWindowEx(
         exStyle,
@@ -159,6 +160,10 @@ void Application::OnKeyDown(WPARAM key)
 {
     switch (key)
     {
+    case VK_F5:
+        LoadLoadSettings();
+        break;
+
     case VK_ESCAPE:
         PostMessage(m_wnd, WM_CLOSE, 0, 0);
         break;
@@ -167,6 +172,7 @@ void Application::OnKeyDown(WPARAM key)
 
 int Application::Run()
 {
+    wprintf(L"Application initialized, running...\n");
     MSG msg;
     for (;;)
     {
@@ -190,6 +196,7 @@ int Application::Run()
                 m_renderer->Render();
         }
     }
+    wprintf(L"Application exiting.\n");
     return (int)msg.wParam;
 }
 

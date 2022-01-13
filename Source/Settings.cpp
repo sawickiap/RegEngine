@@ -16,6 +16,73 @@ static void ThrowParseError(const rapidjson::Document& doc, const str_view& str)
     FAIL(Format(L"RapidJSON parsing error: row=%u, column=%u, code=%i \"%hs\"", row, col, (int)errorCode, errorMsg));
 }
 
+static bool LoadValueFromJson(bool& outVal, const rapidjson::Value& jsonVal)
+{
+    if(jsonVal.IsBool())
+    {
+        outVal = jsonVal.GetBool();
+        return true;
+    }
+    return false;
+}
+static bool LoadValueFromJson(uint32_t& outVal, const rapidjson::Value& jsonVal)
+{
+    if(jsonVal.IsUint())
+    {
+        outVal = jsonVal.GetUint();
+        return true;
+    }
+    return false;
+}
+static bool LoadValueFromJson(int32_t& outVal, const rapidjson::Value& jsonVal)
+{
+    if(jsonVal.IsInt())
+    {
+        outVal = jsonVal.GetInt();
+        return true;
+    }
+    return false;
+}
+static bool LoadValueFromJson(float& outVal, const rapidjson::Value& jsonVal)
+{
+    if(jsonVal.IsFloat())
+    {
+        outVal = jsonVal.GetFloat();
+        return true;
+    }
+    return false;
+}
+
+template<typename VecT>
+bool LoadVecFromJson(VecT& outVec, const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(!realVal->IsArray())
+        return false;
+    auto array = realVal->GetArray();
+    if(array.Size() != (size_t)VecT::length())
+        return false;
+    for(uint32_t i = 0; i < array.Size(); ++i)
+    {
+        if(!LoadValueFromJson(outVec[i], array[i]))
+            return false;
+    }
+    return true;
+}
+
+template bool LoadVecFromJson<glm::vec2>(glm::vec2& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::vec3>(glm::vec3& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::vec4>(glm::vec4& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::uvec2>(glm::uvec2& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::uvec3>(glm::uvec3& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::uvec4>(glm::uvec4& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::ivec2>(glm::ivec2& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::ivec3>(glm::ivec3& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::ivec4>(glm::ivec4& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::bvec2>(glm::bvec2& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::bvec3>(glm::bvec3& outVec, const void* jsonVal);
+template bool LoadVecFromJson<glm::bvec4>(glm::bvec4& outVec, const void* jsonVal);
+
 class SettingCollection
 {
 public:
@@ -36,16 +103,25 @@ public:
 
     void Register(SettingCategory category, Setting* setting)
     {
-        if(category == SettingCategory::Startup)
+        switch(category)
+        {
+        case SettingCategory::Startup:
             m_startupSettings.Register(setting);
-        else
+            break;
+        case SettingCategory::Load:
+            m_loadSettings.Register(setting);
+            break;
+        default:
             assert(0);
+        }
     }
 
     void LoadStartupSettings();
+    void LoadLoadSettings();
 
 private:
     SettingCollection m_startupSettings;
+    SettingCollection m_loadSettings;
 };
 
 Setting::Setting(SettingCategory category, const str_view& name) :
@@ -95,30 +171,39 @@ void SettingManager::LoadStartupSettings()
     ERR_CATCH_MSG(L"Cannot load startup settings.");
 }
 
+void SettingManager::LoadLoadSettings()
+{
+    ERR_TRY;
+    wprintf(L"Loading load settings...\n");
+    m_loadSettings.LoadFromFile(L"LoadSettings.json");
+    ERR_CATCH_MSG(L"Cannot load load settings.");
+}
+
+void BoolSetting::LoadFromJson(const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(!LoadValueFromJson(m_value, *realVal))
+        wprintf(Format(L"WARNING: Invalid bool setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
+}
+
 void FloatSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(realVal->IsFloat())
-        m_value = realVal->GetFloat();
-    else
+    if(!LoadValueFromJson(m_value, *realVal))
         wprintf(Format(L"WARNING: Invalid float setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
 }
 
 void UintSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(realVal->IsUint())
-        m_value = realVal->GetUint();
-    else
+    if(!LoadValueFromJson(m_value, *realVal))
         wprintf(Format(L"WARNING: Invalid uint setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
 }
 
 void IntSetting::LoadFromJson(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(realVal->IsInt())
-        m_value = realVal->GetInt();
-    else
+    if(!LoadValueFromJson(m_value, *realVal))
         wprintf(Format(L"WARNING: Invalid int setting \"%.*hs\".\n", (int)GetName().size(), GetName().data()).c_str());
 }
 
@@ -134,4 +219,8 @@ void StringSetting::LoadFromJson(const void* jsonVal)
 void LoadStartupSettings()
 {
     SettingManager::GetSingleton().LoadStartupSettings();
+}
+void LoadLoadSettings()
+{
+    SettingManager::GetSingleton().LoadLoadSettings();
 }

@@ -1,4 +1,7 @@
 #include "BaseUtils.hpp"
+#include "Settings.hpp"
+
+static BoolSetting g_UseThreadNames(SettingCategory::Startup, "UseThreadNames", true);
 
 void Exception::Print() const
 {
@@ -169,6 +172,9 @@ std::vector<char> LoadFile(const wstr_view& path)
 // GetThreadId((HANDLE)t.native_handle());
 void SetThreadName(DWORD threadId, const str_view& name)
 {
+    if(!g_UseThreadNames.GetValue())
+        return;
+
     // Code found in: https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
 
     const DWORD MS_VC_EXCEPTION = 0x406D1388;

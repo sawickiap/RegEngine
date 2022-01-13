@@ -1,12 +1,13 @@
 #include "BaseUtils.hpp"
 #include "Renderer.hpp"
+#include "Settings.hpp"
 #include <pix3.h>
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
-static const int SIZE_X = 1024; // TODO: unify with same in Main.cpp
-static const int SIZE_Y = 576; // TODO: unify with same in Main.cpp
+
+extern VecSetting<glm::uvec2> g_size;
 
 static Renderer* g_renderer;
 
@@ -247,10 +248,10 @@ void Renderer::Render()
 
 	    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
 
-        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)SIZE_X, (float)SIZE_Y, 0.f, 1.f};
+        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_size.GetValue().x, (float)g_size.GetValue().y, 0.f, 1.f};
         cmdList->RSSetViewports(1, &viewport);
 
-	    const D3D12_RECT scissorRect = {0, 0, SIZE_X, SIZE_Y};
+	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_size.GetValue().x, (LONG)g_size.GetValue().y};
 	    cmdList->RSSetScissorRects(1, &scissorRect);
 
 	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -262,7 +263,7 @@ void Renderer::Render()
             vec3(0.f, 0.f, 1.f)); // up
         const mat4x4 proj = glm::perspectiveFovLH(
             glm::radians(80.0f), // fov
-            (float)SIZE_X, (float)SIZE_Y,
+            (float)g_size.GetValue().x, (float)g_size.GetValue().y,
             0.5f, // zNear
             100.f); // zFar
         mat4x4 worldViewProj = proj * view * world;
@@ -339,8 +340,8 @@ void Renderer::CreateSwapChain()
 {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 	swapChainDesc.BufferCount = FRAME_COUNT;
-	swapChainDesc.BufferDesc.Width = SIZE_X;
-	swapChainDesc.BufferDesc.Height = SIZE_Y;
+	swapChainDesc.BufferDesc.Width = g_size.GetValue().x;
+	swapChainDesc.BufferDesc.Height = g_size.GetValue().y;
 	swapChainDesc.BufferDesc.Format = RENDER_TARGET_FORMAT;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;//DXGI_SWAP_EFFECT_FLIP_DISCARD;

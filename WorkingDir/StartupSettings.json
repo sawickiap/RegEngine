@@ -1,3 +1,4 @@
 {
-    "foo": 1
+    "UseThreadNames": true,
+    "Size": [1024, 576]
 }
