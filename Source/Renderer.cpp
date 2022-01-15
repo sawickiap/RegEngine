@@ -2,6 +2,7 @@
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include <pix3.h>
+#include <WICTextureLoader.h>
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
