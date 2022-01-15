@@ -136,6 +136,10 @@ wstring GetHRESULTErrorMessage(HRESULT hr);
 constexpr D3D12_RANGE* D3D12_RANGE_ALL = nullptr;
 extern const D3D12_RANGE* D3D12_RANGE_NONE;
 
+extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_DEFAULT;
+extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_UPLOAD;
+extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_READBACK;
+
 template<typename CharT>
 void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_template<CharT>& str, size_t offset)
 {

@@ -34,14 +34,13 @@ void Mesh::Init(
     m_VertexCount = vertexCount;
     m_IndexCount = indexCount;
 
-    const D3D12_HEAP_PROPERTIES uploadHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
 
     // Create vertex buffer.
     {
         const UINT64 vbSize = vertexCount * sizeof(Vertex);
         D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vbSize);
         CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &uploadHeapProps,
+            &D3D12_HEAP_PROPERTIES_UPLOAD,
             D3D12_HEAP_FLAG_NONE,
             &vbDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
@@ -66,7 +65,7 @@ void Mesh::Init(
             const UINT64 ibSize = indexCount * sizeof(IndexType);
             D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(ibSize);
             CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-                &uploadHeapProps,
+                &D3D12_HEAP_PROPERTIES_UPLOAD,
                 D3D12_HEAP_FLAG_NONE,
                 &ibDesc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,

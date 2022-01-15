@@ -20,9 +20,8 @@ void RenderingResource::Init(
 {
     m_Desc = resDesc;
     m_States = initialStates;
-    const D3D12_HEAP_PROPERTIES defaultHeapProps = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
     CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-        &defaultHeapProps,
+        &D3D12_HEAP_PROPERTIES_DEFAULT,
         D3D12_HEAP_FLAG_NONE,
         &resDesc,
         initialStates,
