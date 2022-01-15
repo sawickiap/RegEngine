@@ -16,7 +16,7 @@ static void ThrowParseError(const rapidjson::Document& doc, const str_view& str)
     FAIL(Format(L"RapidJSON parsing error: row=%u, column=%u, code=%i \"%hs\"", row, col, (int)errorCode, errorMsg));
 }
 
-static bool LoadValueFromJson(bool& outVal, const rapidjson::Value& jsonVal)
+static bool LoadValueFromJSON(bool& outVal, const rapidjson::Value& jsonVal)
 {
     if(jsonVal.IsBool())
     {
@@ -25,7 +25,7 @@ static bool LoadValueFromJson(bool& outVal, const rapidjson::Value& jsonVal)
     }
     return false;
 }
-static bool LoadValueFromJson(uint32_t& outVal, const rapidjson::Value& jsonVal)
+static bool LoadValueFromJSON(uint32_t& outVal, const rapidjson::Value& jsonVal)
 {
     if(jsonVal.IsUint())
     {
@@ -34,7 +34,7 @@ static bool LoadValueFromJson(uint32_t& outVal, const rapidjson::Value& jsonVal)
     }
     return false;
 }
-static bool LoadValueFromJson(int32_t& outVal, const rapidjson::Value& jsonVal)
+static bool LoadValueFromJSON(int32_t& outVal, const rapidjson::Value& jsonVal)
 {
     if(jsonVal.IsInt())
     {
@@ -43,7 +43,7 @@ static bool LoadValueFromJson(int32_t& outVal, const rapidjson::Value& jsonVal)
     }
     return false;
 }
-static bool LoadValueFromJson(float& outVal, const rapidjson::Value& jsonVal)
+static bool LoadValueFromJSON(float& outVal, const rapidjson::Value& jsonVal)
 {
     if(jsonVal.IsFloat())
     {
@@ -54,7 +54,7 @@ static bool LoadValueFromJson(float& outVal, const rapidjson::Value& jsonVal)
 }
 
 template<typename VecT>
-bool LoadVecFromJson(VecT& outVec, const void* jsonVal)
+bool LoadVecFromJSON(VecT& outVec, const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!realVal->IsArray())
@@ -64,36 +64,36 @@ bool LoadVecFromJson(VecT& outVec, const void* jsonVal)
         return false;
     for(uint32_t i = 0; i < array.Size(); ++i)
     {
-        if(!LoadValueFromJson(outVec[i], array[i]))
+        if(!LoadValueFromJSON(outVec[i], array[i]))
             return false;
     }
     return true;
 }
 
-template bool LoadVecFromJson<glm::vec2>(glm::vec2& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::vec3>(glm::vec3& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::vec4>(glm::vec4& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::uvec2>(glm::uvec2& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::uvec3>(glm::uvec3& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::uvec4>(glm::uvec4& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::ivec2>(glm::ivec2& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::ivec3>(glm::ivec3& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::ivec4>(glm::ivec4& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::bvec2>(glm::bvec2& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::bvec3>(glm::bvec3& outVec, const void* jsonVal);
-template bool LoadVecFromJson<glm::bvec4>(glm::bvec4& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::vec2>(glm::vec2& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::vec3>(glm::vec3& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::vec4>(glm::vec4& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::uvec2>(glm::uvec2& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::uvec3>(glm::uvec3& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::uvec4>(glm::uvec4& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::ivec2>(glm::ivec2& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::ivec3>(glm::ivec3& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::ivec4>(glm::ivec4& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::bvec2>(glm::bvec2& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::bvec3>(glm::bvec3& outVec, const void* jsonVal);
+template bool LoadVecFromJSON<glm::bvec4>(glm::bvec4& outVec, const void* jsonVal);
 
 class SettingCollection
 {
 public:
     void Register(Setting* setting)
     {
-        m_settings.push_back(setting);
+        m_Settings.push_back(setting);
     }
 
     void LoadFromFile(const wstr_view& filePath);
 private:
-    std::vector<Setting*> m_settings;
+    std::vector<Setting*> m_Settings;
 };
 
 class SettingManager
@@ -106,10 +106,10 @@ public:
         switch(category)
         {
         case SettingCategory::Startup:
-            m_startupSettings.Register(setting);
+            m_StartupSettings.Register(setting);
             break;
         case SettingCategory::Load:
-            m_loadSettings.Register(setting);
+            m_LoadSettings.Register(setting);
             break;
         default:
             assert(0);
@@ -120,12 +120,12 @@ public:
     void LoadLoadSettings();
 
 private:
-    SettingCollection m_startupSettings;
-    SettingCollection m_loadSettings;
+    SettingCollection m_StartupSettings;
+    SettingCollection m_LoadSettings;
 };
 
 Setting::Setting(SettingCategory category, const str_view& name) :
-    m_name{name.data(), name.size()}
+    m_Name{name.data(), name.size()}
 {
     SettingManager::GetSingleton().Register(category, this);
 }
@@ -141,11 +141,11 @@ void SettingCollection::LoadFromFile(const wstr_view& filePath)
     if(doc.HasParseError())
         ThrowParseError(doc, str_view{fileContents.data(), fileContents.size()});
     CHECK_BOOL(doc.IsObject());
-    for(Setting* setting : m_settings)
+    for(Setting* setting : m_Settings)
     {
         const auto memberIt = doc.FindMember(setting->GetName().c_str());
         if(memberIt != doc.MemberEnd())
-            setting->LoadFromJson(&memberIt->value);
+            setting->LoadFromJSON(&memberIt->value);
         else
             LogWarningF(L"Setting \"%.*hs\" not found. Leaving current value.", STR_TO_FORMAT(setting->GetName()));
     }
@@ -162,7 +162,7 @@ void SettingManager::LoadStartupSettings()
 {
     ERR_TRY;
     LogMessage(L"Loading statup settings...");
-    m_startupSettings.LoadFromFile(L"StartupSettings.json");
+    m_StartupSettings.LoadFromFile(L"StartupSettings.json");
     ERR_CATCH_MSG(L"Cannot load startup settings.");
 }
 
@@ -172,45 +172,45 @@ void SettingManager::LoadLoadSettings()
     {
         ERR_TRY;
         LogMessage(L"Loading load settings...");
-        m_loadSettings.LoadFromFile(L"LoadSettings.json");
+        m_LoadSettings.LoadFromFile(L"LoadSettings.json");
         ERR_CATCH_MSG(L"Cannot load load settings.");
     }
     CATCH_PRINT_ERROR(;);
 }
 
-void BoolSetting::LoadFromJson(const void* jsonVal)
+void BoolSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(!LoadValueFromJson(m_value, *realVal))
+    if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid bool setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
-void FloatSetting::LoadFromJson(const void* jsonVal)
+void FloatSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(!LoadValueFromJson(m_value, *realVal))
+    if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid float setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
-void UintSetting::LoadFromJson(const void* jsonVal)
+void UintSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(!LoadValueFromJson(m_value, *realVal))
+    if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid uint setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
-void IntSetting::LoadFromJson(const void* jsonVal)
+void IntSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
-    if(!LoadValueFromJson(m_value, *realVal))
+    if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid int setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }
 
-void StringSetting::LoadFromJson(const void* jsonVal)
+void StringSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(realVal->IsString())
-        m_value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
+        m_Value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
     else
         LogWarningF(L"Invalid string setting \"%.*hs\".", STR_TO_FORMAT(GetName()));
 }

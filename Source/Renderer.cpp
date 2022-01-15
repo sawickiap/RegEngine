@@ -8,43 +8,43 @@
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 
-extern VecSetting<glm::uvec2> g_size;
+extern VecSetting<glm::uvec2> g_Size;
 
-static UintSetting g_frameCount(SettingCategory::Startup, "FrameCount", 3);
-static StringSetting g_fontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
-static IntSetting g_fontHeight(SettingCategory::Startup, "Font.Height", 32);
-static UintSetting g_fontFlags(SettingCategory::Startup, "Font.Flags", 0);
+static UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
+static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
+static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
+static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
 
-static BoolSetting g_usePixEvents(SettingCategory::Load, "UsePixEvents", true);
-static UintSetting g_syncInterval(SettingCategory::Load, "SyncInterval", 1);
-static StringSetting g_textureFilePath(SettingCategory::Load, "TextureFilePath");
+static BoolSetting g_UsePIXEvents(SettingCategory::Load, "UsePIXEvents", true);
+static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
+static StringSetting g_TextureFilePath(SettingCategory::Load, "TextureFilePath");
 
-static Renderer* g_renderer;
+static Renderer* g_Renderer;
 
-class PixEventScope
+class PIXEventScope
 {
 public:
     // Warning! msg is actually a formatting string, so don't use '%'!
-    PixEventScope(ID3D12GraphicsCommandList* cmdList, const wstr_view& msg) :
-        m_cmdList{cmdList}
+    PIXEventScope(ID3D12GraphicsCommandList* cmdList, const wstr_view& msg) :
+        m_CmdList{cmdList}
     {
-        if(g_usePixEvents.GetValue())
-            PIXBeginEvent(m_cmdList, 0, msg.c_str());
+        if(g_UsePIXEvents.GetValue())
+            PIXBeginEvent(m_CmdList, 0, msg.c_str());
     }
-    ~PixEventScope()
+    ~PIXEventScope()
     {
-        if(g_usePixEvents.GetValue())
-            PIXEndEvent(m_cmdList);
+        if(g_UsePIXEvents.GetValue())
+            PIXEndEvent(m_CmdList);
     }
 
 private:
-    ID3D12GraphicsCommandList* m_cmdList;
+    ID3D12GraphicsCommandList* m_CmdList;
 };
 
 #define HELPER_CAT_1(a, b) a ## b
 #define HELPER_CAT_2(a, b) HELPER_CAT_1(a, b)
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
-#define PIX_EVENT_SCOPE(cmdList, msg) PixEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
+#define PIX_EVENT_SCOPE(cmdList, msg) PIXEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
 class Font
 {
@@ -65,9 +65,9 @@ void Font::Init()
 
     // Create WinFontRender object.
     WinFontRender::SFontDesc fontDesc = {};
-    fontDesc.FaceName = g_fontFaceName.GetValue();
-    fontDesc.Height = g_fontHeight.GetValue();
-    fontDesc.Flags = g_fontFlags.GetValue();
+    fontDesc.FaceName = g_FontFaceName.GetValue();
+    fontDesc.Height = g_FontHeight.GetValue();
+    fontDesc.Flags = g_FontFlags.GetValue();
     CHECK_BOOL(m_WinFont.Init(fontDesc));
 
     // Fetch texture data.
@@ -83,14 +83,14 @@ void Font::Init()
     {
         const CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
         CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
-        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &desc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
             IID_PPV_ARGS(&srcBuf)));
-        SetD3d12ObjectName(srcBuf, L"Font texture source buffer");
+        SetD3D12ObjectName(srcBuf, L"Font texture source buffer");
     }
 
     // Fill source buffer.
@@ -121,19 +121,19 @@ void Font::Init()
             1, // arraySize
             1); // mipLevels
         CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_DEFAULT};
-        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &resDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, // pOptimizedClearValue
             IID_PPV_ARGS(&m_Texture)));
-        SetD3d12ObjectName(m_Texture, L"Font");
+        SetD3D12ObjectName(m_Texture, L"Font");
     }
 
     // Copy the data.
     {
-        auto cmdList = g_renderer->BeginUploadCommandList();
+        const auto cmdList = g_Renderer->BeginUploadCommandList();
 
         CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
@@ -151,11 +151,11 @@ void Font::Init()
             m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         cmdList->ResourceBarrier(1, &barrier);
 
-        g_renderer->CompleteUploadCommandList();
+        g_Renderer->CompleteUploadCommandList();
     }
 
     // Setup texture SRV descriptor
-    //g_renderer->SetTexture(m_Texture.Get());
+    //g_Renderer->SetTexture(m_Texture.Get());
     
     ERR_CATCH_FUNC;
 }
@@ -165,17 +165,17 @@ Font::~Font()
 }
 
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
-	m_dxgiFactory{dxgiFactory},
-	m_adapter{adapter},
-	m_wnd(wnd)
+	m_DXGIFactory{dxgiFactory},
+	m_Adapter{adapter},
+	m_Wnd(wnd)
 {
-    g_renderer = this;
+    g_Renderer = this;
 }
 
 void Renderer::Init()
 {
     ERR_TRY;
-    CHECK_BOOL(g_frameCount.GetValue() >= 2 && g_frameCount.GetValue() <= MAX_FRAME_COUNT);
+    CHECK_BOOL(g_FrameCount.GetValue() >= 2 && g_FrameCount.GetValue() <= MAX_FRAME_COUNT);
 	CreateDevice();
 	LoadCapabilities();
 	CreateCommandQueues();
@@ -187,14 +187,14 @@ void Renderer::Init()
 
 Renderer::~Renderer()
 {
-    g_renderer = nullptr;
+    g_Renderer = nullptr;
 
-    if(m_cmdQueue)
+    if(m_CmdQueue)
     {
 	    try
 	    {
-		    m_cmdQueue->Signal(m_fence.Get(), m_nextFenceValue);
-            WaitForFenceOnCpu(m_nextFenceValue);
+		    m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
+            WaitForFenceOnCPU(m_NextFenceValue);
 	    }
 	    CATCH_PRINT_ERROR(;);
     }
@@ -202,52 +202,52 @@ Renderer::~Renderer()
 
 ID3D12GraphicsCommandList* Renderer::BeginUploadCommandList()
 {
-    WaitForFenceOnCpu(m_uploadCmdListSubmittedFenceValue);
-    CHECK_HR(m_uploadCmdList->Reset(m_cmdAllocator.Get(), NULL));
-    return m_uploadCmdList.Get();
+    WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
+    CHECK_HR(m_UploadCmdList->Reset(m_CmdAllocator.Get(), NULL));
+    return m_UploadCmdList.Get();
 }
 
 void Renderer::CompleteUploadCommandList()
 {
-    CHECK_HR(m_uploadCmdList->Close());
+    CHECK_HR(m_UploadCmdList->Close());
 
-	ID3D12CommandList* const baseCmdList = m_uploadCmdList.Get();
-	m_cmdQueue->ExecuteCommandLists(1, &baseCmdList);
+	ID3D12CommandList* const baseCmdList = m_UploadCmdList.Get();
+	m_CmdQueue->ExecuteCommandLists(1, &baseCmdList);
 
-	m_uploadCmdListSubmittedFenceValue = m_nextFenceValue++;
-	CHECK_HR(m_cmdQueue->Signal(m_fence.Get(), m_uploadCmdListSubmittedFenceValue));
+	m_UploadCmdListSubmittedFenceValue = m_NextFenceValue++;
+	CHECK_HR(m_CmdQueue->Signal(m_Fence.Get(), m_UploadCmdListSubmittedFenceValue));
 
-    WaitForFenceOnCpu(m_uploadCmdListSubmittedFenceValue);
+    WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
 }
 
 void Renderer::SetTexture(ID3D12Resource* res)
 {
-    m_device->CreateShaderResourceView(res,
+    m_Device->CreateShaderResourceView(res,
         nullptr, // pDesc
-        m_descriptorHeap->GetCPUDescriptorHandleForHeapStart());
+        m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 }
 
 void Renderer::Render()
 {
-	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-	FrameResources& frameRes = m_frameResources[m_frameIndex];
-	ID3D12GraphicsCommandList* const cmdList = frameRes.m_cmdList.Get();
+	m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
+	FrameResources& frameRes = m_FrameResources[m_FrameIndex];
+	ID3D12GraphicsCommandList* const cmdList = frameRes.m_CmdList.Get();
 
-    WaitForFenceOnCpu(frameRes.m_submittedFenceValue);
+    WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
 
-	CHECK_HR(cmdList->Reset(m_cmdAllocator.Get(), NULL));
+	CHECK_HR(cmdList->Reset(m_CmdAllocator.Get(), NULL));
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
         CD3DX12_RESOURCE_BARRIER presentToRenderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		    frameRes.m_backBuffer.Get(),
+		    frameRes.m_BackBuffer.Get(),
 		    D3D12_RESOURCE_STATE_PRESENT,
 		    D3D12_RESOURCE_STATE_RENDER_TARGET);
 	    cmdList->ResourceBarrier(1, &presentToRenderTargetBarrier);
 
 	    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
-		    m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
-		    (INT)m_frameIndex, m_capabilities.m_descriptorSize_RTV};
+		    m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
+		    (INT)m_FrameIndex, m_Capabilities.m_DescriptorSize_RTV};
 
         float time = (float)GetTickCount() * 1e-3f;
 	    float color = sin(time) * 0.5f + 0.5f;
@@ -260,14 +260,14 @@ void Renderer::Render()
 
 	    cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
 
-	    cmdList->SetPipelineState(m_pipelineState.Get());
+	    cmdList->SetPipelineState(m_PipelineState.Get());
 
-	    cmdList->SetGraphicsRootSignature(m_rootSignature.Get());
+	    cmdList->SetGraphicsRootSignature(m_RootSignature.Get());
 
-        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_size.GetValue().x, (float)g_size.GetValue().y, 0.f, 1.f};
+        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
         cmdList->RSSetViewports(1, &viewport);
 
-	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_size.GetValue().x, (LONG)g_size.GetValue().y};
+	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	    cmdList->RSSetScissorRects(1, &scissorRect);
 
 	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -279,14 +279,14 @@ void Renderer::Render()
             vec3(0.f, 0.f, 1.f)); // up
         const mat4x4 proj = glm::perspectiveFovLH(
             glm::radians(80.0f), // fov
-            (float)g_size.GetValue().x, (float)g_size.GetValue().y,
+            (float)g_Size.GetValue().x, (float)g_Size.GetValue().y,
             0.5f, // zNear
             100.f); // zFar
         mat4x4 worldViewProj = proj * view * world;
 
-        ID3D12DescriptorHeap* const descriptorHeap = m_descriptorHeap.Get();
+        ID3D12DescriptorHeap* const descriptorHeap = m_DescriptorHeap.Get();
         cmdList->SetDescriptorHeaps(1, &descriptorHeap);
-        cmdList->SetGraphicsRootDescriptorTable(1, m_descriptorHeap->GetGPUDescriptorHandleForHeapStart());
+        cmdList->SetGraphicsRootDescriptorTable(1, m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
         cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
@@ -299,7 +299,7 @@ void Renderer::Render()
 	    */
 
 	    CD3DX12_RESOURCE_BARRIER renderTargetToPresentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		    frameRes.m_backBuffer.Get(),
+		    frameRes.m_BackBuffer.Get(),
 		    D3D12_RESOURCE_STATE_RENDER_TARGET,
 		    D3D12_RESOURCE_STATE_PRESENT);
 	    cmdList->ResourceBarrier(1, &renderTargetToPresentBarrier);
@@ -307,26 +307,26 @@ void Renderer::Render()
 	CHECK_HR(cmdList->Close());
 
 	ID3D12CommandList* const baseCmdList = cmdList;
-	m_cmdQueue->ExecuteCommandLists(1, &baseCmdList);
+	m_CmdQueue->ExecuteCommandLists(1, &baseCmdList);
 
-	frameRes.m_submittedFenceValue = m_nextFenceValue++;
-	CHECK_HR(m_cmdQueue->Signal(m_fence.Get(), frameRes.m_submittedFenceValue));
+	frameRes.m_SubmittedFenceValue = m_NextFenceValue++;
+	CHECK_HR(m_CmdQueue->Signal(m_Fence.Get(), frameRes.m_SubmittedFenceValue));
 
-	CHECK_HR(m_swapChain->Present(g_syncInterval.GetValue(), 0));
+	CHECK_HR(m_SwapChain->Present(g_SyncInterval.GetValue(), 0));
 }
 
 void Renderer::CreateDevice()
 {
-    CHECK_HR( D3D12CreateDevice(m_adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_device)) );
-    SetD3d12ObjectName(m_device, L"Device");
+    CHECK_HR( D3D12CreateDevice(m_Adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_Device)) );
+    SetD3D12ObjectName(m_Device, L"Device");
 }
 
 void Renderer::LoadCapabilities()
 {
-	m_capabilities.m_descriptorSize_CVB_SRV_UAV = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_capabilities.m_descriptorSize_sampler = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-	m_capabilities.m_descriptorSize_RTV = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_capabilities.m_descriptorSize_DSV = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	m_Capabilities.m_DescriptorSize_CVB_SRV_UAV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	m_Capabilities.m_DescriptorSize_Sampler = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+	m_Capabilities.m_DescriptorSize_RTV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_Capabilities.m_DescriptorSize_DSV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 }
 
 void Renderer::CreateCommandQueues()
@@ -335,67 +335,67 @@ void Renderer::CreateCommandQueues()
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
 	//queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
-	CHECK_HR(m_device->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), &m_cmdQueue));
-    SetD3d12ObjectName(m_cmdQueue, L"Main command queue");
+	CHECK_HR(m_Device->CreateCommandQueue(&queueDesc, __uuidof(ID3D12CommandQueue), &m_CmdQueue));
+    SetD3D12ObjectName(m_CmdQueue, L"Main command queue");
 	
-	CHECK_HR(m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_fence));
-    SetD3d12ObjectName(m_fence, L"Main fence");
+	CHECK_HR(m_Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_Fence));
+    SetD3D12ObjectName(m_Fence, L"Main fence");
 
-	CHECK_HR(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
-		&m_cmdAllocator));
-    SetD3d12ObjectName(m_cmdAllocator, L"Command allocator");
+	CHECK_HR(m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
+		&m_CmdAllocator));
+    SetD3D12ObjectName(m_CmdAllocator, L"Command allocator");
 
-	CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-		m_cmdAllocator.Get(), NULL,
-		IID_PPV_ARGS(&m_uploadCmdList)));
-	CHECK_HR(m_uploadCmdList->Close());
-    SetD3d12ObjectName(m_uploadCmdList, L"Upload command list");
+	CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+		m_CmdAllocator.Get(), NULL,
+		IID_PPV_ARGS(&m_UploadCmdList)));
+	CHECK_HR(m_UploadCmdList->Close());
+    SetD3D12ObjectName(m_UploadCmdList, L"Upload command list");
 }
 
 void Renderer::CreateSwapChain()
 {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
-	swapChainDesc.BufferCount = g_frameCount.GetValue();
-	swapChainDesc.BufferDesc.Width = g_size.GetValue().x;
-	swapChainDesc.BufferDesc.Height = g_size.GetValue().y;
+	swapChainDesc.BufferCount = g_FrameCount.GetValue();
+	swapChainDesc.BufferDesc.Width = g_Size.GetValue().x;
+	swapChainDesc.BufferDesc.Height = g_Size.GetValue().y;
 	swapChainDesc.BufferDesc.Format = RENDER_TARGET_FORMAT;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
-	swapChainDesc.OutputWindow = m_wnd;
+	swapChainDesc.OutputWindow = m_Wnd;
 	swapChainDesc.SampleDesc.Count = 1;
 	swapChainDesc.Windowed = TRUE;
 
 	ComPtr<IDXGISwapChain> swapChain;
-	CHECK_HR(m_dxgiFactory->CreateSwapChain(m_cmdQueue.Get(), &swapChainDesc, &swapChain));
-	CHECK_HR(swapChain->QueryInterface<IDXGISwapChain3>(&m_swapChain));
+	CHECK_HR(m_DXGIFactory->CreateSwapChain(m_CmdQueue.Get(), &swapChainDesc, &swapChain));
+	CHECK_HR(swapChain->QueryInterface<IDXGISwapChain3>(&m_SwapChain));
 }
 
 void Renderer::CreateFrameResources()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	desc.NumDescriptors = g_frameCount.GetValue();
-	CHECK_HR(m_device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_swapChainRtvDescriptors));
-    SetD3d12ObjectName(m_swapChainRtvDescriptors, L"Swap chain RTV descriptors");
+	desc.NumDescriptors = g_FrameCount.GetValue();
+	CHECK_HR(m_Device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_SwapChainRtvDescriptors));
+    SetD3D12ObjectName(m_SwapChainRtvDescriptors, L"Swap chain RTV descriptors");
 
 	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	CHECK_BOOL(fenceEvent);
-	m_fenceEvent.reset(fenceEvent);
+	m_FenceEvent.reset(fenceEvent);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_swapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart();
-	for(uint32_t i = 0; i < g_frameCount.GetValue(); ++i)
+	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart();
+	for(uint32_t i = 0; i < g_FrameCount.GetValue(); ++i)
 	{
-		CHECK_HR(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			m_cmdAllocator.Get(), NULL,
-			IID_PPV_ARGS(&m_frameResources[i].m_cmdList)));
-		CHECK_HR(m_frameResources[i].m_cmdList->Close());
-        SetD3d12ObjectName(m_frameResources[i].m_cmdList, Format(L"Command list %u", i).c_str());
+		CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+			m_CmdAllocator.Get(), NULL,
+			IID_PPV_ARGS(&m_FrameResources[i].m_CmdList)));
+		CHECK_HR(m_FrameResources[i].m_CmdList->Close());
+        SetD3D12ObjectName(m_FrameResources[i].m_CmdList, Format(L"Command list %u", i).c_str());
 
-		CHECK_HR(m_swapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_frameResources[i].m_backBuffer));
+		CHECK_HR(m_SwapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_FrameResources[i].m_BackBuffer));
 
-		m_device->CreateRenderTargetView(m_frameResources[i].m_backBuffer.Get(), nullptr, backBufferRtvHandle);
+		m_Device->CreateRenderTargetView(m_FrameResources[i].m_BackBuffer.Get(), nullptr, backBufferRtvHandle);
 		
-		backBufferRtvHandle.ptr += m_capabilities.m_descriptorSize_RTV;
+		backBufferRtvHandle.ptr += m_Capabilities.m_DescriptorSize_RTV;
 	}
 }
 
@@ -474,9 +474,9 @@ void Renderer::CreateResources()
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 		ComPtr<ID3DBlob> blob;
 		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
-		CHECK_HR(m_device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
-			__uuidof(ID3D12RootSignature), &m_rootSignature));
-        SetD3d12ObjectName(m_rootSignature, L"Test root signature");
+		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+			__uuidof(ID3D12RootSignature), &m_RootSignature));
+        SetD3D12ObjectName(m_RootSignature, L"Test root signature");
 	}
 
 	// Pipeline state
@@ -487,7 +487,7 @@ void Renderer::CreateResources()
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 		//desc.InputLayout.NumElements = 0;
 		//desc.InputLayout.pInputElementDescs = 
-		desc.pRootSignature = m_rootSignature.Get();
+		desc.pRootSignature = m_RootSignature.Get();
 		desc.VS.BytecodeLength = vsCode.size();
 		desc.VS.pShaderBytecode = vsCode.data();
 		desc.PS.BytecodeLength = psCode.size();
@@ -501,8 +501,8 @@ void Renderer::CreateResources()
 		SetDefaultRasterizerDesc(desc.RasterizerState);
 		SetDefaultBlendDesc(desc.BlendState);
 		SetDefaultDepthStencilDesc(desc.DepthStencilState);
-		CHECK_HR(m_device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_pipelineState));
-        SetD3d12ObjectName(m_pipelineState, L"Test pipeline state");
+		CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_PipelineState));
+        SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
 	}
 
     // Descriptor heap
@@ -511,8 +511,8 @@ void Renderer::CreateResources()
         desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
         desc.NumDescriptors = 1;
         desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        CHECK_HR(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_descriptorHeap)));
-        SetD3d12ObjectName(m_descriptorHeap, L"Descriptor heap");
+        CHECK_HR(m_Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_DescriptorHeap)));
+        SetD3D12ObjectName(m_DescriptorHeap, L"Descriptor heap");
     }
 
     // Font
@@ -528,30 +528,31 @@ void Renderer::CreateResources()
 
 void Renderer::LoadTexture()
 {
-    m_texture.Reset();
-    if(g_textureFilePath.GetValue().empty())
+    m_Texture.Reset();
+    if(g_TextureFilePath.GetValue().empty())
         return;
     ERR_TRY;
 
-    LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(g_textureFilePath.GetValue()));
+    LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(g_TextureFilePath.GetValue()));
 
     unique_ptr<uint8_t[]> decodedData;
     D3D12_SUBRESOURCE_DATA subresource = {};
     CHECK_HR(DirectX::LoadWICTextureFromFileEx(
-        m_device.Get(),
-        g_textureFilePath.GetValue().c_str(),
+        m_Device.Get(),
+        g_TextureFilePath.GetValue().c_str(),
         0, // maxSize
         D3D12_RESOURCE_FLAG_NONE,
         DirectX::WIC_LOADER_FORCE_SRGB,
-        &m_texture,
+        &m_Texture,
         decodedData,
         subresource));
-    CHECK_BOOL(m_texture && decodedData && subresource.pData && subresource.RowPitch);
+    CHECK_BOOL(m_Texture && decodedData && subresource.pData && subresource.RowPitch);
     CHECK_BOOL(subresource.pData == decodedData.get());
-    SetD3d12ObjectName(m_texture, Format(L"Texture from file: %.*s", STR_TO_FORMAT(g_textureFilePath.GetValue())));
+    SetD3D12ObjectName(m_Texture, Format(L"Texture from file: %.*s", STR_TO_FORMAT(g_TextureFilePath.GetValue())));
 
-    const D3D12_RESOURCE_DESC textureDesc = m_texture->GetDesc();
-    const uint32_t bytesPerPixel = DxgiFormatToBytesPerPixel(textureDesc.Format);
+    const D3D12_RESOURCE_DESC textureDesc = m_Texture->GetDesc();
+    const uint32_t bytesPerPixel = DXGIFormatToBytesPerPixel(textureDesc.Format);
+    CHECK_BOOL(bytesPerPixel > 0);
     const uvec2 textureSize = uvec2((uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height);
 
     // Create source buffer.
@@ -561,14 +562,14 @@ void Renderer::LoadTexture()
     {
         const CD3DX12_RESOURCE_DESC srcBufDesc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
         CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
-        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
             &heapProps,
             D3D12_HEAP_FLAG_NONE,
             &srcBufDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
             IID_PPV_ARGS(&srcBuf)));
-        SetD3d12ObjectName(srcBuf, L"Texture source buffer");
+        SetD3D12ObjectName(srcBuf, L"Texture source buffer");
     }
 
     // Map source buffer and memcpy data to it from decodedData.
@@ -593,9 +594,9 @@ void Renderer::LoadTexture()
 
     // Copy the data.
     {
-        auto cmdList = g_renderer->BeginUploadCommandList();
+        auto cmdList = g_Renderer->BeginUploadCommandList();
 
-        CD3DX12_TEXTURE_COPY_LOCATION dst{m_texture.Get()};
+        CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
             {textureDesc.Format, (uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height, 1, srcBufRowPitch}};
         CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
@@ -608,23 +609,23 @@ void Renderer::LoadTexture()
             &src, &srcBox);
 
         CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
         cmdList->ResourceBarrier(1, &barrier);
 
-        g_renderer->CompleteUploadCommandList();
+        g_Renderer->CompleteUploadCommandList();
     }
 
     // Setup texture SRV descriptor
-    g_renderer->SetTexture(m_texture.Get());
+    g_Renderer->SetTexture(m_Texture.Get());
 
-    ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(g_textureFilePath.GetValue())));
+    ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(g_TextureFilePath.GetValue())));
 }
 
-void Renderer::WaitForFenceOnCpu(UINT64 value)
+void Renderer::WaitForFenceOnCPU(UINT64 value)
 {
-	if(m_fence->GetCompletedValue() < value)
+	if(m_Fence->GetCompletedValue() < value)
 	{
-		CHECK_HR(m_fence->SetEventOnCompletion(value, m_fenceEvent.get()));
-		WaitForSingleObject(m_fenceEvent.get(), INFINITE);
+		CHECK_HR(m_Fence->SetEventOnCompletion(value, m_FenceEvent.get()));
+		WaitForSingleObject(m_FenceEvent.get(), INFINITE);
 	}
 }

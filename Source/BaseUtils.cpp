@@ -16,7 +16,7 @@ void Exception::Print() const
     }
 }
 
-wstring GetWinApiErrorMessage()
+wstring GetWinAPIErrorMessage()
 {
     const uint32_t err = GetLastError();
     wchar_t* msg;
@@ -38,7 +38,7 @@ wstring GetWinApiErrorMessage()
     return result;
 }
 
-wstring GetHresultErrorMessage(HRESULT hr)
+wstring GetHRESULTErrorMessage(HRESULT hr)
 {
     const wchar_t* msg = nullptr;
 #define KNOWN_ERROR(symbol) case symbol: msg = _T(#symbol); break;
@@ -251,14 +251,14 @@ void SetThreadName(DWORD threadId, const str_view& name)
     }
 }
 
-void SetD3d12ObjectName(ID3D12Object* obj, const wstr_view& name)
+void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name)
 {
     if(!g_UseD3d12ObjectNames.GetValue())
         return;
     obj->SetName(name.c_str());
 }
 
-uint8_t DxgiFormatToBytesPerPixel(DXGI_FORMAT format)
+uint8_t DXGIFormatToBytesPerPixel(DXGI_FORMAT format)
 {
 #define FORMAT_SINGLE(f, result) if(format == f) return result;
 #define FORMAT_PAIR(first, last, result) if(format >= first && format <= last) return result;

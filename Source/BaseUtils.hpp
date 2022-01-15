@@ -91,8 +91,8 @@ struct Exception
     void Print() const;
 };
 
-wstring GetWinApiErrorMessage();
-wstring GetHresultErrorMessage(HRESULT hr);
+wstring GetWinAPIErrorMessage();
+wstring GetHRESULTErrorMessage(HRESULT hr);
 
 // Use this macro to pass the 2 parameters to formatting function matching formatting string like "%.*s", "%.*hs" etc.
 // for s of type like std::string, std::wstring, str_view, wstr_view.
@@ -106,10 +106,10 @@ wstring GetHresultErrorMessage(HRESULT hr);
         throw Exception(__TFILE__, __LINE__, L"(" _T(#expr) L") == false"); \
     } } while(false)
 #define CHECK_BOOL_WINAPI(expr)  do { if(!(expr)) { \
-        throw Exception(__TFILE__, __LINE__, {GetWinApiErrorMessage(), L"(" _T(#expr) L") == false"}); \
+        throw Exception(__TFILE__, __LINE__, {GetWinAPIErrorMessage(), L"(" _T(#expr) L") == false"}); \
     } } while(false)
 #define CHECK_HR(expr)  do { HRESULT hr__ = (expr); if(FAILED(hr__)) { \
-        throw Exception(__TFILE__, __LINE__, {GetHresultErrorMessage(hr__), L"FAILED(" #expr L")"}); \
+        throw Exception(__TFILE__, __LINE__, {GetHRESULTErrorMessage(hr__), L"FAILED(" #expr L")"}); \
     } } while(false)
 
 #define ERR_TRY try {
@@ -175,7 +175,7 @@ inline void LogErrorF(const wchar_t* format, ...) { va_list argList; va_start(ar
 
 std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);
-void SetD3d12ObjectName(ID3D12Object* obj, const wstr_view& name);
-inline void SetD3d12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3d12ObjectName(obj.Get(), name); }
+void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
+inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }
 // On error returns 0.
-uint8_t DxgiFormatToBytesPerPixel(DXGI_FORMAT format);
+uint8_t DXGIFormatToBytesPerPixel(DXGI_FORMAT format);

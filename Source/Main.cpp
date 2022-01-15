@@ -11,7 +11,7 @@ enum EXIT_CODE
 static const wchar_t* const CLASS_NAME = L"REG_ENGINE_1";
 static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 
-VecSetting<glm::uvec2> g_size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
+VecSetting<glm::uvec2> g_Size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
 
 class Application
 {
@@ -21,11 +21,11 @@ public:
     int Run();
 
 private:
-    HINSTANCE m_instance = NULL;
-    HWND m_wnd = NULL;
-    ComPtr<IDXGIFactory4> m_dxgiFactory;
-    ComPtr<IDXGIAdapter1> m_adapter;
-    unique_ptr<Renderer> m_renderer;
+    HINSTANCE m_Instance = NULL;
+    HWND m_Wnd = NULL;
+    ComPtr<IDXGIFactory4> m_DXGIFactory;
+    ComPtr<IDXGIAdapter1> m_Adapter;
+    unique_ptr<Renderer> m_Renderer;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     void SelectAdapter();
@@ -36,11 +36,11 @@ private:
     void OnKeyDown(WPARAM key);
 };
 
-static Application* g_app;
+static Application* g_App;
 
 Application::Application()
 {
-    m_instance = (HINSTANCE)GetModuleHandle(NULL);
+    m_Instance = (HINSTANCE)GetModuleHandle(NULL);
     SetThreadName(GetCurrentThreadId(), "MAIN");
 }
 
@@ -49,28 +49,28 @@ void Application::Init()
     ERR_TRY;
     LogMessage(L"Application starting.");
     CHECK_HR(CoInitialize(NULL));
-    CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_dxgiFactory)));
+    CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DXGIFactory)));
     LoadStartupSettings();
     LoadLoadSettings();
     SelectAdapter();
-    assert(m_adapter);
+    assert(m_Adapter);
     RegisterWindowClass();
     CreateWindow_();
-    m_renderer = make_unique<Renderer>(m_dxgiFactory.Get(), m_adapter.Get(), m_wnd);
-    m_renderer->Init();
+    m_Renderer = make_unique<Renderer>(m_DXGIFactory.Get(), m_Adapter.Get(), m_Wnd);
+    m_Renderer->Init();
     ERR_CATCH_MSG(L"Failed to initialize application.");
 }
 
 void Application::SelectAdapter()
 {
     ComPtr<IDXGIAdapter1> tmpAdapter;
-    for(UINT i = 0; m_dxgiFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
+    for(UINT i = 0; m_DXGIFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
     {
         DXGI_ADAPTER_DESC1 desc;
         tmpAdapter->GetDesc1(&desc);
         if((desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0)
         {
-            m_adapter = std::move(tmpAdapter);
+            m_Adapter = std::move(tmpAdapter);
             return;
         }
     }
@@ -79,8 +79,8 @@ void Application::SelectAdapter()
 
 LRESULT WINAPI Application::GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    assert(g_app);
-    return g_app->WndProc(wnd, msg, wParam, lParam);
+    assert(g_App);
+    return g_App->WndProc(wnd, msg, wParam, lParam);
 }
 
 void Application::RegisterWindowClass()
@@ -91,22 +91,22 @@ void Application::RegisterWindowClass()
     wndClass.hbrBackground = NULL;
     wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
     wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-    wndClass.hInstance = m_instance;
+    wndClass.hInstance = m_Instance;
     wndClass.lpfnWndProc = &GlobalWndProc;
     wndClass.lpszClassName = CLASS_NAME;
 
-    ATOM classR = RegisterClassEx(&wndClass);
-    assert(classR);
+    ATOM classResult = RegisterClassEx(&wndClass);
+    assert(classResult);
 }
 
 void Application::CreateWindow_()
 {
-    assert(m_instance);
+    assert(m_Instance);
     constexpr DWORD style = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_VISIBLE;
     constexpr DWORD exStyle = 0;
-    RECT rect = {0, 0, (int)g_size.GetValue().x, (int)g_size.GetValue().y};
+    RECT rect = {0, 0, (int)g_Size.GetValue().x, (int)g_Size.GetValue().y};
     AdjustWindowRectEx(&rect, style, FALSE, exStyle);
-    m_wnd = CreateWindowEx(
+    m_Wnd = CreateWindowEx(
         exStyle,
         CLASS_NAME,
         WINDOW_TITLE,
@@ -115,15 +115,15 @@ void Application::CreateWindow_()
         rect.right - rect.left, rect.bottom - rect.top,
         NULL,
         NULL,
-        m_instance,
+        m_Instance,
         NULL);
-    assert(m_wnd);
+    assert(m_Wnd);
 }
 
 LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    if(m_wnd == NULL)
-        m_wnd = wnd;
+    if(m_Wnd == NULL)
+        m_Wnd = wnd;
 
     switch(msg)
     {
@@ -144,7 +144,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             OnKeyDown(wParam);
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_wnd);)
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
     }
 
@@ -153,7 +153,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 void Application::OnDestroy()
 {
-    m_renderer.reset();
+    m_Renderer.reset();
 }
 
 void Application::OnKeyDown(WPARAM key)
@@ -165,7 +165,7 @@ void Application::OnKeyDown(WPARAM key)
         break;
 
     case VK_ESCAPE:
-        PostMessage(m_wnd, WM_CLOSE, 0, 0);
+        PostMessage(m_Wnd, WM_CLOSE, 0, 0);
         break;
     }
 }
@@ -192,8 +192,8 @@ int Application::Run()
             */
 
             //Update();
-            if(m_renderer)
-                m_renderer->Render();
+            if(m_Renderer)
+                m_Renderer->Render();
         }
     }
     LogMessage(L"Application exiting.");
@@ -205,10 +205,10 @@ int wmain(int argc, wchar_t** argv)
 	try
 	{
         Application app;
-        g_app = &app;
+        g_App = &app;
         app.Init();
         const int result = app.Run();
-        g_app = nullptr;
+        g_App = nullptr;
         return result;
 	}
 	CATCH_PRINT_ERROR(return EXIT_CODE_RUNTIME_ERROR;);
