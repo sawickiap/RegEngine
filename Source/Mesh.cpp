@@ -53,13 +53,9 @@ void Mesh::Init(
     {
         CD3DX12_RANGE readEmptyRange{0, 0};
         void* vbMappedPtr = nullptr;
-        CHECK_HR(m_VertexBuffer->Map(
-            0, // Subresource
-            &readEmptyRange, // pReadRange
-            &vbMappedPtr));
+        CHECK_HR(m_VertexBuffer->Map(0, D3D12_RANGE_NONE, &vbMappedPtr));
         memcpy(vbMappedPtr, vertices, vertexCount * sizeof(Vertex));
-        m_VertexBuffer->Unmap(0, // Subresource
-            nullptr); // pWrittenRange
+        m_VertexBuffer->Unmap(0, D3D12_RANGE_ALL);
     }
 
     if(indexCount > 0)
@@ -82,13 +78,9 @@ void Mesh::Init(
         {
             CD3DX12_RANGE readEmptyRange{0, 0};
             void* ibMappedPtr = nullptr;
-            CHECK_HR(m_IndexBuffer->Map(
-                0, // Subresource
-                &readEmptyRange, // pReadRange
-                &ibMappedPtr));
+            CHECK_HR(m_IndexBuffer->Map(0, D3D12_RANGE_NONE, &ibMappedPtr));
             memcpy(ibMappedPtr, indices, indexCount * sizeof(IndexType));
-            m_IndexBuffer->Unmap(0, // Subresource
-                nullptr); // pWrittenRange
+            m_IndexBuffer->Unmap(0, D3D12_RANGE_ALL);
         }
     }
 }

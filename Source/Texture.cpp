@@ -57,18 +57,14 @@ void Texture::LoadFromFile(const wstr_view& filePath)
         const uint8_t* textureDataPtr = decodedData.get();
         CD3DX12_RANGE readEmptyRange{0, 0};
         void* srcBufMappedPtr = nullptr;
-        CHECK_HR(srcBuf->Map(
-            0, // Subresource
-            &readEmptyRange, // pReadRange
-            &srcBufMappedPtr));
+        CHECK_HR(srcBuf->Map(0, D3D12_RANGE_NONE, &srcBufMappedPtr));
         for(uint32_t y = 0; y < textureSize.y; ++y)
         {
             memcpy(srcBufMappedPtr, textureDataPtr, textureSize.x * bytesPerPixel);
             textureDataPtr += subresource.RowPitch;
             srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
         }
-        srcBuf->Unmap(0, // Subresource
-            nullptr); // pWrittenRange
+        srcBuf->Unmap(0, D3D12_RANGE_ALL);
     }
     decodedData.reset();
 
@@ -133,18 +129,14 @@ void Texture::LoadFromMemory(
         CD3DX12_RANGE readEmptyRange{0, 0};
         char* srcBufMappedPtr = nullptr;
         const char* textureDataPtr = (const char*)data.pData;
-        CHECK_HR(srcBuf->Map(
-            0, // Subresource
-            &readEmptyRange, // pReadRange
-            (void**)&srcBufMappedPtr));
+        CHECK_HR(srcBuf->Map(0, D3D12_RANGE_NONE, (void**)&srcBufMappedPtr));
         for(uint32_t y = 0; y < resDesc.Height; ++y)
         {
             memcpy(srcBufMappedPtr, textureDataPtr, resDesc.Width * bytesPerPixel);
             textureDataPtr = (char*)textureDataPtr + data.RowPitch;
             srcBufMappedPtr += srcBufRowPitch;
         }
-        srcBuf->Unmap(0, // Subresource
-            nullptr); // pWrittenRange
+        srcBuf->Unmap(0, D3D12_RANGE_ALL); // pWrittenRange
     }
 
     // Create destination texture.

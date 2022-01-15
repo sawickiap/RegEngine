@@ -133,6 +133,9 @@ wstring GetHRESULTErrorMessage(HRESULT hr);
         extraCatchCode \
     }
 
+constexpr D3D12_RANGE* D3D12_RANGE_ALL = nullptr;
+extern const D3D12_RANGE* D3D12_RANGE_NONE;
+
 template<typename CharT>
 void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_template<CharT>& str, size_t offset)
 {
