@@ -28,7 +28,8 @@ Renderer* g_Renderer;
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PIXEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
-static mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
+// Source: "Reversed-Z in OpenGL", https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
+static mat4 MakeInfReversedZProjLH(float fovY_radians, float aspectWbyH, float zNear)
 {
     float f = 1.0f / tan(fovY_radians / 2.0f);
     return mat4(
@@ -207,7 +208,7 @@ void Renderer::Render()
             vec3(0.f, 2.f, 0.5f), // eye
             vec3(0.f), // center
             vec3(0.f, 0.f, 1.f)); // up
-        const mat4 proj = MakeInfReversedZProjRH(
+        const mat4 proj = MakeInfReversedZProjLH(
             glm::radians(80.f),
             (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
             0.5f); // zNear
