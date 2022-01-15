@@ -3,6 +3,7 @@
 static const uint32_t MAX_FRAME_COUNT = 10;
 
 class Font;
+class CommandList;
 
 class Renderer
 {
@@ -13,9 +14,9 @@ public:
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
-    ID3D12GraphicsCommandList* BeginUploadCommandList();
+    void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
-    void CompleteUploadCommandList();
+    void CompleteUploadCommandList(CommandList& cmdList);
     void SetTexture(ID3D12Resource* res);
 
 	void Render();

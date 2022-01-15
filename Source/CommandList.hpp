@@ -23,8 +23,9 @@ public:
     void SetViewport(const D3D12_VIEWPORT& viewport);
     void SetScissorRect(const D3D12_RECT& scissorRect);
     void SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY primitiveTopology);
-    void SetDescriptorHeap_CBV_SRV_UAV(ID3D12DescriptorHeap* descriptorHeap);
-    void SetDescriptorHeap_Sampler(ID3D12DescriptorHeap* descriptorHeap);
+    void SetDescriptorHeaps(
+        ID3D12DescriptorHeap* descriptorHeap_CBV_SRV_UAV,
+        ID3D12DescriptorHeap* descriptorHeap_Sampler);
 
 private:
     ID3D12GraphicsCommandList* m_CmdList = nullptr;
@@ -38,8 +39,6 @@ private:
         ID3D12DescriptorHeap* m_DescriptorHeap_CBV_SRV_UAV = nullptr;
         ID3D12DescriptorHeap* m_DescriptorHeap_Sampler = nullptr;
     } m_State;
-
-    void SetCommandListDescriptorHeaps();
 };
 
 class PIXEventScope

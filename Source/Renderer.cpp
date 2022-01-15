@@ -112,7 +112,8 @@ void Font::Init()
 
     // Copy the data.
     {
-        const auto cmdList = g_Renderer->BeginUploadCommandList();
+        CommandList cmdList;
+        g_Renderer->BeginUploadCommandList(cmdList);
 
         CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
@@ -122,15 +123,15 @@ void Font::Init()
             0, 0, 0, // Left, Top, Front
             (LONG)textureDataSize.x, (LONG)textureDataSize.y, 1}; // Right, Bottom, Back
 
-        cmdList->CopyTextureRegion(&dst,
+        cmdList.GetCmdList()->CopyTextureRegion(&dst,
             0, 0, 0, // DstX, DstY, DstZ
             &src, &srcBox);
 
         CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList->ResourceBarrier(1, &barrier);
+        cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
 
-        g_Renderer->CompleteUploadCommandList();
+        g_Renderer->CompleteUploadCommandList(cmdList);
     }
 
     // Setup texture SRV descriptor
@@ -179,19 +180,15 @@ Renderer::~Renderer()
     }
 }
 
-ID3D12GraphicsCommandList* Renderer::BeginUploadCommandList()
+void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
 {
     WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
-    CHECK_HR(m_UploadCmdList->Reset(m_CmdAllocator.Get(), NULL));
-    return m_UploadCmdList.Get();
+    dstCmdList.Init(m_CmdAllocator.Get(), m_UploadCmdList.Get());
 }
 
-void Renderer::CompleteUploadCommandList()
+void Renderer::CompleteUploadCommandList(CommandList& cmdList)
 {
-    CHECK_HR(m_UploadCmdList->Close());
-
-	ID3D12CommandList* const baseCmdList = m_UploadCmdList.Get();
-	m_CmdQueue->ExecuteCommandLists(1, &baseCmdList);
+    cmdList.Execute(m_CmdQueue.Get());
 
 	m_UploadCmdListSubmittedFenceValue = m_NextFenceValue++;
 	CHECK_HR(m_CmdQueue->Signal(m_Fence.Get(), m_UploadCmdListSubmittedFenceValue));
@@ -263,7 +260,7 @@ void Renderer::Render()
         mat4x4 worldViewProj = proj * view * world;
 
         ID3D12DescriptorHeap* const descriptorHeap = m_DescriptorHeap.Get();
-        cmdList.SetDescriptorHeap_CBV_SRV_UAV(m_DescriptorHeap.Get());
+        cmdList.SetDescriptorHeaps(m_DescriptorHeap.Get(), nullptr);
         cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
         cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
@@ -570,7 +567,8 @@ void Renderer::LoadTexture()
 
     // Copy the data.
     {
-        auto cmdList = g_Renderer->BeginUploadCommandList();
+        CommandList cmdList;
+        g_Renderer->BeginUploadCommandList(cmdList);
 
         CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
@@ -580,15 +578,15 @@ void Renderer::LoadTexture()
             0, 0, 0, // Left, Top, Front
             (LONG)textureDesc.Width, (LONG)textureDesc.Height, 1}; // Right, Bottom, Back
 
-        cmdList->CopyTextureRegion(&dst,
+        cmdList.GetCmdList()->CopyTextureRegion(&dst,
             0, 0, 0, // DstX, DstY, DstZ
             &src, &srcBox);
 
         CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList->ResourceBarrier(1, &barrier);
+        cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
 
-        g_Renderer->CompleteUploadCommandList();
+        g_Renderer->CompleteUploadCommandList(cmdList);
     }
 
     // Setup texture SRV descriptor

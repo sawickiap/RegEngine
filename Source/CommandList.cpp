@@ -89,46 +89,34 @@ void CommandList::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY primitiveTopolog
     }
 }
 
-void CommandList::SetDescriptorHeap_CBV_SRV_UAV(ID3D12DescriptorHeap* descriptorHeap)
+void CommandList::SetDescriptorHeaps(
+    ID3D12DescriptorHeap* descriptorHeap_CBV_SRV_UAV,
+    ID3D12DescriptorHeap* descriptorHeap_Sampler)
 {
     assert(m_CmdList);
-    if(descriptorHeap != m_State.m_DescriptorHeap_CBV_SRV_UAV)
+    if(descriptorHeap_CBV_SRV_UAV != m_State.m_DescriptorHeap_CBV_SRV_UAV ||
+        descriptorHeap_Sampler != m_State.m_DescriptorHeap_Sampler)
     {
-        m_State.m_DescriptorHeap_CBV_SRV_UAV = descriptorHeap;
-        SetCommandListDescriptorHeaps();
-    }
-}
+        m_State.m_DescriptorHeap_CBV_SRV_UAV = descriptorHeap_CBV_SRV_UAV;
+        m_State.m_DescriptorHeap_Sampler = descriptorHeap_Sampler;
+        /*
+        Documentation of SetDescriptorHeaps says:
 
-void CommandList::SetDescriptorHeap_Sampler(ID3D12DescriptorHeap* descriptorHeap)
-{
-    assert(m_CmdList);
-    if(descriptorHeap != m_State.m_DescriptorHeap_Sampler)
-    {
-        m_State.m_DescriptorHeap_Sampler = descriptorHeap;
-        SetCommandListDescriptorHeaps();
+        Only one descriptor heap of each type can be set at one time, which means a
+        maximum of 2 heaps (one sampler, one CBV/SRV/UAV) can be set at one time.
+        All previously set heaps are unset by the call. At most one heap of each
+        shader-visible type can be set in the call.
+        */
+        if(m_State.m_DescriptorHeap_CBV_SRV_UAV && m_State.m_DescriptorHeap_Sampler)
+        {
+            ID3D12DescriptorHeap* heaps[] = {m_State.m_DescriptorHeap_CBV_SRV_UAV, m_State.m_DescriptorHeap_Sampler};
+            m_CmdList->SetDescriptorHeaps(2, heaps);
+        }
+        else if(m_State.m_DescriptorHeap_CBV_SRV_UAV)
+            m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_CBV_SRV_UAV);
+        else if(m_State.m_DescriptorHeap_Sampler)
+            m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_Sampler);
+        else
+            m_CmdList->SetDescriptorHeaps(0, nullptr);
     }
-}
-
-void CommandList::SetCommandListDescriptorHeaps()
-{
-    /*
-    Documentation of SetDescriptorHeaps says:
-
-    Only one descriptor heap of each type can be set at one time, which means a
-    maximum of 2 heaps (one sampler, one CBV/SRV/UAV) can be set at one time.
-    All previously set heaps are unset by the call. At most one heap of each
-    shader-visible type can be set in the call.
-    */
-    assert(m_CmdList);
-    if(m_State.m_DescriptorHeap_CBV_SRV_UAV && m_State.m_DescriptorHeap_Sampler)
-    {
-        ID3D12DescriptorHeap* heaps[] = {m_State.m_DescriptorHeap_CBV_SRV_UAV, m_State.m_DescriptorHeap_Sampler};
-        m_CmdList->SetDescriptorHeaps(2, heaps);
-    }
-    else if(m_State.m_DescriptorHeap_CBV_SRV_UAV)
-        m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_CBV_SRV_UAV);
-    else if(m_State.m_DescriptorHeap_Sampler)
-        m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_Sampler);
-    else
-        m_CmdList->SetDescriptorHeaps(0, nullptr);
 }
