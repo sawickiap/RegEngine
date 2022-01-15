@@ -105,6 +105,7 @@
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="RenderingResource.cpp" />
     <ClCompile Include="Settings.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="WinFontRenderImpl.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -116,6 +117,7 @@
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Settings.hpp" />
+    <ClInclude Include="Texture.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis" />

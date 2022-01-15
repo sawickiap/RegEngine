@@ -5,6 +5,7 @@ static const uint32_t MAX_FRAME_COUNT = 10;
 class Font;
 class CommandList;
 class RenderingResource;
+class Texture;
 
 class Renderer
 {
@@ -59,7 +60,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
-    ComPtr<ID3D12Resource> m_Texture;
+    unique_ptr<Texture> m_Texture;
 
 	void CreateDevice();
 	void LoadCapabilities();
@@ -67,7 +68,8 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
-    void LoadTexture();
 
     void WaitForFenceOnCPU(UINT64 value);
 };
+
+extern Renderer* g_Renderer;

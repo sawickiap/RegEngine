@@ -1,9 +1,9 @@
 #include "BaseUtils.hpp"
 #include "CommandList.hpp"
 #include "RenderingResource.hpp"
+#include "Texture.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
-#include <WICTextureLoader.h>
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
@@ -489,105 +489,10 @@ void Renderer::CreateResources()
         m_Font->Init();
     }
 
-    LoadTexture();
+    m_Texture = std::make_unique<Texture>();
+    m_Texture->LoadFromFile(g_TextureFilePath.GetValue());
 
     ERR_CATCH_FUNC;
-}
-
-void Renderer::LoadTexture()
-{
-    m_Texture.Reset();
-    if(g_TextureFilePath.GetValue().empty())
-        return;
-    ERR_TRY;
-
-    LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(g_TextureFilePath.GetValue()));
-
-    unique_ptr<uint8_t[]> decodedData;
-    D3D12_SUBRESOURCE_DATA subresource = {};
-    CHECK_HR(DirectX::LoadWICTextureFromFileEx(
-        m_Device.Get(),
-        g_TextureFilePath.GetValue().c_str(),
-        0, // maxSize
-        D3D12_RESOURCE_FLAG_NONE,
-        DirectX::WIC_LOADER_FORCE_SRGB,
-        &m_Texture,
-        decodedData,
-        subresource));
-    CHECK_BOOL(m_Texture && decodedData && subresource.pData && subresource.RowPitch);
-    CHECK_BOOL(subresource.pData == decodedData.get());
-    SetD3D12ObjectName(m_Texture, Format(L"Texture from file: %.*s", STR_TO_FORMAT(g_TextureFilePath.GetValue())));
-
-    const D3D12_RESOURCE_DESC textureDesc = m_Texture->GetDesc();
-    const uint32_t bytesPerPixel = DXGIFormatToBytesPerPixel(textureDesc.Format);
-    CHECK_BOOL(bytesPerPixel > 0);
-    const uvec2 textureSize = uvec2((uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height);
-
-    // Create source buffer.
-    const uint32_t srcBufRowPitch = std::max<uint32_t>(textureSize.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-    const uint32_t srcBufSize = srcBufRowPitch * textureSize.y;
-    ComPtr<ID3D12Resource> srcBuf;
-    {
-        const CD3DX12_RESOURCE_DESC srcBufDesc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
-        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &srcBufDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&srcBuf)));
-        SetD3D12ObjectName(srcBuf, L"Texture source buffer");
-    }
-
-    // Map source buffer and memcpy data to it from decodedData.
-    {
-        const uint8_t* textureDataPtr = decodedData.get();
-        CD3DX12_RANGE readEmptyRange{0, 0};
-        void* srcBufMappedPtr = nullptr;
-        CHECK_HR(srcBuf->Map(
-            0, // Subresource
-            &readEmptyRange, // pReadRange
-            &srcBufMappedPtr));
-        for(uint32_t y = 0; y < textureSize.y; ++y)
-        {
-            memcpy(srcBufMappedPtr, textureDataPtr, textureSize.x * bytesPerPixel);
-            textureDataPtr += subresource.RowPitch;
-            srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
-        }
-        srcBuf->Unmap(0, // Subresource
-            nullptr); // pWrittenRange
-    }
-    decodedData.reset();
-
-    // Copy the data.
-    {
-        CommandList cmdList;
-        g_Renderer->BeginUploadCommandList(cmdList);
-
-        CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
-            {textureDesc.Format, (uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height, 1, srcBufRowPitch}};
-        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
-        CD3DX12_BOX srcBox{
-            0, 0, 0, // Left, Top, Front
-            (LONG)textureDesc.Width, (LONG)textureDesc.Height, 1}; // Right, Bottom, Back
-
-        cmdList.GetCmdList()->CopyTextureRegion(&dst,
-            0, 0, 0, // DstX, DstY, DstZ
-            &src, &srcBox);
-
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
-
-        g_Renderer->CompleteUploadCommandList(cmdList);
-    }
-
-    // Setup texture SRV descriptor
-    g_Renderer->SetTexture(m_Texture.Get());
-
-    ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(g_TextureFilePath.GetValue())));
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)
