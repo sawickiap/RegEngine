@@ -6,6 +6,7 @@ class Font;
 class CommandList;
 class RenderingResource;
 class Texture;
+class Mesh;
 
 class Renderer
 {
@@ -61,6 +62,7 @@ private:
     unique_ptr<Font> m_Font;
     ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
     unique_ptr<Texture> m_Texture;
+    unique_ptr<Mesh> m_Mesh;
 
 	void CreateDevice();
 	void LoadCapabilities();

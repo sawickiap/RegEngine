@@ -9,6 +9,7 @@
     <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="RenderingResource.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -43,6 +44,7 @@
     <ClInclude Include="CommandList.hpp" />
     <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Texture.hpp" />
+    <ClInclude Include="Mesh.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

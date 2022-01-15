@@ -2,6 +2,7 @@
 #include "CommandList.hpp"
 #include "RenderingResource.hpp"
 #include "Texture.hpp"
+#include "Mesh.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
@@ -199,6 +200,17 @@ void Renderer::Render()
 
         cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
+        const D3D12_VERTEX_BUFFER_VIEW vbView = m_Mesh->GetVertexBufferView();
+        cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
+
+        if(m_Mesh->HasIndices())
+        {
+            const D3D12_INDEX_BUFFER_VIEW ibView = m_Mesh->GetIndexBufferView();
+            cmdList.GetCmdList()->IASetIndexBuffer(&ibView);
+        }
+        else
+            cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
+
 	    cmdList.GetCmdList()->DrawInstanced(4, 1, 0, 0);
 
 	    /*
@@ -390,8 +402,8 @@ void Renderer::CreateResources()
 		std::vector<char> psCode = LoadFile(L"Data\\PS");
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
-		//desc.InputLayout.NumElements = 0;
-		//desc.InputLayout.pInputElementDescs = 
+		desc.InputLayout.NumElements = Vertex::GetInputElementCount();
+		desc.InputLayout.pInputElementDescs = Vertex::GetInputElements();
 		desc.pRootSignature = m_RootSignature.Get();
 		desc.VS.BytecodeLength = vsCode.size();
 		desc.VS.pShaderBytecode = vsCode.data();
@@ -428,6 +440,26 @@ void Renderer::CreateResources()
 
     m_Texture = std::make_unique<Texture>();
     m_Texture->LoadFromFile(g_TextureFilePath.GetValue());
+
+    {
+        const Vertex vertices[] = {
+            { {0.f, 0.f, 0.f}, {0.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {1.f, 0.f, 0.f}, {1.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {0.f, 0.f, 1.f}, {0.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {1.f, 0.f, 1.f}, {1.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+        };
+        const uint16_t indices[] = {
+            0, 1, 2,
+            2, 1, 3,
+        };
+
+        m_Mesh = std::make_unique<Mesh>();
+        m_Mesh->Init(
+            D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+            D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
+            vertices, (uint32_t)_countof(vertices),
+            indices, (uint32_t)_countof(indices));
+    }
 
     ERR_CATCH_FUNC;
 }
