@@ -7,6 +7,7 @@
     <ClCompile Include="WinFontRenderImpl.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="CommandList.cpp" />
+    <ClCompile Include="RenderingResource.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -39,6 +40,7 @@
     </ClInclude>
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="CommandList.hpp" />
+    <ClInclude Include="RenderingResource.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

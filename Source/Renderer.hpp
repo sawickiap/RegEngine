@@ -4,6 +4,7 @@ static const uint32_t MAX_FRAME_COUNT = 10;
 
 class Font;
 class CommandList;
+class RenderingResource;
 
 class Renderer
 {
@@ -25,7 +26,7 @@ private:
 	struct FrameResources
 	{
 		ComPtr<ID3D12GraphicsCommandList> m_CmdList;
-		ComPtr<ID3D12Resource> m_BackBuffer;
+		unique_ptr<RenderingResource> m_BackBuffer;
 		UINT64 m_SubmittedFenceValue = 0;
 	};
 

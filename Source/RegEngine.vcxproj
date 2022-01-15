@@ -103,6 +103,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="RenderingResource.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="WinFontRenderImpl.cpp" />
   </ItemGroup>
@@ -113,6 +114,7 @@
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="CommandList.hpp" />
     <ClInclude Include="Renderer.hpp" />
+    <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Settings.hpp" />
   </ItemGroup>
   <ItemGroup>

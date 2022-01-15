@@ -1,5 +1,6 @@
 #include "BaseUtils.hpp"
 #include "CommandList.hpp"
+#include "RenderingResource.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include <WICTextureLoader.h>
@@ -214,11 +215,7 @@ void Renderer::Render()
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
-        CD3DX12_RESOURCE_BARRIER presentToRenderTargetBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		    frameRes.m_BackBuffer.Get(),
-		    D3D12_RESOURCE_STATE_PRESENT,
-		    D3D12_RESOURCE_STATE_RENDER_TARGET);
-	    cmdList.GetCmdList()->ResourceBarrier(1, &presentToRenderTargetBarrier);
+        frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
 		    m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
@@ -273,12 +270,7 @@ void Renderer::Render()
 	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
 	    */
 
-	    CD3DX12_RESOURCE_BARRIER renderTargetToPresentBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
-		    frameRes.m_BackBuffer.Get(),
-		    D3D12_RESOURCE_STATE_RENDER_TARGET,
-		    D3D12_RESOURCE_STATE_PRESENT);
-	    cmdList.GetCmdList()->ResourceBarrier(1, &renderTargetToPresentBarrier);
-
+        frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
     cmdList.Execute(m_CmdQueue.Get());
 
@@ -364,9 +356,12 @@ void Renderer::CreateFrameResources()
 		CHECK_HR(m_FrameResources[i].m_CmdList->Close());
         SetD3D12ObjectName(m_FrameResources[i].m_CmdList, Format(L"Command list %u", i).c_str());
 
-		CHECK_HR(m_SwapChain->GetBuffer(i, __uuidof(ID3D12Resource), &m_FrameResources[i].m_BackBuffer));
+        ID3D12Resource* backBuffer = nullptr;
+		CHECK_HR(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
+        m_FrameResources[i].m_BackBuffer = std::make_unique<RenderingResource>();
+        m_FrameResources[i].m_BackBuffer->InitExternallyOwned(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
 
-		m_Device->CreateRenderTargetView(m_FrameResources[i].m_BackBuffer.Get(), nullptr, backBufferRtvHandle);
+		m_Device->CreateRenderTargetView(m_FrameResources[i].m_BackBuffer->GetResource(), nullptr, backBufferRtvHandle);
 		
 		backBufferRtvHandle.ptr += m_Capabilities.m_DescriptorSize_RTV;
 	}
