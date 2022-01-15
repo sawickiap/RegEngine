@@ -28,6 +28,16 @@ Renderer* g_Renderer;
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PIXEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
+static mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
+{
+    float f = 1.0f / tan(fovY_radians / 2.0f);
+    return mat4(
+        f / aspectWbyH, 0.0f,  0.0f,  0.0f,
+        0.0f,    f,  0.0f,  0.0f,
+        0.0f, 0.0f,  0.0f,  1.0f,
+        0.0f, 0.0f, zNear,  0.0f);
+}
+
 class Font
 {
 public:
@@ -173,7 +183,7 @@ void Renderer::Render()
             cmdList.GetCmdList()->ClearDepthStencilView(
                 dsvDescriptorHandle,
                 D3D12_CLEAR_FLAG_DEPTH,
-                1.f, // depth
+                0.f, // depth
                 0, // stencil
                 0, nullptr); // NumRects, prects
         }
@@ -192,17 +202,16 @@ void Renderer::Render()
 
 	    cmdList.SetPrimitiveTopology(m_Mesh->GetTopology());
 
-        const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
-        const mat4x4 view = glm::lookAtLH(
+        const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
+        const mat4 view = glm::lookAtLH(
             vec3(0.f, 2.f, 0.5f), // eye
             vec3(0.f), // center
             vec3(0.f, 0.f, 1.f)); // up
-        const mat4x4 proj = glm::perspectiveFovLH(
-            glm::radians(80.0f), // fov
-            (float)g_Size.GetValue().x, (float)g_Size.GetValue().y,
-            0.5f, // zNear
-            100.f); // zFar
-        mat4x4 worldViewProj = proj * view * world;
+        const mat4 proj = MakeInfReversedZProjRH(
+            glm::radians(80.f),
+            (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
+            0.5f); // zNear
+        mat4 worldViewProj = proj * view * world;
 
         ID3D12DescriptorHeap* const descriptorHeap = m_DescriptorHeap.Get();
         cmdList.SetDescriptorHeaps(m_DescriptorHeap.Get(), nullptr);
@@ -359,7 +368,7 @@ static void SetDefaultDepthStencilDesc(D3D12_DEPTH_STENCIL_DESC& outDesc)
 {
     outDesc.DepthEnable = TRUE;
     outDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    outDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+    outDesc.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
     outDesc.StencilEnable = FALSE;
     outDesc.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
     outDesc.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
@@ -385,7 +394,7 @@ void Renderer::CreateResources()
             D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
         D3D12_CLEAR_VALUE clearValue = {};
         clearValue.Format = DEPTH_STENCIL_FORMAT;
-        clearValue.DepthStencil.Depth = 1.f;
+        clearValue.DepthStencil.Depth = 0.f;
         m_DepthTexture = std::make_unique<RenderingResource>();
         m_DepthTexture->Init(resDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, L"Depth", &clearValue);
 

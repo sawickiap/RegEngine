@@ -49,7 +49,7 @@ using glm::vec2;  using glm::vec3;  using glm::vec4;
 using glm::uvec2; using glm::uvec3; using glm::uvec4;
 using glm::ivec2; using glm::ivec3; using glm::ivec4;
 using glm::bvec2; using glm::bvec3; using glm::bvec4;
-using glm::mat4x4;
+using glm::mat4;
 
 struct CloseHandleDeleter
 {
