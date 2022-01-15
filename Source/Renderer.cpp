@@ -31,12 +31,13 @@ class Font
 public:
     void Init();
     ~Font();
+    Texture* GetTexture() const { return m_Texture.get(); }
 
 private:
     static const DXGI_FORMAT FORMAT = DXGI_FORMAT_R8_UNORM;
 
     WinFontRender::CFont m_WinFont;
-    ComPtr<ID3D12Resource> m_Texture;
+    unique_ptr<Texture> m_Texture;
 };
 
 void Font::Init()
@@ -56,88 +57,20 @@ void Font::Init()
     const void* textureDataPtr = nullptr;
     m_WinFont.GetTextureData(textureDataPtr, textureDataSize, textureDataRowPitch);
 
-    // Create source buffer.
-    const uint32_t srcBufRowPitch = std::max<uint32_t>(textureDataSize.x, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-    const uint32_t srcBufSize = srcBufRowPitch * textureDataSize.y;
-    ComPtr<ID3D12Resource> srcBuf;
-    {
-        const CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
-        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&srcBuf)));
-        SetD3D12ObjectName(srcBuf, L"Font texture source buffer");
-    }
+    CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+        FORMAT, // format
+        textureDataSize.x, // width
+        textureDataSize.y, // height
+        1, // arraySize
+        1); // mipLevels
+    m_Texture = std::make_unique<Texture>();
+    D3D12_SUBRESOURCE_DATA subresourceData = {};
+    subresourceData.pData = textureDataPtr;
+    subresourceData.RowPitch = textureDataRowPitch;
+    m_Texture->LoadFromMemory(resDesc, subresourceData, L"Font texture");
 
-    // Fill source buffer.
-    {
-        CD3DX12_RANGE readEmptyRange{0, 0};
-        void* srcBufMappedPtr = nullptr;
-        CHECK_HR(srcBuf->Map(
-            0, // Subresource
-            &readEmptyRange, // pReadRange
-            &srcBufMappedPtr));
-        for(uint32_t y = 0; y < textureDataSize.y; ++y)
-        {
-            memcpy(srcBufMappedPtr, textureDataPtr, textureDataSize.x);
-            textureDataPtr = (char*)textureDataPtr + textureDataRowPitch;
-            srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
-        }
-        srcBuf->Unmap(0, // Subresource
-            nullptr); // pWrittenRange
-    }
     m_WinFont.FreeTextureData();
 
-    // Create destination texture.
-    {
-        CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-            FORMAT, // format
-            textureDataSize.x, // width
-            textureDataSize.y, // height
-            1, // arraySize
-            1); // mipLevels
-        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_DEFAULT};
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &resDesc,
-            D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&m_Texture)));
-        SetD3D12ObjectName(m_Texture, L"Font");
-    }
-
-    // Copy the data.
-    {
-        CommandList cmdList;
-        g_Renderer->BeginUploadCommandList(cmdList);
-
-        CD3DX12_TEXTURE_COPY_LOCATION dst{m_Texture.Get()};
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
-            {FORMAT, textureDataSize.x, textureDataSize.y, 1, srcBufRowPitch}};
-        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
-        CD3DX12_BOX srcBox{
-            0, 0, 0, // Left, Top, Front
-            (LONG)textureDataSize.x, (LONG)textureDataSize.y, 1}; // Right, Bottom, Back
-
-        cmdList.GetCmdList()->CopyTextureRegion(&dst,
-            0, 0, 0, // DstX, DstY, DstZ
-            &src, &srcBox);
-
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_Texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
-
-        g_Renderer->CompleteUploadCommandList(cmdList);
-    }
-
-    // Setup texture SRV descriptor
-    //g_Renderer->SetTexture(m_Texture.Get());
-    
     ERR_CATCH_FUNC;
 }
 
@@ -163,6 +96,10 @@ void Renderer::Init()
 	CreateSwapChain();
 	CreateFrameResources();
 	CreateResources();
+
+    //SetTexture(m_Font->GetTexture()->GetResource());
+    SetTexture(m_Texture->GetResource());
+
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
 

@@ -7,6 +7,10 @@ class Texture
 {
 public:
     void LoadFromFile(const wstr_view& filePath);
+    void LoadFromMemory(
+        const D3D12_RESOURCE_DESC& resDesc,
+        const D3D12_SUBRESOURCE_DATA& data,
+        const wstr_view& name);
 
     bool IsEmpty() const { return !m_Resource; }
     ID3D12Resource* GetResource() const { return m_Resource.Get(); }
