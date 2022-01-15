@@ -45,9 +45,10 @@ using std::string;
 
 using Microsoft::WRL::ComPtr;
 
-using glm::vec2;
-using glm::vec3;
-using glm::vec4;
+using glm::vec2;  using glm::vec3;  using glm::vec4;
+using glm::uvec2; using glm::uvec3; using glm::uvec4;
+using glm::ivec2; using glm::ivec3; using glm::ivec4;
+using glm::bvec2; using glm::bvec3; using glm::bvec4;
 using glm::mat4x4;
 
 struct CloseHandleDeleter
@@ -176,3 +177,5 @@ std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);
 void SetD3d12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3d12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3d12ObjectName(obj.Get(), name); }
+// On error returns 0.
+uint8_t DxgiFormatToBytesPerPixel(DXGI_FORMAT format);

@@ -119,6 +119,14 @@
   <ItemGroup>
     <None Include="packages.config" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\WorkingDir\Data\PS.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+    <Text Include="..\WorkingDir\Data\VS.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="packages\WinPixEventRuntime.1.0.210818001\build\WinPixEventRuntime.targets" Condition="Exists('packages\WinPixEventRuntime.1.0.210818001\build\WinPixEventRuntime.targets')" />

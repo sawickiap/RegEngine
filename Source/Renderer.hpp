@@ -56,6 +56,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_pipelineState;
     unique_ptr<Font> m_Font;
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
+    ComPtr<ID3D12Resource> m_texture;
 
 	void CreateDevice();
 	void LoadCapabilities();
@@ -63,6 +64,7 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
+    void LoadTexture();
 
     void WaitForFenceOnCpu(UINT64 value);
 };

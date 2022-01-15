@@ -129,7 +129,7 @@ protected:
 class StringSetting : public Setting
 {
 public:
-    StringSetting(SettingCategory category, const str_view& name, const wstr_view& defaultValue) :
+    StringSetting(SettingCategory category, const str_view& name, const wstr_view& defaultValue = wstr_view()) :
         Setting(category, name),
         m_value{defaultValue.data(), defaultValue.size()}
     {

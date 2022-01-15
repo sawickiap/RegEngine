@@ -17,6 +17,7 @@ static UintSetting g_fontFlags(SettingCategory::Startup, "Font.Flags", 0);
 
 static BoolSetting g_usePixEvents(SettingCategory::Load, "UsePixEvents", true);
 static UintSetting g_syncInterval(SettingCategory::Load, "SyncInterval", 1);
+static StringSetting g_textureFilePath(SettingCategory::Load, "TextureFilePath");
 
 static Renderer* g_renderer;
 
@@ -103,8 +104,8 @@ void Font::Init()
         for(uint32_t y = 0; y < textureDataSize.y; ++y)
         {
             memcpy(srcBufMappedPtr, textureDataPtr, textureDataSize.x);
-            textureDataPtr = (char*)textureDataPtr + textureDataSize.x;
-            srcBufMappedPtr = (char*)srcBufMappedPtr + textureDataSize.x;
+            textureDataPtr = (char*)textureDataPtr + textureDataRowPitch;
+            srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
         }
         srcBuf->Unmap(0, // Subresource
             nullptr); // pWrittenRange
@@ -154,7 +155,7 @@ void Font::Init()
     }
 
     // Setup texture SRV descriptor
-    g_renderer->SetTexture(m_Texture.Get());
+    //g_renderer->SetTexture(m_Texture.Get());
     
     ERR_CATCH_FUNC;
 }
@@ -269,7 +270,7 @@ void Renderer::Render()
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_size.GetValue().x, (LONG)g_size.GetValue().y};
 	    cmdList->RSSetScissorRects(1, &scissorRect);
 
-	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
         const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
         const mat4x4 view = glm::lookAtLH(
@@ -289,7 +290,7 @@ void Renderer::Render()
 
         cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
-	    cmdList->DrawInstanced(3, 1, 0, 0);
+	    cmdList->DrawInstanced(4, 1, 0, 0);
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -520,7 +521,103 @@ void Renderer::CreateResources()
         m_Font->Init();
     }
 
+    LoadTexture();
+
     ERR_CATCH_FUNC;
+}
+
+void Renderer::LoadTexture()
+{
+    m_texture.Reset();
+    if(g_textureFilePath.GetValue().empty())
+        return;
+    ERR_TRY;
+
+    LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(g_textureFilePath.GetValue()));
+
+    unique_ptr<uint8_t[]> decodedData;
+    D3D12_SUBRESOURCE_DATA subresource = {};
+    CHECK_HR(DirectX::LoadWICTextureFromFileEx(
+        m_device.Get(),
+        g_textureFilePath.GetValue().c_str(),
+        0, // maxSize
+        D3D12_RESOURCE_FLAG_NONE,
+        DirectX::WIC_LOADER_FORCE_SRGB,
+        &m_texture,
+        decodedData,
+        subresource));
+    CHECK_BOOL(m_texture && decodedData && subresource.pData && subresource.RowPitch);
+    CHECK_BOOL(subresource.pData == decodedData.get());
+    SetD3d12ObjectName(m_texture, Format(L"Texture from file: %.*s", STR_TO_FORMAT(g_textureFilePath.GetValue())));
+
+    const D3D12_RESOURCE_DESC textureDesc = m_texture->GetDesc();
+    const uint32_t bytesPerPixel = DxgiFormatToBytesPerPixel(textureDesc.Format);
+    const uvec2 textureSize = uvec2((uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height);
+
+    // Create source buffer.
+    const uint32_t srcBufRowPitch = std::max<uint32_t>(textureSize.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    const uint32_t srcBufSize = srcBufRowPitch * textureSize.y;
+    ComPtr<ID3D12Resource> srcBuf;
+    {
+        const CD3DX12_RESOURCE_DESC srcBufDesc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
+        CD3DX12_HEAP_PROPERTIES heapProps{D3D12_HEAP_TYPE_UPLOAD};
+        CHECK_HR(g_renderer->GetDevice()->CreateCommittedResource(
+            &heapProps,
+            D3D12_HEAP_FLAG_NONE,
+            &srcBufDesc,
+            D3D12_RESOURCE_STATE_GENERIC_READ,
+            nullptr, // pOptimizedClearValue
+            IID_PPV_ARGS(&srcBuf)));
+        SetD3d12ObjectName(srcBuf, L"Texture source buffer");
+    }
+
+    // Map source buffer and memcpy data to it from decodedData.
+    {
+        const uint8_t* textureDataPtr = decodedData.get();
+        CD3DX12_RANGE readEmptyRange{0, 0};
+        void* srcBufMappedPtr = nullptr;
+        CHECK_HR(srcBuf->Map(
+            0, // Subresource
+            &readEmptyRange, // pReadRange
+            &srcBufMappedPtr));
+        for(uint32_t y = 0; y < textureSize.y; ++y)
+        {
+            memcpy(srcBufMappedPtr, textureDataPtr, textureSize.x * bytesPerPixel);
+            textureDataPtr += subresource.RowPitch;
+            srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
+        }
+        srcBuf->Unmap(0, // Subresource
+            nullptr); // pWrittenRange
+    }
+    decodedData.reset();
+
+    // Copy the data.
+    {
+        auto cmdList = g_renderer->BeginUploadCommandList();
+
+        CD3DX12_TEXTURE_COPY_LOCATION dst{m_texture.Get()};
+        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
+            {textureDesc.Format, (uint32_t)textureDesc.Width, (uint32_t)textureDesc.Height, 1, srcBufRowPitch}};
+        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
+        CD3DX12_BOX srcBox{
+            0, 0, 0, // Left, Top, Front
+            (LONG)textureDesc.Width, (LONG)textureDesc.Height, 1}; // Right, Bottom, Back
+
+        cmdList->CopyTextureRegion(&dst,
+            0, 0, 0, // DstX, DstY, DstZ
+            &src, &srcBox);
+
+        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+            m_texture.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        cmdList->ResourceBarrier(1, &barrier);
+
+        g_renderer->CompleteUploadCommandList();
+    }
+
+    // Setup texture SRV descriptor
+    g_renderer->SetTexture(m_texture.Get());
+
+    ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(g_textureFilePath.GetValue())));
 }
 
 void Renderer::WaitForFenceOnCpu(UINT64 value)
