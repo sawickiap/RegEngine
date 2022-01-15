@@ -53,7 +53,9 @@ private:
 	ComPtr<ID3D12Fence> m_Fence;
 	UINT64 m_NextFenceValue = 1;
 	ComPtr<IDXGISwapChain3> m_SwapChain;
-	ComPtr<ID3D12DescriptorHeap> m_SwapChainRtvDescriptors;
+	ComPtr<ID3D12DescriptorHeap> m_SwapChainRTVDescriptors;
+	unique_ptr<RenderingResource> m_DepthTexture;
+	ComPtr<ID3D12DescriptorHeap> m_DSVDescriptor;
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;

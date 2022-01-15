@@ -9,6 +9,7 @@
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
+static const DXGI_FORMAT DEPTH_STENCIL_FORMAT = DXGI_FORMAT_D32_FLOAT;
 
 extern VecSetting<glm::uvec2> g_Size;
 
@@ -155,20 +156,29 @@ void Renderer::Render()
 
         frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-	    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
-		    m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
-		    (INT)m_FrameIndex, m_Capabilities.m_DescriptorSize_RTV};
-
         float time = (float)GetTickCount() * 1e-3f;
 	    float color = sin(time) * 0.5f + 0.5f;
 	    //float pos = fmod(time * 100.f, (float)SIZE_X);
+        const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
+		    m_SwapChainRTVDescriptors->GetCPUDescriptorHandleForHeapStart(),
+		    (INT)m_FrameIndex, m_Capabilities.m_DescriptorSize_RTV};
+        const D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
+            m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart()};
         {
             PIX_EVENT_SCOPE(cmdList, L"Clear");
+
 	        const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
 	        cmdList.GetCmdList()->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+            
+            cmdList.GetCmdList()->ClearDepthStencilView(
+                dsvDescriptorHandle,
+                D3D12_CLEAR_FLAG_DEPTH,
+                1.f, // depth
+                0, // stencil
+                0, nullptr); // NumRects, prects
         }
 
-	    cmdList.GetCmdList()->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
+	    cmdList.GetCmdList()->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, &dsvDescriptorHandle);
 
 	    cmdList.SetPipelineState(m_PipelineState.Get());
 
@@ -180,7 +190,7 @@ void Renderer::Render()
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	    cmdList.SetScissorRect(scissorRect);
 
-	    cmdList.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	    cmdList.SetPrimitiveTopology(m_Mesh->GetTopology());
 
         const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
         const mat4x4 view = glm::lookAtLH(
@@ -211,7 +221,7 @@ void Renderer::Render()
         else
             cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
 
-	    cmdList.GetCmdList()->DrawInstanced(4, 1, 0, 0);
+	    cmdList.GetCmdList()->DrawIndexedInstanced(m_Mesh->GetIndexCount(), 1, 0, 0, 0);
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -289,14 +299,14 @@ void Renderer::CreateFrameResources()
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	desc.NumDescriptors = g_FrameCount.GetValue();
-	CHECK_HR(m_Device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_SwapChainRtvDescriptors));
-    SetD3D12ObjectName(m_SwapChainRtvDescriptors, L"Swap chain RTV descriptors");
+	CHECK_HR(m_Device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_SwapChainRTVDescriptors));
+    SetD3D12ObjectName(m_SwapChainRTVDescriptors, L"Swap chain RTV descriptors");
 
 	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	CHECK_BOOL(fenceEvent);
 	m_FenceEvent.reset(fenceEvent);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_SwapChainRTVDescriptors->GetCPUDescriptorHandleForHeapStart();
 	for(uint32_t i = 0; i < g_FrameCount.GetValue(); ++i)
 	{
 		CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -347,7 +357,7 @@ static void SetDefaultBlendDesc(D3D12_BLEND_DESC& outDesc)
 
 static void SetDefaultDepthStencilDesc(D3D12_DEPTH_STENCIL_DESC& outDesc)
 {
-    outDesc.DepthEnable = FALSE;
+    outDesc.DepthEnable = TRUE;
     outDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
     outDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
     outDesc.StencilEnable = FALSE;
@@ -362,6 +372,62 @@ static void SetDefaultDepthStencilDesc(D3D12_DEPTH_STENCIL_DESC& outDesc)
 void Renderer::CreateResources()
 {
     ERR_TRY;
+
+    // Depth texture and DSV
+    {
+        const D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+            DEPTH_STENCIL_FORMAT,
+            g_Size.GetValue().x, g_Size.GetValue().y,
+            1, // arraySize
+            1, // mipLevels
+            1, // sampleCount
+            0, // sampleQuality
+            D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+        D3D12_CLEAR_VALUE clearValue = {};
+        clearValue.Format = DEPTH_STENCIL_FORMAT;
+        clearValue.DepthStencil.Depth = 1.f;
+        m_DepthTexture = std::make_unique<RenderingResource>();
+        m_DepthTexture->Init(resDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, L"Depth", &clearValue);
+
+	    D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
+	    descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	    descHeapDesc.NumDescriptors = 1;
+	    CHECK_HR(m_Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_DSVDescriptor)));
+        SetD3D12ObjectName(m_DSVDescriptor, L"DSV descriptor");
+
+        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+        dsvDesc.Format = resDesc.Format;
+        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
+        m_Device->CreateDepthStencilView(m_DepthTexture->GetResource(), &dsvDesc, m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart());
+    }
+
+    {
+        const Vertex vertices[] = {
+            // X-Z plane
+            { {0.f, 0.f, 0.f}, {0.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {1.f, 0.f, 0.f}, {1.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {0.f, 0.f, 1.f}, {0.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {1.f, 0.f, 1.f}, {1.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+            // Y-Z plane
+            { {0, 0.f, 0.f}, {0.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {0, 1.f, 0.f}, {1.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {0, 0.f, 1.f}, {0.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+            { {0, 1.f, 1.f}, {1.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
+        };
+        const uint16_t indices[] = {
+            // X-Z plane
+            0, 1, 2, 2, 1, 3,
+            // Y-Z plane
+            4, 5, 6, 6, 5, 7,
+        };
+
+        m_Mesh = std::make_unique<Mesh>();
+        m_Mesh->Init(
+            D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+            D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+            vertices, (uint32_t)_countof(vertices),
+            indices, (uint32_t)_countof(indices));
+    }
 
 	// Root signature
 	{
@@ -409,10 +475,10 @@ void Renderer::CreateResources()
 		desc.VS.pShaderBytecode = vsCode.data();
 		desc.PS.BytecodeLength = psCode.size();
 		desc.PS.pShaderBytecode = psCode.data();
-		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		desc.PrimitiveTopologyType = m_Mesh->GetTopologyType();
 		desc.NumRenderTargets = 1;
 		desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
-		desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+		desc.DSVFormat = DEPTH_STENCIL_FORMAT;
 		desc.SampleDesc.Count = 1;
 		desc.SampleMask = UINT32_MAX;
 		SetDefaultRasterizerDesc(desc.RasterizerState);
@@ -440,26 +506,6 @@ void Renderer::CreateResources()
 
     m_Texture = std::make_unique<Texture>();
     m_Texture->LoadFromFile(g_TextureFilePath.GetValue());
-
-    {
-        const Vertex vertices[] = {
-            { {0.f, 0.f, 0.f}, {0.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
-            { {1.f, 0.f, 0.f}, {1.f, 1.f}, {1.f, 1.f, 1.f, 1.f} },
-            { {0.f, 0.f, 1.f}, {0.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
-            { {1.f, 0.f, 1.f}, {1.f, 0.f}, {1.f, 1.f, 1.f, 1.f} },
-        };
-        const uint16_t indices[] = {
-            0, 1, 2,
-            2, 1, 3,
-        };
-
-        m_Mesh = std::make_unique<Mesh>();
-        m_Mesh->Init(
-            D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-            D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP,
-            vertices, (uint32_t)_countof(vertices),
-            indices, (uint32_t)_countof(indices));
-    }
 
     ERR_CATCH_FUNC;
 }
