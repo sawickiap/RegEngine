@@ -12,6 +12,7 @@ public:
 	~Renderer();
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
+    ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
     ID3D12GraphicsCommandList* BeginUploadCommandList();
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList();

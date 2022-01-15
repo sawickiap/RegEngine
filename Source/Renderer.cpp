@@ -1,7 +1,7 @@
 #include "BaseUtils.hpp"
+#include "CommandList.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
-#include <pix3.h>
 #include <WICTextureLoader.h>
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 
@@ -15,31 +15,10 @@ static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L
 static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
 static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
 
-static BoolSetting g_UsePIXEvents(SettingCategory::Load, "UsePIXEvents", true);
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_TextureFilePath(SettingCategory::Load, "TextureFilePath");
 
-static Renderer* g_Renderer;
-
-class PIXEventScope
-{
-public:
-    // Warning! msg is actually a formatting string, so don't use '%'!
-    PIXEventScope(ID3D12GraphicsCommandList* cmdList, const wstr_view& msg) :
-        m_CmdList{cmdList}
-    {
-        if(g_UsePIXEvents.GetValue())
-            PIXBeginEvent(m_CmdList, 0, msg.c_str());
-    }
-    ~PIXEventScope()
-    {
-        if(g_UsePIXEvents.GetValue())
-            PIXEndEvent(m_CmdList);
-    }
-
-private:
-    ID3D12GraphicsCommandList* m_CmdList;
-};
+Renderer* g_Renderer;
 
 #define HELPER_CAT_1(a, b) a ## b
 #define HELPER_CAT_2(a, b) HELPER_CAT_1(a, b)
@@ -231,11 +210,10 @@ void Renderer::Render()
 {
 	m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	FrameResources& frameRes = m_FrameResources[m_FrameIndex];
-	ID3D12GraphicsCommandList* const cmdList = frameRes.m_CmdList.Get();
-
     WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
 
-	CHECK_HR(cmdList->Reset(m_CmdAllocator.Get(), NULL));
+    CommandList cmdList;
+    cmdList.Init(m_CmdAllocator.Get(), frameRes.m_CmdList.Get());
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
@@ -243,7 +221,7 @@ void Renderer::Render()
 		    frameRes.m_BackBuffer.Get(),
 		    D3D12_RESOURCE_STATE_PRESENT,
 		    D3D12_RESOURCE_STATE_RENDER_TARGET);
-	    cmdList->ResourceBarrier(1, &presentToRenderTargetBarrier);
+	    cmdList.GetCmdList()->ResourceBarrier(1, &presentToRenderTargetBarrier);
 
 	    CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle{
 		    m_SwapChainRtvDescriptors->GetCPUDescriptorHandleForHeapStart(),
@@ -255,22 +233,22 @@ void Renderer::Render()
         {
             PIX_EVENT_SCOPE(cmdList, L"Clear");
 	        const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
-	        cmdList->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+	        cmdList.GetCmdList()->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
         }
 
-	    cmdList->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
+	    cmdList.GetCmdList()->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, nullptr);
 
-	    cmdList->SetPipelineState(m_PipelineState.Get());
+	    cmdList.SetPipelineState(m_PipelineState.Get());
 
-	    cmdList->SetGraphicsRootSignature(m_RootSignature.Get());
+	    cmdList.SetRootSignature(m_RootSignature.Get());
 
         D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
-        cmdList->RSSetViewports(1, &viewport);
+        cmdList.SetViewport(viewport);
 
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
-	    cmdList->RSSetScissorRects(1, &scissorRect);
+	    cmdList.SetScissorRect(scissorRect);
 
-	    cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+	    cmdList.SetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
         const mat4x4 world = glm::rotate(glm::identity<mat4x4>(), time, vec3(0.f, 0.f, 1.f));
         const mat4x4 view = glm::lookAtLH(
@@ -285,12 +263,12 @@ void Renderer::Render()
         mat4x4 worldViewProj = proj * view * world;
 
         ID3D12DescriptorHeap* const descriptorHeap = m_DescriptorHeap.Get();
-        cmdList->SetDescriptorHeaps(1, &descriptorHeap);
-        cmdList->SetGraphicsRootDescriptorTable(1, m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+        cmdList.SetDescriptorHeap_CBV_SRV_UAV(m_DescriptorHeap.Get());
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
-        cmdList->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
+        cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
-	    cmdList->DrawInstanced(4, 1, 0, 0);
+	    cmdList.GetCmdList()->DrawInstanced(4, 1, 0, 0);
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -302,12 +280,10 @@ void Renderer::Render()
 		    frameRes.m_BackBuffer.Get(),
 		    D3D12_RESOURCE_STATE_RENDER_TARGET,
 		    D3D12_RESOURCE_STATE_PRESENT);
-	    cmdList->ResourceBarrier(1, &renderTargetToPresentBarrier);
-    }
-	CHECK_HR(cmdList->Close());
+	    cmdList.GetCmdList()->ResourceBarrier(1, &renderTargetToPresentBarrier);
 
-	ID3D12CommandList* const baseCmdList = cmdList;
-	m_CmdQueue->ExecuteCommandLists(1, &baseCmdList);
+    }
+    cmdList.Execute(m_CmdQueue.Get());
 
 	frameRes.m_SubmittedFenceValue = m_NextFenceValue++;
 	CHECK_HR(m_CmdQueue->Signal(m_Fence.Get(), frameRes.m_SubmittedFenceValue));

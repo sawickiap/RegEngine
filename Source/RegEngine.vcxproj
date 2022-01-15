@@ -96,6 +96,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="BaseUtils.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -110,6 +111,7 @@
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
     <ClInclude Include="BaseUtils.hpp" />
+    <ClInclude Include="CommandList.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="Settings.hpp" />
   </ItemGroup>
