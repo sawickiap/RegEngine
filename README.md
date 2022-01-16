@@ -26,10 +26,10 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\glm
 - **[RapidJSON](https://rapidjson.org/)** - a fast JSON parser/generator, by Tencent. License: MIT.
   - Directory: ThirdParty\rapidjson
-- **[str_view](https://github.com/sawickiap/str_view)** - "Null-termination-aware string-view class for C++", by Adam Sawicki. License: MIT.
+- **[str_view](https://github.com/sawickiap/str_view)** - null-termination-aware string-view class for C++, by Adam Sawicki. License: MIT.
   - Directory: ThirdParty\str_view
-- **[WinFontRender](https://github.com/sawickiap/WinFontRender)** - a library that renders Windows fonts in graphics applications, by Adam Sawicki.
-  - License: Modified MIT. Directory: ThirdParty\WinFontRender
+- **[WinFontRender](https://github.com/sawickiap/WinFontRender)** - a library that renders Windows fonts in graphics applications, by Adam Sawicki. License: Modified MIT.
+  - Directory: ThirdParty\WinFontRender
 - **[WinPixEventRuntime](https://devblogs.microsoft.com/pix/winpixeventruntime/)** - a library for PIX events, by Microsoft. License: custom freeware.
   - Directory: Source\packages\WinPixEventRuntime.1.0.210818001
 - **[D3D12 Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)** - easy to integrate memory allocation library for Direct3D 12, by AMD. License: MIT.
