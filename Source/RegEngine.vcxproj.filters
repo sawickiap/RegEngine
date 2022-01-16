@@ -14,6 +14,7 @@
       <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
     </ClCompile>
     <ClCompile Include="Descriptors.cpp" />
+    <ClCompile Include="ConstantBuffers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -33,6 +34,9 @@
     </Filter>
     <Filter Include="ThirdParty\D3D12MemoryAllocator">
       <UniqueIdentifier>{02e0fc4e-e869-458e-9d29-a6b8ba1d71a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Include">
+      <UniqueIdentifier>{a89f3837-609c-4538-b9da-efd7d780a7ca}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -56,6 +60,7 @@
       <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
     </ClInclude>
     <ClInclude Include="Descriptors.hpp" />
+    <ClInclude Include="ConstantBuffers.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
@@ -71,6 +76,9 @@
     </Text>
     <Text Include="..\WorkingDir\Data\VS.hlsl">
       <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
+      <Filter>Shaders\Include</Filter>
     </Text>
   </ItemGroup>
 </Project>

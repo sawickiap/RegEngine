@@ -11,5 +11,6 @@
     "Font.Flags": 0,
 
     "ShaderResourceDescriptors.Persistent.MaxCount": 1024,
-    "ShaderResourceDescriptors.Temporary.MaxCountPerFrame": 1024
+    "ShaderResourceDescriptors.Temporary.MaxCountPerFrame": 1024,
+    "ConstantBuffers.Temporary.MaxSizePerFrame": 65536
 }

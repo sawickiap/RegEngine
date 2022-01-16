@@ -101,6 +101,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="CommandList.cpp" />
+    <ClCompile Include="ConstantBuffers.cpp" />
     <ClCompile Include="Descriptors.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="BaseUtils.cpp">
@@ -121,6 +122,7 @@
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="CommandList.hpp" />
+    <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="Descriptors.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="Renderer.hpp" />
@@ -139,6 +141,11 @@
       <FileType>Document</FileType>
     </Text>
     <Text Include="..\WorkingDir\Data\VS.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>

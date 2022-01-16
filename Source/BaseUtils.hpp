@@ -55,6 +55,46 @@ using glm::mat4;
 
 static const uint32_t MAX_FRAME_COUNT = 10;
 
+/*
+Returns true if given number is a power of two.
+T must be unsigned integer number or signed integer but always nonnegative.
+For 0 returns true.
+*/
+template <typename T>
+inline bool IsPow2(T x)
+{
+    return (x & (x-1)) == 0;
+}
+
+// Aligns given value up to nearest multiply of align value. For example: AlignUp(11, 8) = 16.
+// Use types like UINT, uint64_t as T.
+// alignment must be power of 2.
+template <typename T>
+static inline T AlignUp(T val, T alignment)
+{
+	return (val + alignment - 1) & ~(alignment - 1);
+}
+// Aligns given value down to nearest multiply of align value. For example: AlignUp(11, 8) = 8.
+// Use types like UINT, uint64_t as T.
+// alignment must be power of 2.
+template <typename T>
+static inline T AlignDown(T val, T alignment)
+{
+    return val & ~(alignment - 1);
+}
+
+// Division with mathematical rounding to nearest number.
+template <typename T>
+static inline T RoundDiv(T x, T y)
+{
+	return (x + (y / (T)2)) / y;
+}
+template <typename T>
+static inline T DivideRoudingUp(T x, T y)
+{
+    return (x + y - 1) / y;
+}
+
 struct CloseHandleDeleter
 {
     typedef HANDLE pointer;

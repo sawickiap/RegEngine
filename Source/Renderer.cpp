@@ -4,6 +4,7 @@
 #include "Texture.hpp"
 #include "Mesh.hpp"
 #include "Descriptors.hpp"
+#include "ConstantBuffers.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
@@ -28,6 +29,20 @@ Renderer* g_Renderer;
 #define HELPER_CAT_2(a, b) HELPER_CAT_1(a, b)
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PIXEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
+
+struct PerFrameConstants
+{
+    uint32_t m_FrameIndex;
+    float m_SceneTime;
+    uint32_t _padding0[2];
+};
+
+enum ROOT_PARAM
+{
+    ROOT_PARAM_PER_FRAME_CBV,
+    ROOT_PARAM_OBJECT_TRANSFORM_CONST,
+    ROOT_PARAM_TEXTURE_SRV,
+};
 
 // Source: "Reversed-Z in OpenGL", https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
 static mat4 MakeInfReversedZProjLH(float fovY_radians, float aspectWbyH, float zNear)
@@ -109,6 +124,8 @@ void Renderer::Init()
 	LoadCapabilities();
     m_ShaderResourceDescriptorManager = std::make_unique<ShaderResourceDescriptorManager>();
     m_ShaderResourceDescriptorManager->Init();
+    m_TemporaryConstantBufferManager = std::make_unique<TemporaryConstantBufferManager>();
+    m_TemporaryConstantBufferManager->Init();
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();
@@ -166,6 +183,7 @@ void Renderer::Render()
     WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
 
     m_ShaderResourceDescriptorManager->NewFrame();
+    m_TemporaryConstantBufferManager->NewFrame();
 
     CommandList cmdList;
     cmdList.Init(m_CmdAllocator.Get(), frameRes.m_CmdList.Get());
@@ -184,6 +202,7 @@ void Renderer::Render()
 		    (INT)m_FrameIndex, m_Capabilities.m_DescriptorSize_RTV};
         const D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
             m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart()};
+
         {
             PIX_EVENT_SCOPE(cmdList, L"Clear");
 
@@ -204,6 +223,20 @@ void Renderer::Render()
 
 	    cmdList.SetRootSignature(m_RootSignature.Get());
 
+        // Set per-frame constants.
+        {
+            PerFrameConstants myData = {};
+            myData.m_FrameIndex = m_FrameIndex;
+            myData.m_SceneTime = time;
+
+            void* mappedPtr = nullptr;
+            D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle;
+            m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, descriptorHandle);
+            memcpy(mappedPtr, &myData, sizeof(myData));
+
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
+        }
+        
         D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
         cmdList.SetViewport(viewport);
 
@@ -221,14 +254,14 @@ void Renderer::Render()
             glm::radians(80.f),
             (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
             0.5f); // zNear
-        mat4 worldViewProj = proj * view * world;
+        const mat4 worldViewProj = proj * view * world;
 
         // A) Testing texture SRV descriptors as persistent.
         /*
         const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_FontTextureSRVDescriptor) :
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_TextureSRVDescriptor);
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1, textureDescriptorHandle);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
         */
         // B) Testing texture SRV descriptors as temporary.
         {
@@ -238,11 +271,11 @@ void Renderer::Render()
                 m_Texture->GetResource();
             m_Device->CreateShaderResourceView(textureRes, nullptr,
                 m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1,
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV,
                 m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
         }
 
-        cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
+        cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(ROOT_PARAM_OBJECT_TRANSFORM_CONST, 16, glm::value_ptr(worldViewProj), 0);
 
         const D3D12_VERTEX_BUFFER_VIEW vbView = m_Mesh->GetVertexBufferView();
         cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
@@ -475,23 +508,29 @@ void Renderer::CreateResources()
 
 	// Root signature
 	{
-        D3D12_ROOT_PARAMETER params[2] = {};
-        params[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        params[0].Constants.ShaderRegister = 0;
-        params[0].Constants.Num32BitValues = 16;
-        params[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        D3D12_ROOT_PARAMETER params[3] = {};
 
-        CD3DX12_DESCRIPTOR_RANGE textureDescriptorRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        params[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[1].DescriptorTable.NumDescriptorRanges = 1;
-        params[1].DescriptorTable.pDescriptorRanges = &textureDescriptorRange;
-        params[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        const CD3DX12_DESCRIPTOR_RANGE perFrameCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
+        params[ROOT_PARAM_PER_FRAME_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[ROOT_PARAM_PER_FRAME_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &perFrameCBVDescRange;
+
+        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
+        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].Constants.ShaderRegister = 1;
+        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].Constants.Num32BitValues = 16;
+
+        const CD3DX12_DESCRIPTOR_RANGE textureSRVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        params[ROOT_PARAM_TEXTURE_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[ROOT_PARAM_TEXTURE_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.pDescriptorRanges = &textureSRVDescRange;
 
         CD3DX12_STATIC_SAMPLER_DESC staticSampler{0};
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
-		desc.NumParameters = 2;
-		desc.NumStaticSamplers = 0;
+		desc.NumParameters = (uint32_t)_countof(params);
         desc.pParameters = params;
         desc.NumStaticSamplers = 1;
         desc.pStaticSamplers = &staticSampler;
