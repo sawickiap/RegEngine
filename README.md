@@ -18,6 +18,8 @@ The project source code depends on:
 
 The project uses following thirt-party libraries:
 
+- **[D3D12 Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)** - easy to integrate memory allocation library for Direct3D 12, by AMD. License: MIT.
+  - Directory: ThirdParty\D3D12MemoryAllocator
 - **[d3dx12.h](https://github.com/microsoft/DirectX-Headers)** - D3D12 helpers, by Microsoft. License: MIT.
   - Directory: ThirdParty\d3dx12
 - **[DirectX Tool Kit for Direct3D 12](https://github.com/Microsoft/DirectXTK12)** - a collection of helper classes for writing Direct3D 12 C++ code, by Microsoft. License: MIT.
@@ -32,8 +34,6 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\WinFontRender
 - **[WinPixEventRuntime](https://devblogs.microsoft.com/pix/winpixeventruntime/)** - a library for PIX events, by Microsoft. License: custom freeware.
   - Directory: Source\packages\WinPixEventRuntime.1.0.210818001
-- **[D3D12 Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)** - easy to integrate memory allocation library for Direct3D 12, by AMD. License: MIT.
-  - Directory: ThirdParty\D3D12MemoryAllocator
 
 The project requires following hardware/software environment to run: PC, Windows 10+, Direct3D 12 compatible display adapter (graphics card).
 
