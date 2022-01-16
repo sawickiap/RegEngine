@@ -3,7 +3,7 @@
 /*
 An abstract algorithm that ensures linear allocation of anything of various size
 in a ring-buffer fashion with a twist that calling NewFrame() bulk-frees memory
-that has been allocated during frame (current - FrameCount + 1).
+that has been allocated during frame (current - FrameCount).
 */
 template<typename T>
 class MultiFrameRingBuffer

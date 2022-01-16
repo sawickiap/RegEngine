@@ -63,7 +63,7 @@ ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocateTemporaryDescr
 {
     ShaderResourceDescriptor descriptor;
     CHECK_BOOL(m_TemporaryDescriptorRingBuffer.Allocate(descriptorCount, descriptor.m_Index));
-    LogInfoF(L"descriptor.m_Index=%u", descriptor.m_Index);
+    descriptor.m_Index += m_TemporaryDescriptorOffset;
     return descriptor;
 }
 
