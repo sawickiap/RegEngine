@@ -125,6 +125,7 @@
     <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="Descriptors.hpp" />
     <ClInclude Include="Mesh.hpp" />
+    <ClInclude Include="MultiFrameRingBuffer.hpp" />
     <ClInclude Include="Renderer.hpp" />
     <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Settings.hpp" />

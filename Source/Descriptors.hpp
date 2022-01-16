@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MultiFrameRingBuffer.hpp"
+
 /*
 Represents a single or a sequence of several shader-visible CBV/SRV/UAV
 descriptors, allocated from ShaderResourceDescriptorManager.
@@ -24,8 +26,8 @@ Space in m_DescriptorHeap is divided into two sections:
 
 1. (g_PersistentDescriptorMaxCount) for persistent descriptors, managed by
    D3D12MA::VirtualAllocator.
-2. (g_FrameCount) regions for temporary descriptors, used in ring buffer fashion,
-   (g_TemporaryDescriptorMaxCountPerFrame) descriptors each.
+2. (g_TemporaryDescriptorMaxCountPerFrame * g_FrameCount) for temporary
+   descriptors, managed by MultiFrameRingBuffer.
 */
 class ShaderResourceDescriptorManager
 {
@@ -47,11 +49,11 @@ private:
     D3D12_GPU_DESCRIPTOR_HANDLE m_GPUHandleForHeapStart = { UINT64_MAX };
     D3D12_CPU_DESCRIPTOR_HANDLE m_CPUHandleForHeapStart = { UINT64_MAX };
     // Size of one descriptor, in bytes.
+    // Copy of g_Renderer->GetCapabilities().m_DescriptorSize_CVB_SRV_UAV.
     uint32_t m_DescriptorSize = UINT32_MAX;
     // Unit used in this allocator is entire descriptors NOT single bytes.
     ComPtr<D3D12MA::VirtualBlock> m_VirtualBlock;
     // These offsets and sizes are also in descriptors.
     uint32_t m_TemporaryDescriptorOffset = UINT32_MAX;
-    uint32_t m_FrameIndex = 0;
-    uint32_t m_TemporaryDescriptorCountInCurrentFrame = 0;
+    MultiFrameRingBuffer<uint64_t> m_TemporaryDescriptorRingBuffer;
 };

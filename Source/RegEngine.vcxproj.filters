@@ -61,6 +61,7 @@
     </ClInclude>
     <ClInclude Include="Descriptors.hpp" />
     <ClInclude Include="ConstantBuffers.hpp" />
+    <ClInclude Include="MultiFrameRingBuffer.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

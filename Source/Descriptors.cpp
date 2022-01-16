@@ -17,6 +17,10 @@ void ShaderResourceDescriptorManager::Init()
     CHECK_BOOL(g_PersistentDescriptorMaxCount.GetValue() > 0);
     CHECK_BOOL(g_TemporaryDescriptorMaxCountPerFrame.GetValue() > 0);
     m_TemporaryDescriptorOffset = g_PersistentDescriptorMaxCount.GetValue();
+    
+    m_TemporaryDescriptorRingBuffer.Init(
+        g_TemporaryDescriptorMaxCountPerFrame.GetValue() * g_FrameCount.GetValue(),
+        g_FrameCount.GetValue());
 
     // Create m_DescriptorHeap.
     {
@@ -43,8 +47,7 @@ void ShaderResourceDescriptorManager::Init()
 
 void ShaderResourceDescriptorManager::NewFrame()
 {
-    ++m_FrameIndex;
-    m_TemporaryDescriptorCountInCurrentFrame = 0;
+    m_TemporaryDescriptorRingBuffer.NewFrame();
 }
 
 ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocatePersistentDescriptor(uint32_t descriptorCount)
@@ -58,12 +61,9 @@ ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocatePersistentDesc
 
 ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocateTemporaryDescriptor(uint32_t descriptorCount)
 {
-    CHECK_BOOL(m_TemporaryDescriptorCountInCurrentFrame + descriptorCount <= g_TemporaryDescriptorMaxCountPerFrame.GetValue());
-    const uint64_t currFrameDescriptorOffset = m_TemporaryDescriptorOffset +
-        m_FrameIndex % g_FrameCount.GetValue() * g_TemporaryDescriptorMaxCountPerFrame.GetValue();
-    ShaderResourceDescriptor descriptor = {
-        currFrameDescriptorOffset + m_TemporaryDescriptorCountInCurrentFrame };
-    m_TemporaryDescriptorCountInCurrentFrame += descriptorCount;
+    ShaderResourceDescriptor descriptor;
+    CHECK_BOOL(m_TemporaryDescriptorRingBuffer.Allocate(descriptorCount, descriptor.m_Index));
+    LogInfoF(L"descriptor.m_Index=%u", descriptor.m_Index);
     return descriptor;
 }
 

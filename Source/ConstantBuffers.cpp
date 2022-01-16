@@ -16,12 +16,15 @@ void TemporaryConstantBufferManager::Init()
     CHECK_BOOL(g_TemporaryConstantBuffereMaxSizePerFrame.GetValue() > 0 &&
         g_TemporaryConstantBuffereMaxSizePerFrame.GetValue() % 32 == 0);
 
+    const uint32_t bufSize = g_TemporaryConstantBuffereMaxSizePerFrame.GetValue() * g_FrameCount.GetValue();
+
+    m_RingBuffer.Init(bufSize, g_FrameCount.GetValue());
+
     // Create m_Buffer.
     {
         D3D12MA::ALLOCATION_DESC allocDesc = {};
         allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-        const D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(
-            g_TemporaryConstantBuffereMaxSizePerFrame.GetValue() * g_FrameCount.GetValue());
+        const D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Buffer(bufSize);
         CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(&allocDesc, &resDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
@@ -41,8 +44,7 @@ TemporaryConstantBufferManager::~TemporaryConstantBufferManager()
 
 void TemporaryConstantBufferManager::NewFrame()
 {
-    ++m_FrameIndex;
-    m_AllocatedSizeInCurrentFrame = 0;
+    m_RingBuffer.NewFrame();
 }
 
 void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
@@ -51,15 +53,9 @@ void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
     constexpr uint32_t ALIGNMENT = 256;
     const uint32_t alignedSize = AlignUp(size, ALIGNMENT);
 
-    // Offset in bytes from the beginning of m_Buffer to the beginning of the section for the current frame.
-    const uint32_t currFrameOffset = m_FrameIndex % g_FrameCount.GetValue() *
-        g_TemporaryConstantBuffereMaxSizePerFrame.GetValue();
+    uint32_t newBufOffset = 0;
+    CHECK_BOOL(m_RingBuffer.Allocate(alignedSize, newBufOffset));
 
-    CHECK_BOOL(m_AllocatedSizeInCurrentFrame + alignedSize <= g_TemporaryConstantBuffereMaxSizePerFrame.GetValue());
-
-    // Offset in bytes from the beginning of m_Buffer to the newly allocated data.
-    const uint32_t newBufOffset = currFrameOffset + m_AllocatedSizeInCurrentFrame;
-    
     outMappedPtr = (char*)m_BufferMappedPtr + newBufOffset;
     
     // GPU VA of the newly allocated data inside m_Buffer.
@@ -73,6 +69,4 @@ void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
     CBVDesc.SizeInBytes = alignedSize;
     g_Renderer->GetDevice()->CreateConstantBufferView(&CBVDesc, descMgr->GetDescriptorCPUHandle(descriptor));
     outCBVDescriptorHandle = descMgr->GetDescriptorGPUHandle(descriptor);
-
-    m_AllocatedSizeInCurrentFrame += alignedSize;
 }

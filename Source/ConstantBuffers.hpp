@@ -1,5 +1,7 @@
 #pragma once
 
+#include "MultiFrameRingBuffer.hpp"
+
 /*
 Represents a facility for allocation and filling temporary constant buffers
 valid only for recording and execution of the current frame.
@@ -24,6 +26,5 @@ public:
 private:
     ComPtr<D3D12MA::Allocation> m_Buffer;
     void* m_BufferMappedPtr = nullptr;
-    uint32_t m_FrameIndex = 0;
-    uint32_t m_AllocatedSizeInCurrentFrame = 0;
+    MultiFrameRingBuffer<uint32_t> m_RingBuffer;
 };
