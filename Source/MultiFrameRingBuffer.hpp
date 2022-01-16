@@ -38,6 +38,10 @@ public:
         */
         if(m_Front > m_Back || (m_Front == m_Back && m_Size == 0))
         {
+            // Special empty case - move pointers to 0 to make room for bigger allocation.
+            if(m_Size == 0)
+                m_Front = m_Back = 0;
+
             /*
             OK to allocate after Front:
 
