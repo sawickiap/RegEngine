@@ -53,6 +53,8 @@ using glm::ivec2; using glm::ivec3; using glm::ivec4;
 using glm::bvec2; using glm::bvec3; using glm::bvec4;
 using glm::mat4;
 
+static const uint32_t MAX_FRAME_COUNT = 10;
+
 struct CloseHandleDeleter
 {
     typedef HANDLE pointer;

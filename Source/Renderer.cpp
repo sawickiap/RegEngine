@@ -3,6 +3,7 @@
 #include "RenderingResource.hpp"
 #include "Texture.hpp"
 #include "Mesh.hpp"
+#include "Descriptors.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
@@ -13,7 +14,7 @@ static const DXGI_FORMAT DEPTH_STENCIL_FORMAT = DXGI_FORMAT_D32_FLOAT;
 
 extern VecSetting<glm::uvec2> g_Size;
 
-static UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
+UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
 static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
 static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
 static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
@@ -106,13 +107,12 @@ void Renderer::Init()
 	CreateDevice();
     CreateMemoryAllocator();
 	LoadCapabilities();
+    m_ShaderResourceDescriptorManager = std::make_unique<ShaderResourceDescriptorManager>();
+    m_ShaderResourceDescriptorManager->Init();
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();
 	CreateResources();
-
-    //SetTexture(m_Font->GetTexture()->GetResource());
-    SetTexture(m_Texture->GetResource());
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -120,6 +120,17 @@ void Renderer::Init()
 Renderer::~Renderer()
 {
     g_Renderer = nullptr;
+
+    if(m_TextureSRVDescriptor)
+    {
+        m_ShaderResourceDescriptorManager->FreePersistentDescriptor(*m_TextureSRVDescriptor);
+        m_TextureSRVDescriptor.reset();
+    }
+    if(m_FontTextureSRVDescriptor)
+    {
+        m_ShaderResourceDescriptorManager->FreePersistentDescriptor(*m_FontTextureSRVDescriptor);
+        m_FontTextureSRVDescriptor.reset();
+    }
 
     if(m_CmdQueue)
     {
@@ -148,23 +159,20 @@ void Renderer::CompleteUploadCommandList(CommandList& cmdList)
     WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
 }
 
-void Renderer::SetTexture(ID3D12Resource* res)
-{
-    m_Device->CreateShaderResourceView(res,
-        nullptr, // pDesc
-        m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-}
-
 void Renderer::Render()
 {
 	m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	FrameResources& frameRes = m_FrameResources[m_FrameIndex];
     WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
 
+    m_ShaderResourceDescriptorManager->NewFrame();
+
     CommandList cmdList;
     cmdList.Init(m_CmdAllocator.Get(), frameRes.m_CmdList.Get());
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
+
+        cmdList.SetDescriptorHeaps(m_ShaderResourceDescriptorManager->GetDescriptorHeap(), nullptr);
 
         frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
@@ -215,9 +223,24 @@ void Renderer::Render()
             0.5f); // zNear
         mat4 worldViewProj = proj * view * world;
 
-        ID3D12DescriptorHeap* const descriptorHeap = m_DescriptorHeap.Get();
-        cmdList.SetDescriptorHeaps(m_DescriptorHeap.Get(), nullptr);
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+        // A) Testing texture SRV descriptors as persistent.
+        /*
+        const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_FontTextureSRVDescriptor) :
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_TextureSRVDescriptor);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1, textureDescriptorHandle);
+        */
+        // B) Testing texture SRV descriptors as temporary.
+        {
+            ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
+            ID3D12Resource* const textureRes = fmod(time, 1.f) > 0.5f ?
+                m_Font->GetTexture()->GetResource() :
+                m_Texture->GetResource();
+            m_Device->CreateShaderResourceView(textureRes, nullptr,
+                m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(1,
+                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
+        }
 
         cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(0, 16, glm::value_ptr(worldViewProj), 0);
 
@@ -509,16 +532,6 @@ void Renderer::CreateResources()
         SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
 	}
 
-    // Descriptor heap
-    {
-        D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        desc.NumDescriptors = 1;
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-        CHECK_HR(m_Device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_DescriptorHeap)));
-        SetD3D12ObjectName(m_DescriptorHeap, L"Descriptor heap");
-    }
-
     // Font
     {
         m_Font = std::make_unique<Font>();
@@ -527,6 +540,20 @@ void Renderer::CreateResources()
 
     m_Texture = std::make_unique<Texture>();
     m_Texture->LoadFromFile(g_TextureFilePath.GetValue());
+
+    m_FontTextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
+        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
+    m_Device->CreateShaderResourceView(
+        m_Font->GetTexture()->GetResource(),
+        nullptr, // pDesc
+        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_FontTextureSRVDescriptor));
+
+    m_TextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
+        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
+    m_Device->CreateShaderResourceView(
+        m_Texture->GetResource(),
+        nullptr, // pDesc
+        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_TextureSRVDescriptor));
 
     ERR_CATCH_FUNC;
 }

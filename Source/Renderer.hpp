@@ -1,12 +1,20 @@
 #pragma once
 
-static const uint32_t MAX_FRAME_COUNT = 10;
-
 class Font;
 class CommandList;
 class RenderingResource;
 class Texture;
 class Mesh;
+struct ShaderResourceDescriptor;
+class ShaderResourceDescriptorManager;
+
+struct RendererCapabilities
+{
+	UINT m_DescriptorSize_CVB_SRV_UAV = UINT32_MAX;
+	UINT m_DescriptorSize_Sampler = UINT32_MAX;
+	UINT m_DescriptorSize_RTV = UINT32_MAX;
+	UINT m_DescriptorSize_DSV = UINT32_MAX;
+};
 
 class Renderer
 {
@@ -16,12 +24,13 @@ public:
 	~Renderer();
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
+    const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
     D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
+    ShaderResourceDescriptorManager* GetShaderResourceDescriptorManager() { return m_ShaderResourceDescriptorManager.get(); }
     void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList(CommandList& cmdList);
-    void SetTexture(ID3D12Resource* res);
 
 	void Render();
 
@@ -33,20 +42,12 @@ private:
 		UINT64 m_SubmittedFenceValue = 0;
 	};
 
-	struct Capabilities
-	{
-		UINT m_DescriptorSize_CVB_SRV_UAV = UINT32_MAX;
-		UINT m_DescriptorSize_Sampler = UINT32_MAX;
-		UINT m_DescriptorSize_RTV = UINT32_MAX;
-		UINT m_DescriptorSize_DSV = UINT32_MAX;
-	};
-
 	IDXGIFactory4* const m_DXGIFactory;
 	IDXGIAdapter1* const m_Adapter;
 	const HWND m_Wnd;
 
 	ComPtr<ID3D12Device> m_Device;
-	Capabilities m_Capabilities;
+	RendererCapabilities m_Capabilities;
     ComPtr<D3D12MA::Allocator> m_MemoryAllocator;
 	ComPtr<ID3D12CommandQueue> m_CmdQueue;
     ComPtr<ID3D12CommandAllocator> m_CmdAllocator;
@@ -58,15 +59,19 @@ private:
 	ComPtr<ID3D12DescriptorHeap> m_SwapChainRTVDescriptors;
 	unique_ptr<RenderingResource> m_DepthTexture;
 	ComPtr<ID3D12DescriptorHeap> m_DSVDescriptor;
+    unique_ptr<ShaderResourceDescriptorManager> m_ShaderResourceDescriptorManager;
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
-    ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
     unique_ptr<Texture> m_Texture;
     unique_ptr<Mesh> m_Mesh;
+    
+    // A) Testing texture SRV descriptors as persistent.
+    unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
+    unique_ptr<ShaderResourceDescriptor> m_TextureSRVDescriptor;
 
 	void CreateDevice();
 	void CreateMemoryAllocator();

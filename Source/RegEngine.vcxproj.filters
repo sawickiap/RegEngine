@@ -13,6 +13,7 @@
     <ClCompile Include="..\ThirdParty\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
       <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
     </ClCompile>
+    <ClCompile Include="Descriptors.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -54,6 +55,7 @@
     <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
       <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
     </ClInclude>
+    <ClInclude Include="Descriptors.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
