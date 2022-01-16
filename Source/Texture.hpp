@@ -18,6 +18,9 @@ public:
     uvec2 GetSize() const { return uvec2((uint32_t)GetDesc().Width, (uint32_t)GetDesc().Height); }
 
 private:
+    // May be null in case m_Resource was created by DirectXTK12, without D3D12MA.
+    // If not null, m_Resource == m_Allocation->GetResource().
+    ComPtr<D3D12MA::Allocation> m_Allocation;
     ComPtr<ID3D12Resource> m_Resource;
     D3D12_RESOURCE_DESC m_Desc;
 };

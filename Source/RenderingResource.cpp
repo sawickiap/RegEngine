@@ -5,7 +5,7 @@
 
 static bool NewStatesAreSubset(D3D12_RESOURCE_STATES newStates, D3D12_RESOURCE_STATES oldStates)
 {
-    if((newStates == 0) != (oldStates == 0))
+    if((newStates == D3D12_RESOURCE_STATE_COMMON) != (oldStates == D3D12_RESOURCE_STATE_COMMON))
         return false;
     if((newStates & ~oldStates) != 0)
         return false;
@@ -18,17 +18,24 @@ void RenderingResource::Init(
     const wstr_view& name,
     const D3D12_CLEAR_VALUE* optimizedClearValue)
 {
+    assert(!m_ExternallyOwnedRes && !m_MyRes);
+    
     m_Desc = resDesc;
     m_States = initialStates;
-    CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-        &D3D12_HEAP_PROPERTIES_DEFAULT,
-        D3D12_HEAP_FLAG_NONE,
+    
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+    allocDesc.Flags = D3D12MA::ALLOCATION_FLAG_COMMITTED;
+    CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+        &allocDesc,
         &resDesc,
         initialStates,
         optimizedClearValue,
-        IID_PPV_ARGS(&m_MyRes)));
+        &m_MyRes,
+        IID_NULL, NULL)); // riidResource, ppvResource
+    
     if(!name.empty())
-        SetD3D12ObjectName(m_MyRes, name);
+        SetD3D12ObjectName(m_MyRes->GetResource(), name);
 }
 
 void RenderingResource::InitExternallyOwned(
@@ -36,7 +43,8 @@ void RenderingResource::InitExternallyOwned(
     D3D12_RESOURCE_STATES currentStates,
     const D3D12_RESOURCE_DESC* resDesc)
 {
-    assert(m_ExternallyOwnedRes == nullptr);
+    assert(!m_ExternallyOwnedRes && !m_MyRes);
+    
     m_ExternallyOwnedRes = res;
     if(resDesc)
         m_Desc = *resDesc;
@@ -49,7 +57,7 @@ void RenderingResource::SetStates(CommandList& cmdList, D3D12_RESOURCE_STATES st
 {
     if(!NewStatesAreSubset(states, m_States))
     {
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
+        const CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
             GetResource(), m_States, states);
         cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
         m_States = states;

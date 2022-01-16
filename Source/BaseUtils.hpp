@@ -19,7 +19,9 @@
 #include <wrl/client.h>
 #include <dxgi1_4.h>
 #include <d3d12.h>
-#include "..\ThirdParty\d3dx12\d3dx12.h"
+#include "../ThirdParty/d3dx12/d3dx12.h"
+
+#include "../ThirdParty/D3D12MemoryAllocator/include/D3D12MemAlloc.h"
 
 #include <memory>
 #include <exception>

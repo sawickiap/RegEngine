@@ -32,6 +32,8 @@ The project uses following thirt-party libraries:
   - License: Modified MIT. Directory: ThirdParty\WinFontRender
 - **[WinPixEventRuntime](https://devblogs.microsoft.com/pix/winpixeventruntime/)** - a library for PIX events, by Microsoft. License: custom freeware.
   - Directory: Source\packages\WinPixEventRuntime.1.0.210818001
+- **[D3D12 Memory Allocator](https://github.com/GPUOpen-LibrariesAndSDKs/D3D12MemoryAllocator)** - easy to integrate memory allocation library for Direct3D 12, by AMD. License: MIT.
+  - Directory: ThirdParty\D3D12MemoryAllocator
 
 The project requires following hardware/software environment to run: PC, Windows 10+, Direct3D 12 compatible display adapter (graphics card).
 

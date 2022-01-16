@@ -34,27 +34,29 @@ void Mesh::Init(
     m_VertexCount = vertexCount;
     m_IndexCount = indexCount;
 
+    D3D12MA::ALLOCATION_DESC allocDesc = {};
+    allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
 
     // Create vertex buffer.
     {
         const UINT64 vbSize = vertexCount * sizeof(Vertex);
         D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vbSize);
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &D3D12_HEAP_PROPERTIES_UPLOAD,
-            D3D12_HEAP_FLAG_NONE,
+        CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+            &allocDesc,
             &vbDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&m_VertexBuffer)));
+            &m_VertexBuffer,
+            IID_NULL, NULL)); // riidResource, ppvResource
     }
 
     // Map and fill vertex buffer.
     {
         CD3DX12_RANGE readEmptyRange{0, 0};
         void* vbMappedPtr = nullptr;
-        CHECK_HR(m_VertexBuffer->Map(0, D3D12_RANGE_NONE, &vbMappedPtr));
+        CHECK_HR(m_VertexBuffer->GetResource()->Map(0, D3D12_RANGE_NONE, &vbMappedPtr));
         memcpy(vbMappedPtr, vertices, vertexCount * sizeof(Vertex));
-        m_VertexBuffer->Unmap(0, D3D12_RANGE_ALL);
+        m_VertexBuffer->GetResource()->Unmap(0, D3D12_RANGE_ALL);
     }
 
     if(indexCount > 0)
@@ -64,22 +66,22 @@ void Mesh::Init(
         {
             const UINT64 ibSize = indexCount * sizeof(IndexType);
             D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(ibSize);
-            CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-                &D3D12_HEAP_PROPERTIES_UPLOAD,
-                D3D12_HEAP_FLAG_NONE,
+            CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+                &allocDesc,
                 &ibDesc,
                 D3D12_RESOURCE_STATE_GENERIC_READ,
                 nullptr, // pOptimizedClearValue
-                IID_PPV_ARGS(&m_IndexBuffer)));
+                &m_IndexBuffer,
+                IID_NULL, NULL)); // riidResource, ppvResource
         }
 
         // Map and fill vertex buffer.
         {
             CD3DX12_RANGE readEmptyRange{0, 0};
             void* ibMappedPtr = nullptr;
-            CHECK_HR(m_IndexBuffer->Map(0, D3D12_RANGE_NONE, &ibMappedPtr));
+            CHECK_HR(m_IndexBuffer->GetResource()->Map(0, D3D12_RANGE_NONE, &ibMappedPtr));
             memcpy(ibMappedPtr, indices, indexCount * sizeof(IndexType));
-            m_IndexBuffer->Unmap(0, D3D12_RANGE_ALL);
+            m_IndexBuffer->GetResource()->Unmap(0, D3D12_RANGE_ALL);
         }
     }
 }
@@ -88,7 +90,7 @@ D3D12_VERTEX_BUFFER_VIEW Mesh::GetVertexBufferView() const
 {
     assert(m_VertexBuffer);
     return D3D12_VERTEX_BUFFER_VIEW{
-        m_VertexBuffer->GetGPUVirtualAddress(),
+        m_VertexBuffer->GetResource()->GetGPUVirtualAddress(),
         m_VertexCount * sizeof(Vertex), // SizeInBytes
         sizeof(Vertex) }; // StrideInBytes
 }
@@ -97,7 +99,7 @@ D3D12_INDEX_BUFFER_VIEW Mesh::GetIndexBufferView() const
 {
     assert(m_IndexBuffer);
     return D3D12_INDEX_BUFFER_VIEW{
-        m_IndexBuffer->GetGPUVirtualAddress(),
+        m_IndexBuffer->GetResource()->GetGPUVirtualAddress(),
         m_IndexCount * sizeof(IndexType), // SizeInBytes
         s_IndexFormat };
 }

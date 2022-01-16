@@ -104,6 +104,7 @@ void Renderer::Init()
     ERR_TRY;
     CHECK_BOOL(g_FrameCount.GetValue() >= 2 && g_FrameCount.GetValue() <= MAX_FRAME_COUNT);
 	CreateDevice();
+    CreateMemoryAllocator();
 	LoadCapabilities();
 	CreateCommandQueues();
 	CreateSwapChain();
@@ -253,6 +254,16 @@ void Renderer::CreateDevice()
 {
     CHECK_HR( D3D12CreateDevice(m_Adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_Device)) );
     SetD3D12ObjectName(m_Device, L"Device");
+}
+
+void Renderer::CreateMemoryAllocator()
+{
+    assert(m_Device && m_Adapter && !m_MemoryAllocator);
+
+    D3D12MA::ALLOCATOR_DESC desc = {};
+    desc.pDevice = m_Device.Get();
+    desc.pAdapter = m_Adapter;
+    CHECK_HR(D3D12MA::CreateAllocator(&desc, &m_MemoryAllocator));
 }
 
 void Renderer::LoadCapabilities()

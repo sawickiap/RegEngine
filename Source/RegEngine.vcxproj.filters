@@ -10,6 +10,9 @@
     <ClCompile Include="RenderingResource.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="..\ThirdParty\D3D12MemoryAllocator\src\D3D12MemAlloc.cpp">
+      <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -26,6 +29,9 @@
     </Filter>
     <Filter Include="Shaders">
       <UniqueIdentifier>{9bbac897-8dfe-4040-b8b4-a46a7e8866ed}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\D3D12MemoryAllocator">
+      <UniqueIdentifier>{02e0fc4e-e869-458e-9d29-a6b8ba1d71a9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -45,6 +51,9 @@
     <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Texture.hpp" />
     <ClInclude Include="Mesh.hpp" />
+    <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h">
+      <Filter>ThirdParty\D3D12MemoryAllocator</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

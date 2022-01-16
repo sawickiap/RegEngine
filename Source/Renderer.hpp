@@ -16,6 +16,7 @@ public:
 	~Renderer();
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
+    D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
     void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
@@ -46,6 +47,7 @@ private:
 
 	ComPtr<ID3D12Device> m_Device;
 	Capabilities m_Capabilities;
+    ComPtr<D3D12MA::Allocator> m_MemoryAllocator;
 	ComPtr<ID3D12CommandQueue> m_CmdQueue;
     ComPtr<ID3D12CommandAllocator> m_CmdAllocator;
     ComPtr<ID3D12GraphicsCommandList> m_UploadCmdList;
@@ -67,6 +69,7 @@ private:
     unique_ptr<Mesh> m_Mesh;
 
 	void CreateDevice();
+	void CreateMemoryAllocator();
 	void LoadCapabilities();
 	void CreateCommandQueues();
 	void CreateSwapChain();

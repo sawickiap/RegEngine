@@ -38,17 +38,19 @@ void Texture::LoadFromFile(const wstr_view& filePath)
     // Create source buffer.
     const uint32_t srcBufRowPitch = std::max<uint32_t>(textureSize.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     const uint32_t srcBufSize = srcBufRowPitch * textureSize.y;
-    ComPtr<ID3D12Resource> srcBuf;
+    ComPtr<D3D12MA::Allocation> srcBuf;
     {
         const CD3DX12_RESOURCE_DESC srcBufDesc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &D3D12_HEAP_PROPERTIES_UPLOAD,
-            D3D12_HEAP_FLAG_NONE,
+        D3D12MA::ALLOCATION_DESC srcBufAllocDesc = {};
+        srcBufAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+            &srcBufAllocDesc,
             &srcBufDesc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&srcBuf)));
-        SetD3D12ObjectName(srcBuf, L"Texture source buffer");
+            &srcBuf,
+            IID_NULL, NULL)); // riidResource, ppvResource
+        SetD3D12ObjectName(srcBuf->GetResource(), L"Texture source buffer");
     }
 
     // Map source buffer and memcpy data to it from decodedData.
@@ -56,14 +58,14 @@ void Texture::LoadFromFile(const wstr_view& filePath)
         const uint8_t* textureDataPtr = decodedData.get();
         CD3DX12_RANGE readEmptyRange{0, 0};
         void* srcBufMappedPtr = nullptr;
-        CHECK_HR(srcBuf->Map(0, D3D12_RANGE_NONE, &srcBufMappedPtr));
+        CHECK_HR(srcBuf->GetResource()->Map(0, D3D12_RANGE_NONE, &srcBufMappedPtr));
         for(uint32_t y = 0; y < textureSize.y; ++y)
         {
             memcpy(srcBufMappedPtr, textureDataPtr, textureSize.x * bytesPerPixel);
             textureDataPtr += subresource.RowPitch;
             srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
         }
-        srcBuf->Unmap(0, D3D12_RANGE_ALL);
+        srcBuf->GetResource()->Unmap(0, D3D12_RANGE_ALL);
     }
     decodedData.reset();
 
@@ -75,7 +77,7 @@ void Texture::LoadFromFile(const wstr_view& filePath)
         CD3DX12_TEXTURE_COPY_LOCATION dst{m_Resource.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
             {m_Desc.Format, (uint32_t)m_Desc.Width, (uint32_t)m_Desc.Height, 1, srcBufRowPitch}};
-        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
+        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf->GetResource(), srcFootprint};
         CD3DX12_BOX srcBox{
             0, 0, 0, // Left, Top, Front
             (LONG)m_Desc.Width, (LONG)m_Desc.Height, 1}; // Right, Bottom, Back
@@ -109,17 +111,19 @@ void Texture::LoadFromMemory(
     // Create source buffer.
     const size_t srcBufRowPitch = std::max<size_t>(resDesc.Width * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     const size_t srcBufSize = srcBufRowPitch * resDesc.Height;
-    ComPtr<ID3D12Resource> srcBuf;
+    ComPtr<D3D12MA::Allocation> srcBuf;
     {
         const CD3DX12_RESOURCE_DESC desc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &D3D12_HEAP_PROPERTIES_UPLOAD,
-            D3D12_HEAP_FLAG_NONE,
+        D3D12MA::ALLOCATION_DESC srcBufAllocDesc = {};
+        srcBufAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
+        CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+            &srcBufAllocDesc,
             &desc,
             D3D12_RESOURCE_STATE_GENERIC_READ,
             nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&srcBuf)));
-        SetD3D12ObjectName(srcBuf, L"Font texture source buffer");
+            &srcBuf,
+            IID_NULL, NULL)); // riidResource, ppvResource
+        SetD3D12ObjectName(srcBuf->GetResource(), L"Font texture source buffer");
     }
 
     // Fill source buffer.
@@ -127,27 +131,29 @@ void Texture::LoadFromMemory(
         CD3DX12_RANGE readEmptyRange{0, 0};
         char* srcBufMappedPtr = nullptr;
         const char* textureDataPtr = (const char*)data.pData;
-        CHECK_HR(srcBuf->Map(0, D3D12_RANGE_NONE, (void**)&srcBufMappedPtr));
+        CHECK_HR(srcBuf->GetResource()->Map(0, D3D12_RANGE_NONE, (void**)&srcBufMappedPtr));
         for(uint32_t y = 0; y < resDesc.Height; ++y)
         {
             memcpy(srcBufMappedPtr, textureDataPtr, resDesc.Width * bytesPerPixel);
             textureDataPtr = (char*)textureDataPtr + data.RowPitch;
             srcBufMappedPtr += srcBufRowPitch;
         }
-        srcBuf->Unmap(0, D3D12_RANGE_ALL); // pWrittenRange
+        srcBuf->GetResource()->Unmap(0, D3D12_RANGE_ALL); // pWrittenRange
     }
 
     // Create destination texture.
     {
-        CHECK_HR(g_Renderer->GetDevice()->CreateCommittedResource(
-            &D3D12_HEAP_PROPERTIES_DEFAULT,
-            D3D12_HEAP_FLAG_NONE,
+        D3D12MA::ALLOCATION_DESC allocDesc = {};
+        allocDesc.HeapType = D3D12_HEAP_TYPE_DEFAULT;
+        CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
+            &allocDesc,
             &resDesc,
             D3D12_RESOURCE_STATE_COPY_DEST,
             nullptr, // pOptimizedClearValue
-            IID_PPV_ARGS(&m_Resource)));
+            &m_Allocation,
+            IID_PPV_ARGS(&m_Resource))); // riidResource, ppvResource
         if(!name.empty())
-            SetD3D12ObjectName(m_Resource, name);
+            SetD3D12ObjectName(m_Resource.Get(), name);
     }
 
     // Copy the data.
@@ -158,7 +164,7 @@ void Texture::LoadFromMemory(
         CD3DX12_TEXTURE_COPY_LOCATION dst{m_Resource.Get()};
         D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
             {resDesc.Format, (UINT)resDesc.Width, (UINT)resDesc.Height, 1, (UINT)srcBufRowPitch}};
-        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf.Get(), srcFootprint};
+        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf->GetResource(), srcFootprint};
         CD3DX12_BOX srcBox{
             0, 0, 0, // Left, Top, Front
             (LONG)resDesc.Width, (LONG)resDesc.Height, 1}; // Right, Bottom, Back
