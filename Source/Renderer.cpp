@@ -8,6 +8,14 @@
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+#include <assimp/LogStream.hpp>
+#include <assimp/Logger.hpp>
+#include <assimp/DefaultLogger.hpp>
+#include <assimp/vector2.h>
+#include <assimp/vector3.h>
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -15,13 +23,25 @@ static const DXGI_FORMAT DEPTH_STENCIL_FORMAT = DXGI_FORMAT_D32_FLOAT;
 
 extern VecSetting<glm::uvec2> g_Size;
 
+enum ASSIMP_LOG_SEVERITY
+{
+    ASSIMP_LOG_SEVERITY_NONE,
+    ASSIMP_LOG_SEVERITY_ERROR,
+    ASSIMP_LOG_SEVERITY_WARNING,
+    ASSIMP_LOG_SEVERITY_INFO,
+    ASSIMP_LOG_SEVERITY_DEBUG,
+};
+
 UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
 static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
 static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
 static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
+static UintSetting g_AssimpLogSeverity(SettingCategory::Startup, "Assimp.LogSeverity", 3);
+static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFilePath");
 
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_TextureFilePath(SettingCategory::Load, "TextureFilePath");
+static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 
 Renderer* g_Renderer;
 
@@ -55,6 +75,13 @@ static mat4 MakeInfReversedZProjLH(float fovY_radians, float aspectWbyH, float z
         0.0f, 0.0f, zNear,  0.0f);
 }
 
+class AssimpInit
+{
+public:
+    AssimpInit();
+    ~AssimpInit();
+};
+
 class Font
 {
 public:
@@ -68,6 +95,56 @@ private:
     WinFontRender::CFont m_WinFont;
     unique_ptr<Texture> m_Texture;
 };
+
+class AssimpLogStream : public Assimp::LogStream
+{
+public:
+    void write(const char* message) override;
+};
+static AssimpLogStream g_AssimpLogStream;
+
+AssimpInit::AssimpInit()
+{
+    using namespace Assimp;
+    uint32_t errorSeverity = 0;
+    Logger::LogSeverity logSeverity = Logger::NORMAL;
+
+    switch(g_AssimpLogSeverity.GetValue())
+    {
+    case ASSIMP_LOG_SEVERITY_NONE:
+        break;
+    case ASSIMP_LOG_SEVERITY_ERROR:
+        errorSeverity = Logger::Err;
+        break;
+    case ASSIMP_LOG_SEVERITY_WARNING:
+        errorSeverity = Logger::Err | Logger::Warn;
+        break;
+    case ASSIMP_LOG_SEVERITY_INFO:
+        errorSeverity = Logger::Err | Logger::Warn | Logger::Info;
+        break;
+    case ASSIMP_LOG_SEVERITY_DEBUG:
+        errorSeverity = Logger::Err | Logger::Warn | Logger::Debugging;
+        logSeverity = Logger::VERBOSE;
+        break;
+    default:
+        assert(0);
+    }
+
+    Assimp::DefaultLogger::create(ConvertUnicodeToChars(g_AssimpLogFilePath.GetValue(), CP_ACP).c_str(), logSeverity);
+    Assimp::DefaultLogger::get()->attachStream(&g_AssimpLogStream, errorSeverity);
+}
+
+AssimpInit::~AssimpInit()
+{
+    // Crashes with error:
+    // HEAP[RegEngine.exe]: Invalid address specified to RtlValidateHeap( 00000265EA700000, 00007FF667F24038 )
+    //Assimp::DefaultLogger::kill();
+}
+
+void AssimpLogStream::write(const char* message)
+{
+    LogInfo(ConvertCharsToUnicode(message, CP_ACP));
+}
 
 void Font::Init()
 {
@@ -130,6 +207,8 @@ void Renderer::Init()
 	CreateSwapChain();
 	CreateFrameResources();
 	CreateResources();
+    m_AssimpInit = std::make_unique<AssimpInit>();
+    LoadModel();
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -243,9 +322,7 @@ void Renderer::Render()
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	    cmdList.SetScissorRect(scissorRect);
 
-	    cmdList.SetPrimitiveTopology(m_Mesh->GetTopology());
-
-        const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
+        const mat4 world = glm::rotate(glm::identity<mat4>(), 0.f/*time*/, vec3(0.f, 0.f, 1.f));
         const mat4 view = glm::lookAtLH(
             vec3(0.f, 2.f, 0.5f), // eye
             vec3(0.f), // center
@@ -277,18 +354,26 @@ void Renderer::Render()
 
         cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(ROOT_PARAM_OBJECT_TRANSFORM_CONST, 16, glm::value_ptr(worldViewProj), 0);
 
-        const D3D12_VERTEX_BUFFER_VIEW vbView = m_Mesh->GetVertexBufferView();
-        cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
-
-        if(m_Mesh->HasIndices())
+        for(size_t meshIndex = 0; meshIndex < m_Meshes.size(); ++meshIndex)
         {
-            const D3D12_INDEX_BUFFER_VIEW ibView = m_Mesh->GetIndexBufferView();
-            cmdList.GetCmdList()->IASetIndexBuffer(&ibView);
-        }
-        else
-            cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
+            const Mesh* const mesh = m_Meshes[meshIndex].get();
+	        cmdList.SetPrimitiveTopology(mesh->GetTopology());
 
-	    cmdList.GetCmdList()->DrawIndexedInstanced(m_Mesh->GetIndexCount(), 1, 0, 0, 0);
+            const D3D12_VERTEX_BUFFER_VIEW vbView = mesh->GetVertexBufferView();
+            cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
+
+            if(mesh->HasIndices())
+            {
+                const D3D12_INDEX_BUFFER_VIEW ibView = mesh->GetIndexBufferView();
+                cmdList.GetCmdList()->IASetIndexBuffer(&ibView);
+    	        cmdList.GetCmdList()->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
+            }
+            else
+            {
+                cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
+    	        cmdList.GetCmdList()->DrawInstanced(mesh->GetVertexCount(), 1, 0, 0);
+            }
+        }
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -478,6 +563,7 @@ void Renderer::CreateResources()
         m_Device->CreateDepthStencilView(m_DepthTexture->GetResource(), &dsvDesc, m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart());
     }
 
+    /*
     {
         const Vertex vertices[] = {
             // X-Z plane
@@ -505,6 +591,7 @@ void Renderer::CreateResources()
             vertices, (uint32_t)_countof(vertices),
             indices, (uint32_t)_countof(indices));
     }
+    */
 
 	// Root signature
 	{
@@ -558,7 +645,7 @@ void Renderer::CreateResources()
 		desc.VS.pShaderBytecode = vsCode.data();
 		desc.PS.BytecodeLength = psCode.size();
 		desc.PS.pShaderBytecode = psCode.data();
-		desc.PrimitiveTopologyType = m_Mesh->GetTopologyType();
+		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		desc.NumRenderTargets = 1;
 		desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
 		desc.DSVFormat = DEPTH_STENCIL_FORMAT;
@@ -595,6 +682,85 @@ void Renderer::CreateResources()
         m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_TextureSRVDescriptor));
 
     ERR_CATCH_FUNC;
+}
+
+void Renderer::LoadModel()
+{
+    const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
+    LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
+    ERR_TRY;
+
+    {
+        Assimp::Importer importer;
+        const aiScene* scene = importer.ReadFile(
+            filePath.c_str(),
+            aiProcess_Triangulate |
+            aiProcess_JoinIdenticalVertices |
+            aiProcess_SortByPType |
+            aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
+        // aiProcess_CalcTangentSpace
+        // aiProcess_FlipWindingOrder
+        // aiProcess_MakeLeftHande
+        if(!scene)
+            FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
+        const aiNode* node = scene->mRootNode;
+        if(node)
+            LoadModelNode(scene, node);
+    }
+
+    ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*hs\".", STR_TO_FORMAT(filePath)));
+}
+
+void Renderer::LoadModelNode(const aiScene* scene, const aiNode* node)
+{
+    // TODO: respect node->mTransformation
+    for(uint32_t i = 0; i < node->mNumMeshes; ++i)
+        LoadModelMesh(scene, scene->mMeshes[node->mMeshes[i]]);
+    for(uint32_t i = 0; i < node->mNumChildren; ++i)
+        LoadModelNode(scene, node->mChildren[i]);
+}
+
+void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
+{
+    const uint32_t vertexCount = assimpMesh->mNumVertices;
+    const uint32_t faceCount = assimpMesh->mNumFaces;
+    if(vertexCount == 0 || faceCount == 0)
+        return;
+    CHECK_BOOL(assimpMesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE);
+    CHECK_BOOL(assimpMesh->HasTextureCoords(0) || !assimpMesh->HasTextureCoords(1));
+    CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
+
+    std::vector<Vertex> vertices(vertexCount);
+    const float scale = g_AssimpScale.GetValue();
+    for(uint32_t i = 0; i < vertexCount; ++i)
+    {
+        const aiVector3D pos = assimpMesh->mVertices[i];
+        const aiVector3D texCoord = assimpMesh->mTextureCoords[0][i];
+        vertices[i].m_Position = packed_vec3(pos.x, pos.y, pos.z) * scale;
+        vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
+        vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
+    }
+    
+    std::vector<Mesh::IndexType> indices(faceCount * 3);
+    uint32_t indexIndex = 0;
+    for(uint32_t i = 0; i < faceCount; ++i)
+    {
+        assert(assimpMesh->mFaces[i].mNumIndices == 3);
+        for(uint32_t j = 0; j < 3; ++j)
+        {
+            assert(assimpMesh->mFaces[i].mIndices[j] <= std::numeric_limits<Mesh::IndexType>::max());
+            indices[indexIndex++] = (Mesh::IndexType)assimpMesh->mFaces[i].mIndices[j];
+        }
+    }
+
+    unique_ptr<Mesh> rendererMesh = std::make_unique<Mesh>();
+    rendererMesh->Init(
+        L"Mesh",
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+        D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+        vertices.data(), vertexCount,
+        indices.data(), faceCount * 3);
+    m_Meshes.push_back(std::move(rendererMesh));
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)

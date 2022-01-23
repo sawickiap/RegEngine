@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ProjectSchemaDefinitions xmlns="clr-namespace:Microsoft.Build.Framework.XamlTypes;assembly=Microsoft.Build.Framework">
+	<Rule Name="ReferencedPackages-assimp" PageTemplate="tool" DisplayName="Referenced Packages" SwitchPrefix="/" Order="1">
+		<Rule.Categories>
+			<Category Name="assimp" DisplayName="Assimp"/>
+		</Rule.Categories>
+		<Rule.DataSource>
+			<DataSource Persistence="ProjectFile" ItemType="" />
+		</Rule.DataSource>
+		<EnumProperty Name="AssimpVersion" DisplayName="Version Toolset" Description="Select assimp release version folder to use (This option only applies to release mode)." Category="assimp">
+			<EnumValue Name="MinSizeRel" DisplayName="Release Minimum Size" />
+			<EnumValue Name="Release" DisplayName="Release" />
+			<EnumValue Name="Debug" DisplayName="Debug" />
+		</EnumProperty>
+		<!--EnumProperty Name="OPENCV_DIR" Visible="false" Category="assimp">
+			<EnumValue Name="$(MSBuildThisFileDirectory)" />
+		</EnumProperty-->
+	</Rule>
+</ProjectSchemaDefinitions>

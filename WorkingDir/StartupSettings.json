@@ -12,5 +12,14 @@
 
     "ShaderResourceDescriptors.Persistent.MaxCount": 1024,
     "ShaderResourceDescriptors.Temporary.MaxCountPerFrame": 1024,
-    "ConstantBuffers.Temporary.MaxSizePerFrame": 65536
+    "ConstantBuffers.Temporary.MaxSizePerFrame": 65536,
+    /*
+    Level of logging from Assimp library:
+    0 = none, 1 = errors, 2 = also warnings, 3 = also information, 4 = also verbose debug information
+    It affects both main logging output and Assimp.LogFilePath.
+    All messages from Assimp are logged at "info" level in the engine.
+    */
+    "Assimp.LogSeverity": 4,
+    // File path for an extra log just for Assimp. Empty string if no file should be created.
+    "Assimp.LogFilePath": ""
 }

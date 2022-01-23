@@ -1,6 +1,8 @@
 #pragma once
 
 class Font;
+class AssimpInit;
+
 class CommandList;
 class RenderingResource;
 class Texture;
@@ -8,6 +10,10 @@ class Mesh;
 struct ShaderResourceDescriptor;
 class ShaderResourceDescriptorManager;
 class TemporaryConstantBufferManager;
+
+struct aiScene;
+struct aiNode;
+struct aiMesh;
 
 struct RendererCapabilities
 {
@@ -70,7 +76,8 @@ private:
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<Texture> m_Texture;
-    unique_ptr<Mesh> m_Mesh;
+    std::vector<unique_ptr<Mesh>> m_Meshes;
+    unique_ptr<AssimpInit> m_AssimpInit;
     
     // A) Testing texture SRV descriptors as persistent.
     unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
@@ -83,6 +90,9 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
+    void LoadModel();
+    void LoadModelNode(const aiScene* scene, const aiNode* node);
+    void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
 
     void WaitForFenceOnCPU(UINT64 value);
 };

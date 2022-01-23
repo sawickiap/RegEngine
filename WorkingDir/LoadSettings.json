@@ -1,5 +1,6 @@
 {
     "UsePIXEvents": true,
     "SyncInterval": 1,
-    "TextureFilePath": "f:\\Graphics\\11041884_10205320412442122_6518255771002907053_o.jpg"
+    "TextureFilePath": "f:\\Graphics\\11041884_10205320412442122_6518255771002907053_o.jpg",
+    "Assimp.Scale": 0.01
 }

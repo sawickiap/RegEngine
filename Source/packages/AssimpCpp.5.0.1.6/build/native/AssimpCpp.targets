@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+	<!-- Variable PYLON_DEV_DIR definition -->
+	<ItemGroup>
+		<PropertyPageSchema Include="$(MSBuildThisFileDirectory)AssimpCpp.defs.xml" />
+	</ItemGroup>
+	<!--Condition="'$(AssimpVersion)' != 'Release' AND '$(AssimpVersion)' != 'MinSizeRel'"-->
+	<PropertyGroup>
+		<AssimpVersion>Release</AssimpVersion>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug' OR '$(AssimpVersion)' == 'Debug'">
+		<AssimpVersion>Debug</AssimpVersion>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)' != 'Debug' AND '$(AssimpVersion)' == 'MinSizeRel'">
+		<AssimpVersion>MinSizeRel</AssimpVersion>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<isDebug>d</isDebug>
+	</PropertyGroup>
+	
+	<ItemDefinitionGroup>
+		<ClCompile>
+			<AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+		</ClCompile>
+		<Link>
+			<AdditionalDependencies>$(MSBuildThisFileDirectory)lib\$(AssimpVersion)\assimp-vc142-mt$(isDebug).lib;%(AdditionalDependencies)</AdditionalDependencies>
+		</Link>
+	</ItemDefinitionGroup>
+	<ItemGroup>
+		<Content Include="$(MSBuildThisFileDirectory)bin\$(AssimpVersion)\assimp-vc142-mt$(isDebug).dll">
+			<Link>assimp-vc142-mt$(isDebug).dll</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Visible>False</Visible>
+		</Content>
+	</ItemGroup>
+</Project>

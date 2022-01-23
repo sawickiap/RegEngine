@@ -22,7 +22,7 @@ struct VS_OUTPUT
 VS_OUTPUT main(VS_INPUT input)
 {
 	float3 pos = input.pos;
-	pos.z += sin(g_SceneTime);
+	//pos.z += sin(g_SceneTime);
 
 	VS_OUTPUT output;
 	output.pos = mul(g_worldViewProj, float4(pos, 1));

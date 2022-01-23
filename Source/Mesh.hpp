@@ -2,9 +2,9 @@
 
 struct Vertex
 {
-    glm::vec<3, float, glm::packed_highp> m_Position;
-    glm::vec<2, float, glm::packed_highp> m_TexCoord;
-    glm::vec<4, float, glm::packed_highp> m_Color;
+    packed_vec3 m_Position;
+    packed_vec2 m_TexCoord;
+    packed_vec4 m_Color;
 
     static const D3D12_INPUT_ELEMENT_DESC* GetInputElements();
     static const uint32_t GetInputElementCount();
@@ -19,6 +19,7 @@ public:
     typedef uint16_t IndexType;
     static constexpr DXGI_FORMAT s_IndexFormat = DXGI_FORMAT_R16_UINT;
     void Init(
+        const wstr_view& name,
         D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType,
         D3D12_PRIMITIVE_TOPOLOGY topology,
         const Vertex* vertices,

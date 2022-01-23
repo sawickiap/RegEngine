@@ -31,8 +31,9 @@ void Texture::LoadFromFile(const wstr_view& filePath)
     SetD3D12ObjectName(m_Resource, Format(L"Texture from file: %.*s", STR_TO_FORMAT(filePath)));
 
     m_Desc = m_Resource->GetDesc();
-    const uint32_t bytesPerPixel = DXGIFormatToBytesPerPixel(m_Desc.Format);
-    CHECK_BOOL(bytesPerPixel > 0);
+    const uint32_t bitsPerPixel = DXGIFormatToBitsPerPixel(m_Desc.Format);
+    CHECK_BOOL(bitsPerPixel > 0 && bitsPerPixel % 8 == 0);
+    const uint32_t bytesPerPixel = bitsPerPixel / 8;
     const uvec2 textureSize = uvec2((uint32_t)m_Desc.Width, (uint32_t)m_Desc.Height);
 
     // Create source buffer.
@@ -105,8 +106,9 @@ void Texture::LoadFromMemory(
 
     ERR_TRY;
 
-    const uint8_t bytesPerPixel = DXGIFormatToBytesPerPixel(resDesc.Format);
-    CHECK_BOOL(bytesPerPixel > 0);
+    const uint8_t bitsPerPixel = DXGIFormatToBitsPerPixel(resDesc.Format);
+    CHECK_BOOL(bitsPerPixel > 0 && bitsPerPixel % 8 == 0);
+    const uint32_t bytesPerPixel = bitsPerPixel / 8;
 
     // Create source buffer.
     const size_t srcBufRowPitch = std::max<size_t>(resDesc.Width * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);

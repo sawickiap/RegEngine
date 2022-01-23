@@ -19,6 +19,7 @@ const uint32_t Vertex::GetInputElementCount()
 }
 
 void Mesh::Init(
+    const wstr_view& name,
     D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType,
     D3D12_PRIMITIVE_TOPOLOGY topology,
     const Vertex* vertices,
@@ -48,6 +49,7 @@ void Mesh::Init(
             nullptr, // pOptimizedClearValue
             &m_VertexBuffer,
             IID_NULL, NULL)); // riidResource, ppvResource
+        SetD3D12ObjectName(m_VertexBuffer->GetResource(), Format(L"%.*s - vertex buffer", STR_TO_FORMAT(name)));
     }
 
     // Map and fill vertex buffer.
@@ -73,6 +75,7 @@ void Mesh::Init(
                 nullptr, // pOptimizedClearValue
                 &m_IndexBuffer,
                 IID_NULL, NULL)); // riidResource, ppvResource
+            SetD3D12ObjectName(m_IndexBuffer->GetResource(), Format(L"%.*s - index buffer", STR_TO_FORMAT(name)));
         }
 
         // Map and fill vertex buffer.

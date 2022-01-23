@@ -53,6 +53,10 @@ using glm::ivec2; using glm::ivec3; using glm::ivec4;
 using glm::bvec2; using glm::bvec3; using glm::bvec4;
 using glm::mat4;
 
+typedef glm::vec<2, float, glm::packed_highp> packed_vec2;
+typedef glm::vec<3, float, glm::packed_highp> packed_vec3;
+typedef glm::vec<4, float, glm::packed_highp> packed_vec4;
+
 static const uint32_t MAX_FRAME_COUNT = 10;
 
 /*
@@ -229,4 +233,4 @@ void SetThreadName(DWORD threadId, const str_view& name);
 void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }
 // On error returns 0.
-uint8_t DXGIFormatToBytesPerPixel(DXGI_FORMAT format);
+uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format);
