@@ -70,7 +70,7 @@ wstring GetHRESULTErrorMessage(HRESULT hr)
     if(msg)
         return Format(L"HRESULT = 0x%08X (%s)", hr, msg);
     else
-        return Format(L"HRESULT = 0x08X", hr);
+        return Format(L"HRESULT = 0x%08X", hr);
 }
 
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage)
