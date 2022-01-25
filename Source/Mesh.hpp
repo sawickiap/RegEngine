@@ -22,10 +22,8 @@ public:
         const wstr_view& name,
         D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType,
         D3D12_PRIMITIVE_TOPOLOGY topology,
-        const Vertex* vertices,
-        uint32_t vertexCount,
-        const IndexType* indices,
-        uint32_t indexCount);
+        std::span<const Vertex> vertices,
+        std::span<const IndexType> indices);
 
     D3D12_PRIMITIVE_TOPOLOGY_TYPE GetTopologyType() const { return m_TopologyType; }
     D3D12_PRIMITIVE_TOPOLOGY GetTopology() const { return m_Topology; }

@@ -22,25 +22,23 @@ void Mesh::Init(
     const wstr_view& name,
     D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType,
     D3D12_PRIMITIVE_TOPOLOGY topology,
-    const Vertex* vertices,
-    uint32_t vertexCount,
-    const IndexType* indices,
-    uint32_t indexCount)
+    std::span<const Vertex> vertices,
+    std::span<const IndexType> indices)
 {
     assert(!m_VertexBuffer);
     assert(vertexCount > 0 && vertices);
 
     m_TopologyType = topologyType;
     m_Topology = topology;
-    m_VertexCount = vertexCount;
-    m_IndexCount = indexCount;
+    m_VertexCount = (uint32_t)vertices.size();
+    m_IndexCount = (uint32_t)indices.size();
 
     D3D12MA::ALLOCATION_DESC allocDesc = {};
     allocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
 
     // Create vertex buffer.
     {
-        const UINT64 vbSize = vertexCount * sizeof(Vertex);
+        const UINT64 vbSize = m_VertexCount * sizeof(Vertex);
         D3D12_RESOURCE_DESC vbDesc = CD3DX12_RESOURCE_DESC::Buffer(vbSize);
         CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
             &allocDesc,
@@ -57,16 +55,16 @@ void Mesh::Init(
         CD3DX12_RANGE readEmptyRange{0, 0};
         void* vbMappedPtr = nullptr;
         CHECK_HR(m_VertexBuffer->GetResource()->Map(0, D3D12_RANGE_NONE, &vbMappedPtr));
-        memcpy(vbMappedPtr, vertices, vertexCount * sizeof(Vertex));
+        memcpy(vbMappedPtr, vertices.data(), vertices.size() * sizeof(Vertex));
         m_VertexBuffer->GetResource()->Unmap(0, D3D12_RANGE_ALL);
     }
 
-    if(indexCount > 0)
+    if(m_IndexCount > 0)
     {
         assert(indices);
         // Create index buffer.
         {
-            const UINT64 ibSize = indexCount * sizeof(IndexType);
+            const UINT64 ibSize = m_IndexCount * sizeof(IndexType);
             D3D12_RESOURCE_DESC ibDesc = CD3DX12_RESOURCE_DESC::Buffer(ibSize);
             CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
                 &allocDesc,
@@ -83,7 +81,7 @@ void Mesh::Init(
             CD3DX12_RANGE readEmptyRange{0, 0};
             void* ibMappedPtr = nullptr;
             CHECK_HR(m_IndexBuffer->GetResource()->Map(0, D3D12_RANGE_NONE, &ibMappedPtr));
-            memcpy(ibMappedPtr, indices, indexCount * sizeof(IndexType));
+            memcpy(ibMappedPtr, indices.data(), indices.size() * sizeof(IndexType));
             m_IndexBuffer->GetResource()->Unmap(0, D3D12_RANGE_ALL);
         }
     }

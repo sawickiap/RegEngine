@@ -32,6 +32,7 @@
 #include <thread>
 #include <initializer_list>
 #include <limits>
+#include <span>
 
 #include <cstdio>
 #include <cstdint>

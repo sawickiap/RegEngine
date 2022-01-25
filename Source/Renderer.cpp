@@ -327,9 +327,9 @@ void Renderer::Render()
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	    cmdList.SetScissorRect(scissorRect);
 
-        //const mat4 world = glm::rotate(glm::identity<mat4>(), 0.f/*time*/, vec3(0.f, 0.f, 1.f));
+        const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
         const mat4 view = glm::lookAtLH(
-            vec3(0.f, 5.f, 1.f), // eye
+            vec3(0.f, 3.f, 0.5f), // eye
             vec3(0.f), // center
             vec3(0.f, 0.f, 1.f)); // up
         const mat4 proj = MakeInfReversedZProjLH(
@@ -337,7 +337,7 @@ void Renderer::Render()
             (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
             0.5f); // zNear
         //const mat4 worldViewProj = proj * view * world;
-        m_ViewProj = proj * view;
+        m_ViewProj = proj * view * world;
 
         // A) Testing texture SRV descriptors as persistent.
         /*
@@ -349,8 +349,8 @@ void Renderer::Render()
         // B) Testing texture SRV descriptors as temporary.
         {
             ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
-            ID3D12Resource* const textureRes = fmod(time, 1.f) > 0.5f ?
-                m_Font->GetTexture()->GetResource() :
+            ID3D12Resource* const textureRes = /*fmod(time, 1.f) > 0.5f ?
+                m_Font->GetTexture()->GetResource() :*/
                 m_Texture->GetResource();
             m_Device->CreateShaderResourceView(textureRes, nullptr,
                 m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
@@ -673,7 +673,8 @@ void Renderer::CreateResources()
 void Renderer::LoadModel()
 {
     //const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
-    const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/teapot_instancenodes.DAE";
+    //const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/teapot_instancenodes.DAE";
+    const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/duck.DAE";
     LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
     ERR_TRY;
 
@@ -756,8 +757,8 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         L"Mesh",
         D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
         D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
-        vertices.data(), vertexCount,
-        indices.data(), faceCount * 3);
+        std::span<const Vertex>(vertices.begin(), vertices.end()),
+        std::span<const Mesh::IndexType>(indices.begin(), indices.end()));
     m_Meshes.push_back(std::move(rendererMesh));
 }
 
