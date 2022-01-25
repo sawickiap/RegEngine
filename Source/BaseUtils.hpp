@@ -56,6 +56,7 @@ using glm::mat4;
 typedef glm::vec<2, float, glm::packed_highp> packed_vec2;
 typedef glm::vec<3, float, glm::packed_highp> packed_vec3;
 typedef glm::vec<4, float, glm::packed_highp> packed_vec4;
+typedef glm::mat<4, 4, float, glm::packed_highp> packed_mat4;
 
 static const uint32_t MAX_FRAME_COUNT = 10;
 

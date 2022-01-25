@@ -23,6 +23,13 @@ struct RendererCapabilities
 	UINT m_DescriptorSize_DSV = UINT32_MAX;
 };
 
+struct Entity
+{
+    mat4 m_Transform = glm::identity<mat4>();
+    std::vector<unique_ptr<Entity>> m_Children;
+    std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
+};
+
 class Renderer
 {
 public:
@@ -77,11 +84,14 @@ private:
     unique_ptr<Font> m_Font;
     unique_ptr<Texture> m_Texture;
     std::vector<unique_ptr<Mesh>> m_Meshes;
+    Entity m_RootEntity;
     unique_ptr<AssimpInit> m_AssimpInit;
     
     // A) Testing texture SRV descriptors as persistent.
     unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
     unique_ptr<ShaderResourceDescriptor> m_TextureSRVDescriptor;
+
+    mat4 m_ViewProj;
 
 	void CreateDevice();
 	void CreateMemoryAllocator();
@@ -91,10 +101,14 @@ private:
 	void CreateFrameResources();
 	void CreateResources();
     void LoadModel();
-    void LoadModelNode(const aiScene* scene, const aiNode* node);
+    void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
+    // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
 
     void WaitForFenceOnCPU(UINT64 value);
+
+    void RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity);
+    void RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex);
 };
 
 extern Renderer* g_Renderer;

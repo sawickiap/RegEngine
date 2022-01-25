@@ -57,10 +57,15 @@ struct PerFrameConstants
     uint32_t _padding0[2];
 };
 
+struct PerObjectConstants
+{
+    packed_mat4 m_WorldViewProj;
+};
+
 enum ROOT_PARAM
 {
     ROOT_PARAM_PER_FRAME_CBV,
-    ROOT_PARAM_OBJECT_TRANSFORM_CONST,
+    ROOT_PARAM_PER_OBJECT_CBV,
     ROOT_PARAM_TEXTURE_SRV,
 };
 
@@ -322,16 +327,17 @@ void Renderer::Render()
 	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	    cmdList.SetScissorRect(scissorRect);
 
-        const mat4 world = glm::rotate(glm::identity<mat4>(), 0.f/*time*/, vec3(0.f, 0.f, 1.f));
+        //const mat4 world = glm::rotate(glm::identity<mat4>(), 0.f/*time*/, vec3(0.f, 0.f, 1.f));
         const mat4 view = glm::lookAtLH(
-            vec3(0.f, 2.f, 0.5f), // eye
+            vec3(0.f, 5.f, 1.f), // eye
             vec3(0.f), // center
             vec3(0.f, 0.f, 1.f)); // up
         const mat4 proj = MakeInfReversedZProjLH(
             glm::radians(80.f),
             (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
             0.5f); // zNear
-        const mat4 worldViewProj = proj * view * world;
+        //const mat4 worldViewProj = proj * view * world;
+        m_ViewProj = proj * view;
 
         // A) Testing texture SRV descriptors as persistent.
         /*
@@ -352,28 +358,7 @@ void Renderer::Render()
                 m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
         }
 
-        cmdList.GetCmdList()->SetGraphicsRoot32BitConstants(ROOT_PARAM_OBJECT_TRANSFORM_CONST, 16, glm::value_ptr(worldViewProj), 0);
-
-        for(size_t meshIndex = 0; meshIndex < m_Meshes.size(); ++meshIndex)
-        {
-            const Mesh* const mesh = m_Meshes[meshIndex].get();
-	        cmdList.SetPrimitiveTopology(mesh->GetTopology());
-
-            const D3D12_VERTEX_BUFFER_VIEW vbView = mesh->GetVertexBufferView();
-            cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
-
-            if(mesh->HasIndices())
-            {
-                const D3D12_INDEX_BUFFER_VIEW ibView = mesh->GetIndexBufferView();
-                cmdList.GetCmdList()->IASetIndexBuffer(&ibView);
-    	        cmdList.GetCmdList()->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
-            }
-            else
-            {
-                cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
-    	        cmdList.GetCmdList()->DrawInstanced(mesh->GetVertexCount(), 1, 0, 0);
-            }
-        }
+        RenderEntity(cmdList, glm::identity<mat4>(), m_RootEntity);
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -603,10 +588,11 @@ void Renderer::CreateResources()
         params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
         params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &perFrameCBVDescRange;
 
-        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
-        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].Constants.ShaderRegister = 1;
-        params[ROOT_PARAM_OBJECT_TRANSFORM_CONST].Constants.Num32BitValues = 16;
+        const CD3DX12_DESCRIPTOR_RANGE perObjectCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1};
+        params[ROOT_PARAM_PER_OBJECT_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[ROOT_PARAM_PER_OBJECT_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.pDescriptorRanges = &perObjectCBVDescRange;
 
         const CD3DX12_DESCRIPTOR_RANGE textureSRVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
         params[ROOT_PARAM_TEXTURE_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -686,7 +672,8 @@ void Renderer::CreateResources()
 
 void Renderer::LoadModel()
 {
-    const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
+    //const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
+    const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/teapot_instancenodes.DAE";
     LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
     ERR_TRY;
 
@@ -700,32 +687,43 @@ void Renderer::LoadModel()
             aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
         // aiProcess_CalcTangentSpace
         // aiProcess_FlipWindingOrder
-        // aiProcess_MakeLeftHande
+        // aiProcess_MakeLeftHanded
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
+        
+        for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
+            LoadModelMesh(scene, scene->mMeshes[i]);
+        
         const aiNode* node = scene->mRootNode;
         if(node)
-            LoadModelNode(scene, node);
+            LoadModelNode(m_RootEntity, scene, node);
     }
 
     ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*hs\".", STR_TO_FORMAT(filePath)));
 }
 
-void Renderer::LoadModelNode(const aiScene* scene, const aiNode* node)
+void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)
 {
-    // TODO: respect node->mTransformation
+    // Matrix is Assimp is also right-to-left ordered (translation in last column, vectors are column, transform is mat * vec),
+    // but it is stored as row-major instead of column-major like in GLM.
+    outEntity.m_Transform = glm::transpose(glm::make_mat4(&node->mTransformation.a1));
+
     for(uint32_t i = 0; i < node->mNumMeshes; ++i)
-        LoadModelMesh(scene, scene->mMeshes[node->mMeshes[i]]);
+        outEntity.m_Meshes.push_back((size_t)node->mMeshes[i]);
+    
     for(uint32_t i = 0; i < node->mNumChildren; ++i)
-        LoadModelNode(scene, node->mChildren[i]);
+    {
+        unique_ptr<Entity> childEntity = std::make_unique<Entity>();
+        LoadModelNode(*childEntity, scene, node->mChildren[i]);
+        outEntity.m_Children.push_back(std::move(childEntity));
+    }
 }
 
 void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
 {
     const uint32_t vertexCount = assimpMesh->mNumVertices;
     const uint32_t faceCount = assimpMesh->mNumFaces;
-    if(vertexCount == 0 || faceCount == 0)
-        return;
+    CHECK_BOOL(vertexCount > 0 && faceCount > 0);
     CHECK_BOOL(assimpMesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE);
     CHECK_BOOL(assimpMesh->HasTextureCoords(0) || !assimpMesh->HasTextureCoords(1));
     CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
@@ -770,4 +768,49 @@ void Renderer::WaitForFenceOnCPU(UINT64 value)
 		CHECK_HR(m_Fence->SetEventOnCompletion(value, m_FenceEvent.get()));
 		WaitForSingleObject(m_FenceEvent.get(), INFINITE);
 	}
+}
+
+void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity)
+{
+    const mat4 entityXform = parentXform * entity.m_Transform;
+
+    if(!entity.m_Meshes.empty())
+    {
+        PerObjectConstants perObjConstants = {};
+        perObjConstants.m_WorldViewProj = m_ViewProj * entityXform;
+
+        void* perObjectConstantsPtr = nullptr;
+        D3D12_GPU_DESCRIPTOR_HANDLE perObjectConstantsDescriptorHandle;
+        m_TemporaryConstantBufferManager->CreateBuffer(sizeof(perObjConstants), perObjectConstantsPtr, perObjectConstantsDescriptorHandle);
+        memcpy(perObjectConstantsPtr, &perObjConstants, sizeof(perObjConstants));
+
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_OBJECT_CBV, perObjectConstantsDescriptorHandle);
+
+        for(size_t meshIndex : entity.m_Meshes)
+            RenderEntityMesh(cmdList, entity, meshIndex);
+    }
+
+    for(const auto& childEntity : entity.m_Children)
+        RenderEntity(cmdList, entityXform, *childEntity);
+}
+
+void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex)
+{
+    const Mesh* const mesh = m_Meshes[meshIndex].get();
+	cmdList.SetPrimitiveTopology(mesh->GetTopology());
+
+    const D3D12_VERTEX_BUFFER_VIEW vbView = mesh->GetVertexBufferView();
+    cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);
+
+    if(mesh->HasIndices())
+    {
+        const D3D12_INDEX_BUFFER_VIEW ibView = mesh->GetIndexBufferView();
+        cmdList.GetCmdList()->IASetIndexBuffer(&ibView);
+    	cmdList.GetCmdList()->DrawIndexedInstanced(mesh->GetIndexCount(), 1, 0, 0, 0);
+    }
+    else
+    {
+        cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
+    	cmdList.GetCmdList()->DrawInstanced(mesh->GetVertexCount(), 1, 0, 0);
+    }
 }

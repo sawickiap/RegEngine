@@ -2,7 +2,7 @@
 
 cbuffer constants : register(b1)
 {
-	float4x4 g_worldViewProj;
+	float4x4 g_WorldViewProj;
 };
 
 struct VS_INPUT
@@ -25,7 +25,7 @@ VS_OUTPUT main(VS_INPUT input)
 	//pos.z += sin(g_SceneTime);
 
 	VS_OUTPUT output;
-	output.pos = mul(g_worldViewProj, float4(pos, 1));
+	output.pos = mul(g_WorldViewProj, float4(pos, 1));
 	output.texCoord = input.texCoord;
 	output.color = input.color;
 	return output;
