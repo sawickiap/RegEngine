@@ -2,7 +2,8 @@
 #include "Texture.hpp"
 #include "CommandList.hpp"
 #include "Renderer.hpp"
-#include <WICTextureLoader.h>
+//#include <WICTextureLoader.h>
+#include <DirectXTex.h>
 
 void Texture::LoadFromFile(const wstr_view& filePath)
 {
@@ -15,84 +16,44 @@ void Texture::LoadFromFile(const wstr_view& filePath)
 
     LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(filePath));
 
-    unique_ptr<uint8_t[]> decodedData;
-    D3D12_SUBRESOURCE_DATA subresource = {};
-    CHECK_HR(DirectX::LoadWICTextureFromFileEx(
-        g_Renderer->GetDevice(),
-        filePath.c_str(),
-        0, // maxSize
-        D3D12_RESOURCE_FLAG_NONE,
-        DirectX::WIC_LOADER_FORCE_SRGB,
-        &m_Resource,
-        decodedData,
-        subresource));
-    CHECK_BOOL(m_Resource && decodedData && subresource.pData && subresource.RowPitch);
-    CHECK_BOOL(subresource.pData == decodedData.get());
-    SetD3D12ObjectName(m_Resource, Format(L"Texture from file: %.*s", STR_TO_FORMAT(filePath)));
+    DirectX::ScratchImage scratchImage;
+    constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_DEFAULT_SRGB;
+    CHECK_HR(DirectX::LoadFromWICFile(
+        filePath.c_str(), WICFlags,
+        nullptr, // metadata
+        scratchImage));
+    
+    const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
+    CHECK_BOOL(metadata.depth == 1);
+    CHECK_BOOL(metadata.arraySize == 1);
+    CHECK_BOOL(metadata.mipLevels == 1);
+    CHECK_BOOL(metadata.miscFlags == 0); // The only option is TEX_MISC_TEXTURECUBE
+    CHECK_BOOL(metadata.miscFlags2 == 0); // The only option is TEX_MISC2_ALPHA_MODE_MASK
+    CHECK_BOOL(metadata.dimension == DirectX::TEX_DIMENSION_TEXTURE2D);
 
-    m_Desc = m_Resource->GetDesc();
-    const uint32_t bitsPerPixel = DXGIFormatToBitsPerPixel(m_Desc.Format);
-    CHECK_BOOL(bitsPerPixel > 0 && bitsPerPixel % 8 == 0);
-    const uint32_t bytesPerPixel = bitsPerPixel / 8;
-    const uvec2 textureSize = uvec2((uint32_t)m_Desc.Width, (uint32_t)m_Desc.Height);
+    CHECK_BOOL(scratchImage.GetImageCount() == 1);
+    const DirectX::Image* const img = scratchImage.GetImage(0, 0, 0);
+    CHECK_BOOL(img->width == metadata.width);
+    CHECK_BOOL(img->height == metadata.height);
+    CHECK_BOOL(img->format == metadata.format);
 
-    // Create source buffer.
-    const uint32_t srcBufRowPitch = std::max<uint32_t>(textureSize.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-    const uint32_t srcBufSize = srcBufRowPitch * textureSize.y;
-    ComPtr<D3D12MA::Allocation> srcBuf;
-    {
-        const CD3DX12_RESOURCE_DESC srcBufDesc = CD3DX12_RESOURCE_DESC::Buffer(srcBufSize);
-        D3D12MA::ALLOCATION_DESC srcBufAllocDesc = {};
-        srcBufAllocDesc.HeapType = D3D12_HEAP_TYPE_UPLOAD;
-        CHECK_HR(g_Renderer->GetMemoryAllocator()->CreateResource(
-            &srcBufAllocDesc,
-            &srcBufDesc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr, // pOptimizedClearValue
-            &srcBuf,
-            IID_NULL, NULL)); // riidResource, ppvResource
-        SetD3D12ObjectName(srcBuf->GetResource(), L"Texture source buffer");
-    }
+    D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+        metadata.format,
+        (uint64_t)metadata.width,
+        (uint32_t)metadata.height,
+        (uint16_t)metadata.arraySize,
+        (uint16_t)metadata.mipLevels,
+        1, // sampleCount
+        0, // sampleQuality
+        D3D12_RESOURCE_FLAG_NONE);
 
-    // Map source buffer and memcpy data to it from decodedData.
-    {
-        const uint8_t* textureDataPtr = decodedData.get();
-        CD3DX12_RANGE readEmptyRange{0, 0};
-        void* srcBufMappedPtr = nullptr;
-        CHECK_HR(srcBuf->GetResource()->Map(0, D3D12_RANGE_NONE, &srcBufMappedPtr));
-        for(uint32_t y = 0; y < textureSize.y; ++y)
-        {
-            memcpy(srcBufMappedPtr, textureDataPtr, textureSize.x * bytesPerPixel);
-            textureDataPtr += subresource.RowPitch;
-            srcBufMappedPtr = (char*)srcBufMappedPtr + srcBufRowPitch;
-        }
-        srcBuf->GetResource()->Unmap(0, D3D12_RANGE_ALL);
-    }
-    decodedData.reset();
+    D3D12_SUBRESOURCE_DATA subresourceData = {
+        .pData = img->pixels,
+        .RowPitch = (LONG_PTR)img->rowPitch,
+        .SlicePitch = (LONG_PTR)img->slicePitch
+    };
 
-    // Copy the data.
-    {
-        CommandList cmdList;
-        g_Renderer->BeginUploadCommandList(cmdList);
-
-        CD3DX12_TEXTURE_COPY_LOCATION dst{m_Resource.Get()};
-        D3D12_PLACED_SUBRESOURCE_FOOTPRINT srcFootprint = {0, // Offset
-            {m_Desc.Format, (uint32_t)m_Desc.Width, (uint32_t)m_Desc.Height, 1, srcBufRowPitch}};
-        CD3DX12_TEXTURE_COPY_LOCATION src{srcBuf->GetResource(), srcFootprint};
-        CD3DX12_BOX srcBox{
-            0, 0, 0, // Left, Top, Front
-            (LONG)m_Desc.Width, (LONG)m_Desc.Height, 1}; // Right, Bottom, Back
-
-        cmdList.GetCmdList()->CopyTextureRegion(&dst,
-            0, 0, 0, // DstX, DstY, DstZ
-            &src, &srcBox);
-
-        CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-            m_Resource.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
-
-        g_Renderer->CompleteUploadCommandList(cmdList);
-    }
+    LoadFromMemory(resDesc, subresourceData, filePath);
 
     ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(filePath)));
 }

@@ -33,6 +33,7 @@
 #include <initializer_list>
 #include <limits>
 #include <span>
+#include <filesystem>
 
 #include <cstdio>
 #include <cstdint>

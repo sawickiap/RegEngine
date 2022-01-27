@@ -22,8 +22,8 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\D3D12MemoryAllocator
 - **[d3dx12.h](https://github.com/microsoft/DirectX-Headers)** - D3D12 helpers, by Microsoft. License: MIT.
   - Directory: ThirdParty\d3dx12
-- **[DirectX Tool Kit for Direct3D 12](https://github.com/Microsoft/DirectXTK12)** - a collection of helper classes for writing Direct3D 12 C++ code, by Microsoft. License: MIT.
-  - Directory: Source\packages\directxtk12_desktop_2017.2021.11.8.1
+- **[DirectXTex](URL)** - for reading and writing texture file formats, by Microsoft. License: MIT.
+  - Directory: Source\packages\directxtex_desktop_win10.2021.11.8.1
 - **[GLM](https://github.com/g-truc/glm)** - mathematics library for graphics software, by G-Truc Creation. License: The Happy Bunny License or MIT.
   - Directory: ThirdParty\glm
 - **[RapidJSON](https://rapidjson.org/)** - a fast JSON parser/generator, by Tencent. License: MIT.
