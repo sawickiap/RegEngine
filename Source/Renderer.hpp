@@ -83,12 +83,11 @@ private:
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
-    unique_ptr<Texture> m_Texture;
+    unique_ptr<AssimpInit> m_AssimpInit;
     std::vector<unique_ptr<Mesh>> m_Meshes;
     Entity m_RootEntity;
-    unique_ptr<AssimpInit> m_AssimpInit;
-    
-    // A) Testing texture SRV descriptors as persistent.
+    std::filesystem::path m_TexturePath;
+    unique_ptr<Texture> m_Texture;
     unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
     unique_ptr<ShaderResourceDescriptor> m_TextureSRVDescriptor;
 
@@ -105,6 +104,7 @@ private:
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
+    void LoadTexture();
 
     void WaitForFenceOnCPU(UINT64 value);
 

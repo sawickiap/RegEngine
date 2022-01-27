@@ -41,7 +41,7 @@ static UintSetting g_AssimpLogSeverity(SettingCategory::Startup, "Assimp.LogSeve
 static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFilePath");
 
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
-static StringSetting g_TextureFilePath(SettingCategory::Load, "TextureFilePath");
+static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 
 Renderer* g_Renderer;
@@ -215,6 +215,7 @@ void Renderer::Init()
 	CreateResources();
     m_AssimpInit = std::make_unique<AssimpInit>();
     LoadModel();
+    LoadTexture();
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -654,9 +655,6 @@ void Renderer::CreateResources()
         m_Font->Init();
     }
 
-    m_Texture = std::make_unique<Texture>();
-    m_Texture->LoadFromFile(g_TextureFilePath.GetValue());
-
     m_FontTextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
         m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
     m_Device->CreateShaderResourceView(
@@ -664,28 +662,19 @@ void Renderer::CreateResources()
         nullptr, // pDesc
         m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_FontTextureSRVDescriptor));
 
-    m_TextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
-        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
-    m_Device->CreateShaderResourceView(
-        m_Texture->GetResource(),
-        nullptr, // pDesc
-        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_TextureSRVDescriptor));
-
     ERR_CATCH_FUNC;
 }
 
 void Renderer::LoadModel()
 {
-    //const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
-    //const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/teapot_instancenodes.DAE";
-    const str_view filePath = "f:/Libraries/Assimp/assimp-5.0.1/test/models/Collada/duck.DAE";
+    const wstr_view filePath = g_AssimpModelPath.GetValue();
     LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
     ERR_TRY;
 
     {
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(
-            filePath.c_str(),
+            ConvertUnicodeToChars(filePath, CP_ACP).c_str(),
             aiProcess_Triangulate |
             aiProcess_JoinIdenticalVertices |
             aiProcess_SortByPType |
@@ -704,6 +693,25 @@ void Renderer::LoadModel()
         const aiNode* node = scene->mRootNode;
         if(node)
             LoadModelNode(m_RootEntity, scene, node);
+
+        // Parse material for texture path.
+        {
+            CHECK_BOOL(scene->mNumMaterials == 1);
+            const aiMaterial* mat = scene->mMaterials[0];
+            CHECK_BOOL(mat->GetTextureCount(aiTextureType_DIFFUSE) == 1);
+            aiString path;
+            aiTextureMapping mapping;
+            uint32_t uvindex;
+            float blend;
+            aiTextureOp op;
+            aiTextureMapMode mapmodes[3];
+            const aiReturn ret = mat->GetTexture(aiTextureType_DIFFUSE, 0,
+                &path, &mapping, &uvindex, &blend, &op, mapmodes);
+            CHECK_BOOL(ret == aiReturn_SUCCESS);
+            
+            const std::filesystem::path modelDir = std::filesystem::path(filePath.begin(), filePath.end()).parent_path();
+            m_TexturePath = modelDir / path.C_Str();
+        }
     }
 
     ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*hs\".", STR_TO_FORMAT(filePath)));
@@ -765,6 +773,20 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         std::span<const Vertex>(vertices.begin(), vertices.end()),
         std::span<const Mesh::IndexType>(indices.begin(), indices.end()));
     m_Meshes.push_back(std::move(rendererMesh));
+}
+
+void Renderer::LoadTexture()
+{
+    CHECK_BOOL(!m_TexturePath.empty());
+    m_Texture = std::make_unique<Texture>();
+    m_Texture->LoadFromFile(m_TexturePath.native());
+
+    m_TextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
+        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
+    m_Device->CreateShaderResourceView(
+        m_Texture->GetResource(),
+        nullptr, // pDesc
+        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_TextureSRVDescriptor));
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)
