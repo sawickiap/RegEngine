@@ -281,7 +281,6 @@ void Renderer::Render()
         frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
         float time = (float)GetTickCount() * 1e-3f;
-	    float color = sin(time) * 0.5f + 0.5f;
 	    //float pos = fmod(time * 100.f, (float)SIZE_X);
         const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
 		    m_SwapChainRTVDescriptors->GetCPUDescriptorHandleForHeapStart(),
@@ -292,7 +291,7 @@ void Renderer::Render()
         {
             PIX_EVENT_SCOPE(cmdList, L"Clear");
 
-	        const float clearRGBA[] = {color, 0.0f, 0.0f, 1.0f};
+	        const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
 	        cmdList.GetCmdList()->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
             
             cmdList.GetCmdList()->ClearDepthStencilView(
@@ -481,7 +480,7 @@ void Renderer::CreateFrameResources()
 static void SetDefaultRasterizerDesc(D3D12_RASTERIZER_DESC& outDesc)
 {
     outDesc.FillMode = D3D12_FILL_MODE_SOLID;
-    outDesc.CullMode = D3D12_CULL_MODE_NONE;
+    outDesc.CullMode = D3D12_CULL_MODE_BACK;
     outDesc.FrontCounterClockwise = FALSE;
     outDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
     outDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
@@ -667,6 +666,14 @@ void Renderer::CreateResources()
 
 void Renderer::LoadModel()
 {
+    /*
+    RegEngine coordinate system is left-handed: X right, Y back, Z up.
+    Assimp coordinate system is right-handed: X right, Y up, Z back.
+    Thus, we have to:
+    - Swap Y and Z components in position.s
+    - Flip winding order.
+    */
+
     const wstr_view filePath = g_AssimpModelPath.GetValue();
     LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
     ERR_TRY;
@@ -678,9 +685,9 @@ void Renderer::LoadModel()
             aiProcess_Triangulate |
             aiProcess_JoinIdenticalVertices |
             aiProcess_SortByPType |
+            aiProcess_FlipWindingOrder |
             aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
         // aiProcess_CalcTangentSpace
-        // aiProcess_FlipWindingOrder
         // aiProcess_MakeLeftHanded
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
@@ -714,7 +721,7 @@ void Renderer::LoadModel()
         }
     }
 
-    ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*hs\".", STR_TO_FORMAT(filePath)));
+    ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*s\".", STR_TO_FORMAT(filePath)));
 }
 
 void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)
@@ -748,7 +755,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
     {
         const aiVector3D pos = assimpMesh->mVertices[i];
         const aiVector3D texCoord = assimpMesh->mTextureCoords[0][i];
-        vertices[i].m_Position = packed_vec3(pos.x, pos.y, pos.z);
+        vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
