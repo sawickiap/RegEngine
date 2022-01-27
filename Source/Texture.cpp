@@ -17,11 +17,17 @@ void Texture::LoadFromFile(const wstr_view& filePath)
     LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(filePath));
 
     DirectX::ScratchImage scratchImage;
-    constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_DEFAULT_SRGB;
-    CHECK_HR(DirectX::LoadFromWICFile(
-        filePath.c_str(), WICFlags,
-        nullptr, // metadata
-        scratchImage));
+
+    if(filePath.ends_with(L".tga", false))
+    {
+        constexpr DirectX::TGA_FLAGS TGAFlags = DirectX::TGA_FLAGS_DEFAULT_SRGB;
+        CHECK_HR(DirectX::LoadFromTGAFile(filePath.c_str(), TGAFlags, nullptr, scratchImage));
+    }
+    else
+    {
+        constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_DEFAULT_SRGB;
+        CHECK_HR(DirectX::LoadFromWICFile(filePath.c_str(), WICFlags, nullptr, scratchImage));
+    }
     
     const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
     CHECK_BOOL(metadata.depth == 1);
@@ -36,6 +42,9 @@ void Texture::LoadFromFile(const wstr_view& filePath)
     CHECK_BOOL(img->width == metadata.width);
     CHECK_BOOL(img->height == metadata.height);
     CHECK_BOOL(img->format == metadata.format);
+
+    LogInfoF(L"  Width=%zu, Height=%zu, Format=%u",
+        metadata.width, metadata.height, (uint32_t)metadata.format);
 
     D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
         metadata.format,
