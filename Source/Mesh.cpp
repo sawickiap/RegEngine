@@ -26,7 +26,7 @@ void Mesh::Init(
     std::span<const IndexType> indices)
 {
     assert(!m_VertexBuffer);
-    assert(vertexCount > 0 && vertices);
+    assert(vertices.size() > 0 && vertices.data());
 
     m_TopologyType = topologyType;
     m_Topology = topology;
@@ -61,7 +61,7 @@ void Mesh::Init(
 
     if(m_IndexCount > 0)
     {
-        assert(indices);
+        assert(indices.data());
         // Create index buffer.
         {
             const UINT64 ibSize = m_IndexCount * sizeof(IndexType);

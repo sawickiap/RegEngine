@@ -2,6 +2,6 @@
     "UsePIXEvents": true,
     "SyncInterval": 1,
     "TextureFilePath": /*"f:\\Graphics\\11041884_10205320412442122_6518255771002907053_o.jpg",*/
-        "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\Collada\\duckCM.png",
+        "f:\\Libraries\\Assimp\\assimp-5.0.1\\test\\models\\Collada\\duckCM.png",
     "Assimp.Scale": 1
 }

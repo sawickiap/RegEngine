@@ -100,6 +100,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="AssimpUtils.cpp" />
     <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="ConstantBuffers.cpp" />
     <ClCompile Include="Descriptors.cpp" />
@@ -120,6 +121,7 @@
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
+    <ClInclude Include="AssimpUtils.hpp" />
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="CommandList.hpp" />
     <ClInclude Include="ConstantBuffers.hpp" />

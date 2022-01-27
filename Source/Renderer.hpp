@@ -14,6 +14,7 @@ class TemporaryConstantBufferManager;
 struct aiScene;
 struct aiNode;
 struct aiMesh;
+struct aiMaterial;
 
 struct RendererCapabilities
 {

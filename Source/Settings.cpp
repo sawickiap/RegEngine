@@ -50,6 +50,11 @@ static bool LoadValueFromJSON(float& outVal, const rapidjson::Value& jsonVal)
         outVal = jsonVal.GetFloat();
         return true;
     }
+    else if(jsonVal.IsInt64())
+    {
+        outVal = (float)jsonVal.GetInt64();
+        return true;
+    }
     return false;
 }
 

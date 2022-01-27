@@ -7,6 +7,7 @@
 #include "ConstantBuffers.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
+#include "AssimpUtils.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -358,7 +359,10 @@ void Renderer::Render()
                 m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
         }
 
-        RenderEntity(cmdList, glm::identity<mat4>(), m_RootEntity);
+        vec3 scaleVec = vec3(g_AssimpScale.GetValue());
+        mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
+        //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
+        RenderEntity(cmdList, globalXform, m_RootEntity);
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -674,7 +678,7 @@ void Renderer::LoadModel()
 {
     //const str_view filePath = "f:\\Libraries\\ASSIMP 5.0.1\\assimp-5.0.1\\test\\models\\OBJ\\spider.obj";
     //const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/teapot_instancenodes.DAE";
-    const str_view filePath = "f:/Libraries/ASSIMP 5.0.1/assimp-5.0.1/test/models/Collada/duck.DAE";
+    const str_view filePath = "f:/Libraries/Assimp/assimp-5.0.1/test/models/Collada/duck.DAE";
     LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
     ERR_TRY;
 
@@ -692,6 +696,8 @@ void Renderer::LoadModel()
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         
+        PrintAssimpSceneInfo(scene);
+
         for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
             LoadModelMesh(scene, scene->mMeshes[i]);
         
@@ -730,12 +736,11 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
     CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
 
     std::vector<Vertex> vertices(vertexCount);
-    const float scale = g_AssimpScale.GetValue();
     for(uint32_t i = 0; i < vertexCount; ++i)
     {
         const aiVector3D pos = assimpMesh->mVertices[i];
         const aiVector3D texCoord = assimpMesh->mTextureCoords[0][i];
-        vertices[i].m_Position = packed_vec3(pos.x, pos.y, pos.z) * scale;
+        vertices[i].m_Position = packed_vec3(pos.x, pos.y, pos.z);
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
