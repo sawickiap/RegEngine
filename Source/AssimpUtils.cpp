@@ -13,7 +13,7 @@ static void AppendIndent(wstring& out, uint32_t indentLevel)
 
 static void AppendMeshInfo(wstring& out, uint32_t meshIndex, const aiMesh* mesh)
 {
-    out += Format(L"  Mesh %u: Names=\"%hs\", MaterialIndex=%u, PrimitiveTypes=0x%X\n",
+    out += Format(L"  Mesh %u: Name=\"%hs\", MaterialIndex=%u, PrimitiveTypes=0x%X\n",
         meshIndex,
         mesh->mName.C_Str(),
         mesh->mMaterialIndex,
