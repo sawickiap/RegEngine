@@ -4,6 +4,8 @@
 #include "Renderer.hpp"
 #include "Settings.hpp"
 
+constexpr uint32_t ALIGNMENT = 256;
+
 extern UintSetting g_FrameCount;
 
 static UintSetting g_TemporaryConstantBuffereMaxSizePerFrame(SettingCategory::Startup,
@@ -48,9 +50,8 @@ void TemporaryConstantBufferManager::NewFrame()
 }
 
 void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
-    void*& outMappedPtr, D3D12_GPU_DESCRIPTOR_HANDLE& outCBVDescriptorHandle)
+    void*& outMappedPtr, D3D12_GPU_VIRTUAL_ADDRESS& outGPUAddr)
 {
-    constexpr uint32_t ALIGNMENT = 256;
     const uint32_t alignedSize = AlignUp(size, ALIGNMENT);
 
     uint32_t newBufOffset = 0;
@@ -59,7 +60,17 @@ void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
     outMappedPtr = (char*)m_BufferMappedPtr + newBufOffset;
     
     // GPU VA of the newly allocated data inside m_Buffer.
-    const D3D12_GPU_VIRTUAL_ADDRESS newBufGPUVA = m_Buffer->GetResource()->GetGPUVirtualAddress() + newBufOffset;
+    outGPUAddr = m_Buffer->GetResource()->GetGPUVirtualAddress() + newBufOffset;
+}
+
+void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
+    void*& outMappedPtr, D3D12_GPU_DESCRIPTOR_HANDLE& outCBVDescriptorHandle)
+{
+    const uint32_t alignedSize = AlignUp(size, ALIGNMENT);
+
+    // GPU VA of the newly allocated data inside m_Buffer.
+    D3D12_GPU_VIRTUAL_ADDRESS newBufGPUVA;
+    CreateBuffer(alignedSize, outMappedPtr, newBufGPUVA);
     
     ShaderResourceDescriptorManager* const descMgr = g_Renderer->GetShaderResourceDescriptorManager();
     const ShaderResourceDescriptor descriptor = descMgr->AllocateTemporaryDescriptor(1);
