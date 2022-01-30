@@ -75,6 +75,28 @@ bool LoadVecFromJSON(VecT& outVec, const void* jsonVal)
     return true;
 }
 
+template<typename MatT>
+bool LoadMatFromJSON(MatT& outMat, const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(!realVal->IsArray())
+        return false;
+    auto array = realVal->GetArray();
+    const uint32_t colCount = outMat.length();
+    const uint32_t rowCount = outMat[0].length();
+    if(array.Size() != colCount * rowCount)
+        return false;
+    for(uint32_t row = 0, i = 0; row < rowCount; ++row)
+    {
+        for(uint32_t col = 0; col < colCount; ++col, ++i)
+        {
+            if(!LoadValueFromJSON(outMat[col][row], array[i]))
+                return false;
+        }
+    }
+    return true;
+}
+
 template bool LoadVecFromJSON<glm::vec2>(glm::vec2& outVec, const void* jsonVal);
 template bool LoadVecFromJSON<glm::vec3>(glm::vec3& outVec, const void* jsonVal);
 template bool LoadVecFromJSON<glm::vec4>(glm::vec4& outVec, const void* jsonVal);
@@ -87,6 +109,8 @@ template bool LoadVecFromJSON<glm::ivec4>(glm::ivec4& outVec, const void* jsonVa
 template bool LoadVecFromJSON<glm::bvec2>(glm::bvec2& outVec, const void* jsonVal);
 template bool LoadVecFromJSON<glm::bvec3>(glm::bvec3& outVec, const void* jsonVal);
 template bool LoadVecFromJSON<glm::bvec4>(glm::bvec4& outVec, const void* jsonVal);
+
+template bool LoadMatFromJSON<glm::mat4>(glm::mat4& outMat, const void* jsonVal);
 
 class SettingCollection
 {

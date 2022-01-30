@@ -104,6 +104,8 @@ protected:
 
 template<typename VecT>
 bool LoadVecFromJSON(VecT& outVec, const void* jsonVal);
+template<typename MatT>
+bool LoadMatFromJSON(MatT& outMat, const void* jsonVal);
 
 template<typename VecT>
 class VecSetting : public ScalarSetting<VecT>
@@ -123,6 +125,27 @@ protected:
             this->m_Value = vec;
         else
             LogWarningF(L"Invalid vector setting \"{}\".", str_view(this->GetName()));
+    }
+};
+
+template<typename MatT>
+class MatSetting : public ScalarSetting<MatT>
+{
+public:
+    MatSetting(SettingCategory category, const str_view& name, const MatT& defaultValue) :
+        ScalarSetting<MatT>(category, name, defaultValue)
+    {
+    }
+
+protected:
+    virtual void LoadFromJSON(const void* jsonVal) override
+    {
+        // `this` is needed due to a compiler bug!
+        MatT mat;
+        if(LoadMatFromJSON<MatT>(mat, jsonVal))
+            this->m_Value = mat;
+        else
+            LogWarningF(L"Invalid matrix setting \"{}\".", str_view(this->GetName()));
     }
 };
 

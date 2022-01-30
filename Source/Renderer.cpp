@@ -43,6 +43,8 @@ static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFi
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
+static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
+static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
 
 Renderer* g_Renderer;
 
@@ -213,9 +215,9 @@ void Renderer::Init()
 	CreateSwapChain();
 	CreateFrameResources();
 	CreateResources();
+    CreateStandardTextures();
     m_AssimpInit = std::make_unique<AssimpInit>();
     LoadModel();
-    LoadTexture();
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -317,8 +319,8 @@ void Renderer::Render()
 
         const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
         const mat4 view = glm::lookAtLH(
-            vec3(0.f, 3.f, 0.5f), // eye
-            vec3(0.f), // center
+            vec3(0.f, 10.f, 3.f), // eye
+            vec3(0.f, 0.f, 1.f), // center
             vec3(0.f, 0.f, 1.f)); // up
         const mat4 proj = MakeInfReversedZProjLH(
             glm::radians(80.f),
@@ -328,6 +330,7 @@ void Renderer::Render()
         m_ViewProj = proj * view * world;
 
         // A) Testing texture SRV descriptors as persistent.
+#if 0
         const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Font->GetTexture()->GetDescriptor()) :
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
@@ -343,9 +346,10 @@ void Renderer::Render()
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV,
                 m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
         }
+#endif
 
         vec3 scaleVec = vec3(g_AssimpScale.GetValue());
-        mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
+        mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
         //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
         RenderEntity(cmdList, globalXform, m_RootEntity);
 
@@ -464,9 +468,21 @@ void Renderer::CreateFrameResources()
 
 static void SetDefaultRasterizerDesc(D3D12_RASTERIZER_DESC& outDesc)
 {
+    switch(g_BackFaceCullingMode.GetValue())
+    {
+    case 0:
+        outDesc.CullMode = D3D12_CULL_MODE_NONE;
+        outDesc.FrontCounterClockwise = FALSE;
+        break;
+    case 1:
+        outDesc.CullMode = D3D12_CULL_MODE_BACK;
+        outDesc.FrontCounterClockwise = FALSE;
+        break;
+    default:
+        outDesc.CullMode = D3D12_CULL_MODE_BACK;
+        outDesc.FrontCounterClockwise = TRUE;
+    }
     outDesc.FillMode = D3D12_FILL_MODE_SOLID;
-    outDesc.CullMode = D3D12_CULL_MODE_BACK;
-    outDesc.FrontCounterClockwise = FALSE;
     outDesc.DepthBias = D3D12_DEFAULT_DEPTH_BIAS;
     outDesc.DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP;
     outDesc.SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
@@ -642,6 +658,59 @@ void Renderer::CreateResources()
     ERR_CATCH_FUNC;
 }
 
+void Renderer::CreateStandardTextures()
+{
+    const wchar_t* NAMES[] = {
+        L"Standard texture - Transparent",
+        L"Standard texture - Black",
+        L"Standard texture - Gray",
+        L"Standard texture - White",
+        L"Standard texture - Red",
+        L"Standard texture - Green",
+        L"Standard texture - Blue",
+        L"Standard texture - Yellow",
+        L"Standard texture - Fuchsia",
+    };
+    // We are little endian, so it is 0xAABBGGRR
+    using PixelType = uint32_t;
+    const PixelType COLORS[] = {
+        0x00000000, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF00FFFF, 0xFFFF00FF,
+    };
+    static_assert(_countof(NAMES) == (size_t)StandardTexture::Count);
+    static_assert(_countof(COLORS) == (size_t)StandardTexture::Count);
+
+    constexpr uint32_t SIZE = 8;
+    constexpr uint32_t ROW_PITCH = std::max<uint32_t>(SIZE * sizeof(PixelType), D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+
+    std::vector<char> buf(SIZE * ROW_PITCH * sizeof(PixelType));
+
+    D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        SIZE, SIZE, // width, height
+        1, // arraySize
+        1); // mipLevels
+    D3D12_SUBRESOURCE_DATA data = {
+        .pData = buf.data(),
+        .RowPitch = ROW_PITCH,
+        .SlicePitch = 0};
+
+    for(size_t textureIndex = 0; textureIndex < (size_t)StandardTexture::Count; ++textureIndex)
+    {
+        const PixelType color = COLORS[textureIndex];
+        char* rowPtr = buf.data();
+        for(uint32_t y = 0; y < SIZE; ++y, rowPtr += ROW_PITCH)
+        {
+            PixelType* pixelPtr = (PixelType*)rowPtr;
+            for(uint32_t x = 0; x < SIZE; ++x, ++pixelPtr)
+                *pixelPtr = color;
+        }
+
+        unique_ptr<Texture>& texPtr = m_StandardTextures[textureIndex];
+        texPtr = std::make_unique<Texture>();
+        texPtr->LoadFromMemory(resDesc, data, NAMES[textureIndex]);
+    }
+}
+
 void Renderer::LoadModel()
 {
     /*
@@ -679,24 +748,9 @@ void Renderer::LoadModel()
         if(node)
             LoadModelNode(m_RootEntity, scene, node);
 
-        // Parse material for texture path.
-        {
-            CHECK_BOOL(scene->mNumMaterials == 1);
-            const aiMaterial* mat = scene->mMaterials[0];
-            CHECK_BOOL(mat->GetTextureCount(aiTextureType_DIFFUSE) == 1);
-            aiString path;
-            aiTextureMapping mapping;
-            uint32_t uvindex;
-            float blend;
-            aiTextureOp op;
-            aiTextureMapMode mapmodes[3];
-            const aiReturn ret = mat->GetTexture(aiTextureType_DIFFUSE, 0,
-                &path, &mapping, &uvindex, &blend, &op, mapmodes);
-            CHECK_BOOL(ret == aiReturn_SUCCESS);
-            
-            const std::filesystem::path modelDir = std::filesystem::path(filePath.begin(), filePath.end()).parent_path();
-            m_TexturePath = modelDir / path.C_Str();
-        }
+        const std::filesystem::path modelDir = std::filesystem::path(filePath.begin(), filePath.end()).parent_path();
+        for(uint32_t i = 0; i < scene->mNumMaterials; ++i)
+            LoadMaterial(modelDir, scene, i, scene->mMaterials[i]);
     }
 
     ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
@@ -758,13 +812,69 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         std::span<const Vertex>(vertices.begin(), vertices.end()),
         std::span<const Mesh::IndexType>(indices.begin(), indices.end()));
     m_Meshes.push_back(std::move(rendererMesh));
+    m_MeshMaterialIndices.push_back(assimpMesh->mMaterialIndex);
 }
 
-void Renderer::LoadTexture()
+const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
 {
-    CHECK_BOOL(!m_TexturePath.empty());
-    m_Texture = std::make_unique<Texture>();
-    m_Texture->LoadFromFile(m_TexturePath.native());
+    for(uint32_t i = 0; i < material->mNumProperties; ++i)
+    {
+        const aiMaterialProperty* prop = material->mProperties[i];
+        if(str_view(prop->mKey.C_Str()) == key)
+            return prop;
+    }
+    return nullptr;
+}
+bool GetStringMaterialProperty(string& out, const aiMaterial* material, const str_view& key)
+{
+    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
+    if(!prop)
+        return false;
+    if(prop->mType != aiPTI_String)
+        return false;
+    const aiString* s = (const aiString*)prop->mData;
+    out = string(s->data, s->length);
+    return true;
+}
+
+void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex, const aiMaterial* material)
+{
+    ERR_TRY;
+
+    string textureRelativePath;
+    // Canonical way - GetTexture.
+    if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
+    {
+        aiString s;
+        aiTextureMapping mapping;
+        uint32_t uvindex;
+        float blend;
+        aiTextureOp op;
+        aiTextureMapMode mapmodes[3];
+        const aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0,
+            &s, &mapping, &uvindex, &blend, &op, mapmodes);
+        if(ret == aiReturn_SUCCESS)
+            textureRelativePath = s.C_Str();
+    }
+    // Method found in a model from Turbosquid made in Maya.
+    if(textureRelativePath.empty())
+    {
+        GetStringMaterialProperty(textureRelativePath, material, "$raw.Maya|baseColor|file");
+    }
+    
+    if(textureRelativePath.empty())
+    {
+        m_Textures.push_back(unique_ptr<Texture>());
+        return;
+    }
+
+    std::filesystem::path textureAbsolutePath = modelDir / textureRelativePath;
+
+    auto texture = std::make_unique<Texture>();
+    texture->LoadFromFile(textureAbsolutePath.native());
+    m_Textures.push_back(std::move(texture));
+
+    ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)
@@ -778,7 +888,10 @@ void Renderer::WaitForFenceOnCPU(UINT64 value)
 
 void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity)
 {
+    // I thought this is the right way
     const mat4 entityXform = parentXform * entity.m_Transform;
+    // It seems that possibly this works better
+    //const mat4 entityXform = entity.m_Transform * parentXform;
 
     if(!entity.m_Meshes.empty())
     {
@@ -803,7 +916,23 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
 void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex)
 {
     const Mesh* const mesh = m_Meshes[meshIndex].get();
-	cmdList.SetPrimitiveTopology(mesh->GetTopology());
+    const size_t materialIndex = m_MeshMaterialIndices[meshIndex];
+
+    Texture* texture = m_Textures[materialIndex].get();
+    D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle;
+    if(texture)
+    {
+        textureDescriptorHandle =
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Textures[materialIndex]->GetDescriptor());
+    }
+    else
+    {
+        textureDescriptorHandle =
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
+    }
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
+
+    cmdList.SetPrimitiveTopology(mesh->GetTopology());
 
     const D3D12_VERTEX_BUFFER_VIEW vbView = mesh->GetVertexBufferView();
     cmdList.GetCmdList()->IASetVertexBuffers(0, 1, &vbView);

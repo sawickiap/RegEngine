@@ -16,6 +16,11 @@ struct aiNode;
 struct aiMesh;
 struct aiMaterial;
 
+enum class StandardTexture
+{
+    Transparent, Black, Gray, White, Red, Green, Blue, Yellow, Fuchsia, Count
+};
+
 struct RendererCapabilities
 {
 	UINT m_DescriptorSize_CVB_SRV_UAV = UINT32_MAX;
@@ -80,14 +85,19 @@ private:
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;
+    unique_ptr<Texture> m_StandardTextures[(size_t)StandardTexture::Count];
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
     std::vector<unique_ptr<Mesh>> m_Meshes;
+    // Indices of this array match m_Meshes.
+    // Values are indices into m_Textures.
+    std::vector<size_t> m_MeshMaterialIndices;
     Entity m_RootEntity;
-    std::filesystem::path m_TexturePath;
-    unique_ptr<Texture> m_Texture;
+    // Indices to this array are material indices from the Assimp scene.
+    // Elements can be null - use some standard texture then.
+    std::vector<unique_ptr<Texture>> m_Textures;
 
     mat4 m_ViewProj;
 
@@ -98,11 +108,12 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
+    void CreateStandardTextures();
     void LoadModel();
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
-    void LoadTexture();
+    void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex, const aiMaterial* material);
 
     void WaitForFenceOnCPU(UINT64 value);
 
