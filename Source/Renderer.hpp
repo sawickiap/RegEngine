@@ -89,7 +89,6 @@ private:
     std::filesystem::path m_TexturePath;
     unique_ptr<Texture> m_Texture;
     unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
-    unique_ptr<ShaderResourceDescriptor> m_TextureSRVDescriptor;
 
     mat4 m_ViewProj;
 

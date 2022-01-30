@@ -28,9 +28,11 @@ static void AppendMeshInfo(wstring& out, uint32_t meshIndex, const aiMesh* mesh)
         mesh->HasPositions(),
         mesh->HasNormals(),
         mesh->HasTangentsAndBitangents());
+    /* Seems to always be all zeros. Also doesn't appear in the documentation.
     out += std::format(L"    AABB={},{},{};{},{},{}\n",
         mesh->mAABB.mMin.x, mesh->mAABB.mMin.y, mesh->mAABB.mMin.z,
         mesh->mAABB.mMax.x, mesh->mAABB.mMax.y, mesh->mAABB.mMax.z);
+    */
     for(uint32_t i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i)
     {
         if(mesh->HasTextureCoords(i))

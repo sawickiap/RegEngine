@@ -222,13 +222,6 @@ void Renderer::Init()
 
 Renderer::~Renderer()
 {
-    g_Renderer = nullptr;
-
-    if(m_TextureSRVDescriptor)
-    {
-        m_ShaderResourceDescriptorManager->FreePersistentDescriptor(*m_TextureSRVDescriptor);
-        m_TextureSRVDescriptor.reset();
-    }
     if(m_FontTextureSRVDescriptor)
     {
         m_ShaderResourceDescriptorManager->FreePersistentDescriptor(*m_FontTextureSRVDescriptor);
@@ -341,14 +334,12 @@ void Renderer::Render()
         m_ViewProj = proj * view * world;
 
         // A) Testing texture SRV descriptors as persistent.
-        /*
         const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_FontTextureSRVDescriptor) :
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_TextureSRVDescriptor);
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
         cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
-        */
         // B) Testing texture SRV descriptors as temporary.
-        {
+        if(false){
             ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
             ID3D12Resource* const textureRes = /*fmod(time, 1.f) > 0.5f ?
                 m_Font->GetTexture()->GetResource() :*/
@@ -787,13 +778,6 @@ void Renderer::LoadTexture()
     CHECK_BOOL(!m_TexturePath.empty());
     m_Texture = std::make_unique<Texture>();
     m_Texture->LoadFromFile(m_TexturePath.native());
-
-    m_TextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
-        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
-    m_Device->CreateShaderResourceView(
-        m_Texture->GetResource(),
-        nullptr, // pDesc
-        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_TextureSRVDescriptor));
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)

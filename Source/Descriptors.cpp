@@ -69,7 +69,8 @@ ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocateTemporaryDescr
 
 void ShaderResourceDescriptorManager::FreePersistentDescriptor(ShaderResourceDescriptor desc)
 {
-    m_VirtualBlock->FreeAllocation(desc.m_Index);
+    if(!desc.IsNull())
+        m_VirtualBlock->FreeAllocation(desc.m_Index);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE ShaderResourceDescriptorManager::GetDescriptorGPUHandle(ShaderResourceDescriptor desc)

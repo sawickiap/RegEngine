@@ -154,6 +154,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 void Application::OnDestroy()
 {
     m_Renderer.reset();
+    g_Renderer = nullptr;
 }
 
 void Application::OnKeyDown(WPARAM key)

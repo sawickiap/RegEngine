@@ -5,6 +5,11 @@
 //#include <WICTextureLoader.h>
 #include <DirectXTex.h>
 
+Texture::~Texture()
+{
+    g_Renderer->GetShaderResourceDescriptorManager()->FreePersistentDescriptor(m_Descriptor);
+}
+
 void Texture::LoadFromFile(const wstr_view& filePath)
 {
     assert(IsEmpty());
@@ -154,5 +159,36 @@ void Texture::LoadFromMemory(
 
     m_Desc = resDesc;
 
+    CreateDescriptor();
+
     ERR_CATCH_FUNC;
+}
+
+void Texture::CreateDescriptor()
+{
+    assert(m_Resource);
+    assert(m_Desc.Format != DXGI_FORMAT_UNKNOWN);
+    // If not true, we need a conversion from D3D12_RESOURCE_DIMENSION to D3D12_SRV_DIMENSION.
+    CHECK_BOOL(m_Desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D);
+
+    ShaderResourceDescriptorManager* SRVDescManager = g_Renderer->GetShaderResourceDescriptorManager();
+    m_Descriptor = SRVDescManager->AllocatePersistentDescriptor(1);
+
+    /*
+    D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {
+        .Format = m_Desc.Format,
+        .ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D,
+        .Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
+            D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_0,
+            D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_1,
+            D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_2,
+            D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_3)};
+    SRVDesc.Texture2D = {
+        .MostDetailedMip = 0,
+        .MipLevels = UINT32_MAX,
+        .PlaneSlice = 0,
+        .ResourceMinLODClamp = 0.f};
+    */
+    g_Renderer->GetDevice()->CreateShaderResourceView(
+        m_Resource.Get(), nullptr, SRVDescManager->GetDescriptorCPUHandle(m_Descriptor));
 }
