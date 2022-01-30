@@ -233,18 +233,15 @@ Renderer::~Renderer()
 	    }
 	    CATCH_PRINT_ERROR(;);
     }
+
+    ClearModel();
 }
 
 void Renderer::Reload()
 {
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
-
-    m_Textures.clear();
-    m_RootEntity = Entity{};
-    m_MeshMaterialIndices.clear();
-    m_Meshes.clear();
-
+    ClearModel();
     LoadModel();
 }
 
@@ -724,8 +721,18 @@ void Renderer::CreateStandardTextures()
     }
 }
 
+void Renderer::ClearModel()
+{
+    m_Textures.clear();
+    m_RootEntity = Entity{};
+    m_MeshMaterialIndices.clear();
+    m_Meshes.clear();
+}
+
 void Renderer::LoadModel()
 {
+    ClearModel();
+
     /*
     RegEngine coordinate system is left-handed: X right, Y back, Z up.
     Assimp coordinate system is right-handed: X right, Y up, Z back.
@@ -736,6 +743,8 @@ void Renderer::LoadModel()
 
     const wstr_view filePath = g_AssimpModelPath.GetValue();
     LogMessageF(L"Loading model from \"{}\"...", filePath);
+
+    ERR_TRY;
     ERR_TRY;
 
     {
@@ -767,6 +776,7 @@ void Renderer::LoadModel()
     }
 
     ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
+    } CATCH_PRINT_ERROR(ClearModel(););
 }
 
 void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)

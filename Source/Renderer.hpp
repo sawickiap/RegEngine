@@ -91,6 +91,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
+
     std::vector<unique_ptr<Mesh>> m_Meshes;
     // Indices of this array match m_Meshes.
     // Values are indices into m_Textures.
@@ -110,6 +111,7 @@ private:
 	void CreateFrameResources();
 	void CreateResources();
     void CreateStandardTextures();
+    void ClearModel();
     void LoadModel();
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
