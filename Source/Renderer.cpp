@@ -222,12 +222,6 @@ void Renderer::Init()
 
 Renderer::~Renderer()
 {
-    if(m_FontTextureSRVDescriptor)
-    {
-        m_ShaderResourceDescriptorManager->FreePersistentDescriptor(*m_FontTextureSRVDescriptor);
-        m_FontTextureSRVDescriptor.reset();
-    }
-
     if(m_CmdQueue)
     {
 	    try
@@ -335,7 +329,7 @@ void Renderer::Render()
 
         // A) Testing texture SRV descriptors as persistent.
         const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(*m_FontTextureSRVDescriptor) :
+            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Font->GetTexture()->GetDescriptor()) :
             m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
         cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
         // B) Testing texture SRV descriptors as temporary.
@@ -644,13 +638,6 @@ void Renderer::CreateResources()
         m_Font = std::make_unique<Font>();
         m_Font->Init();
     }
-
-    m_FontTextureSRVDescriptor = std::make_unique<ShaderResourceDescriptor>(
-        m_ShaderResourceDescriptorManager->AllocatePersistentDescriptor(1));
-    m_Device->CreateShaderResourceView(
-        m_Font->GetTexture()->GetResource(),
-        nullptr, // pDesc
-        m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(*m_FontTextureSRVDescriptor));
 
     ERR_CATCH_FUNC;
 }

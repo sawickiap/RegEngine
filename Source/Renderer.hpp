@@ -88,7 +88,6 @@ private:
     Entity m_RootEntity;
     std::filesystem::path m_TexturePath;
     unique_ptr<Texture> m_Texture;
-    unique_ptr<ShaderResourceDescriptor> m_FontTextureSRVDescriptor;
 
     mat4 m_ViewProj;
 
