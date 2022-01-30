@@ -1,6 +1,16 @@
 {
     "UsePIXEvents": true,
     "SyncInterval": 1,
-    "Assimp.ModelPath": "f:/Libraries/Assimp/assimp-5.0.1/test/models/Collada/duck.DAE",
-    "Assimp.Scale": 1
+    //"Assimp.ModelPath": "f:\\Libraries\\Assimp\\assimp-5.0.1\\test\\models\\MS3D\\jeep1.ms3d",
+    //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\FairyTower\\FairyTower.fbx",
+    "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",
+    "Assimp.Scale": 0.005,
+    "Assimp.Transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, -1, 0,
+        0, 0, 0, 1
+    ],
+    // 0 = backface culling disabled, 1 = clockwise is front, 2 = counterclockwise is front
+    "BackFaceCullingMode": 0
 }

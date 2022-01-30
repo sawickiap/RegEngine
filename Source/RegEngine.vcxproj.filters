@@ -16,6 +16,7 @@
     <ClCompile Include="Descriptors.cpp" />
     <ClCompile Include="ConstantBuffers.cpp" />
     <ClCompile Include="AssimpUtils.cpp" />
+    <ClCompile Include="Shaders.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -64,6 +65,7 @@
     <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="MultiFrameRingBuffer.hpp" />
     <ClInclude Include="AssimpUtils.hpp" />
+    <ClInclude Include="Shaders.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

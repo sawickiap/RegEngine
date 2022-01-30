@@ -19,7 +19,7 @@
     It affects both main logging output and Assimp.LogFilePath.
     All messages from Assimp are logged at "info" level in the engine.
     */
-    "Assimp.LogSeverity": 4,
+    "Assimp.LogSeverity": 0,
     // File path for an extra log just for Assimp. Empty string if no file should be created.
     "Assimp.LogFilePath": ""
 }

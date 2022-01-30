@@ -5,6 +5,7 @@
 #include "Mesh.hpp"
 #include "Descriptors.hpp"
 #include "ConstantBuffers.hpp"
+#include "Shaders.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "AssimpUtils.hpp"
@@ -120,7 +121,7 @@ AssimpInit::AssimpInit()
     switch(g_AssimpLogSeverity.GetValue())
     {
     case ASSIMP_LOG_SEVERITY_NONE:
-        break;
+        return;
     case ASSIMP_LOG_SEVERITY_ERROR:
         errorSeverity = Logger::Err;
         break;
@@ -144,7 +145,7 @@ AssimpInit::AssimpInit()
 
 AssimpInit::~AssimpInit()
 {
-    // Crashes with error:
+    // Crashes with error, I don't know why :(
     // HEAP[RegEngine.exe]: Invalid address specified to RtlValidateHeap( 00000265EA700000, 00007FF667F24038 )
     //Assimp::DefaultLogger::kill();
 }
@@ -184,6 +185,11 @@ void Font::Init()
     m_Texture->LoadFromMemory(resDesc, subresourceData, L"Font texture");
 
     m_WinFont.FreeTextureData();
+
+    ERR_TRY
+    Shader sh;
+    sh.Init(ShaderType::Vertex, L"Data/VS.hlsl");
+    } CATCH_PRINT_ERROR(;)
 
     ERR_CATCH_FUNC;
 }
@@ -243,6 +249,11 @@ void Renderer::Reload()
     WaitForFenceOnCPU(m_NextFenceValue++);
     ClearModel();
     LoadModel();
+
+    ERR_TRY
+    Shader sh;
+    sh.Init(ShaderType::Vertex, L"Data/VS.hlsl");
+    } CATCH_PRINT_ERROR(;)
 }
 
 void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
@@ -761,7 +772,7 @@ void Renderer::LoadModel()
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         
-        PrintAssimpSceneInfo(scene);
+        //PrintAssimpSceneInfo(scene);
 
         for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
             LoadModelMesh(scene, scene->mMeshes[i]);
