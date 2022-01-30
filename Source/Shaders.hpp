@@ -12,7 +12,7 @@ class Shader
 public:
     Shader();
     ~Shader();
-    void Init(ShaderType type, const wstr_view& filePath);
+    void Init(ShaderType type, const wstr_view& filePath, const wstr_view& entryPointName);
     bool IsNull() const;
     std::span<const char> GetCode() const;
 

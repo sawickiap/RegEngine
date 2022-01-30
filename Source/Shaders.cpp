@@ -40,9 +40,9 @@ public:
     ComPtr<IDxcBlob> m_CompiledObject;
 };
 
-Shader::Shader()
+Shader::Shader() :
+    m_Pimpl(std::make_unique<ShaderPimpl>())
 {
-
 }
 
 Shader::~Shader()
@@ -50,13 +50,11 @@ Shader::~Shader()
 
 }
 
-void Shader::Init(ShaderType type, const wstr_view& filePath)
+void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& entryPointName)
 {
     ERR_TRY;
 
     LogMessageF(L"Compiling shader from \"{}\"...", filePath);
-
-    m_Pimpl = std::make_unique<ShaderPimpl>();
 
     std::filesystem::path dir(filePath.begin(), filePath.end(), std::filesystem::path::format::native_format);
     dir = dir.parent_path();
@@ -72,9 +70,19 @@ void Shader::Init(ShaderType type, const wstr_view& filePath)
         .Size = source.size(),
         .Encoding = DXC_CP_UTF8};
 
+    const wchar_t* profileParam = nullptr;
+    switch(type)
+    {
+    case ShaderType::Vertex: profileParam = L"-T vs_6_0"; break;
+    case ShaderType::Pixel:  profileParam = L"-T ps_6_0"; break;
+    default: assert(0);
+    }
+
+    const wstring entryPointParam = std::format(L"-E {}", entryPointName);
+
     std::vector<const wchar_t*> arguments = {
-        L"/T vs_6_0",
-        L"/E main",
+        profileParam,
+        entryPointParam.c_str(),
         DXC_ARG_OPTIMIZATION_LEVEL3};
 
     ComPtr<IDxcResult> result;
@@ -96,6 +104,7 @@ void Shader::Init(ShaderType type, const wstr_view& filePath)
     {
         // Minus one to remove null terminator.
         errorsView = str_view((const char*)errors->GetBufferPointer(), errors->GetBufferSize() - 1);
+        // Trim trailing whitespaces.
         while(!errorsView.empty() && isspace(errorsView.back()))
             errorsView = errorsView.substr(0, errorsView.length() - 1);
     }
@@ -106,16 +115,14 @@ void Shader::Init(ShaderType type, const wstr_view& filePath)
         CHECK_BOOL(m_Pimpl->m_CompiledObject && m_Pimpl->m_CompiledObject->GetBufferSize() > 0);
         
         if(errors && errors->GetBufferSize() > 0)
-        {
             LogWarningF(L"{}", errorsView);
-        }
     }
     else
     {
         if(errors && errors->GetBufferSize() > 0)
             FAIL(std::format(L"{}", errorsView));
         else
-            FAIL(L"Failed with no errors output.");
+            FAIL(L"No error buffer.");
     }
 
     ERR_CATCH_MSG(std::format(L"Cannot compile shader from \"{}\".", filePath));

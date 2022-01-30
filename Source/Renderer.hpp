@@ -110,6 +110,7 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
+    void CreatePipelineState();
     void CreateStandardTextures();
     void ClearModel();
     void LoadModel();

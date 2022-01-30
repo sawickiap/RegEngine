@@ -186,11 +186,6 @@ void Font::Init()
 
     m_WinFont.FreeTextureData();
 
-    ERR_TRY
-    Shader sh;
-    sh.Init(ShaderType::Vertex, L"Data/VS.hlsl");
-    } CATCH_PRINT_ERROR(;)
-
     ERR_CATCH_FUNC;
 }
 
@@ -210,6 +205,9 @@ void Renderer::Init()
 {
     ERR_TRY;
     CHECK_BOOL(g_FrameCount.GetValue() >= 2 && g_FrameCount.GetValue() <= MAX_FRAME_COUNT);
+
+    D3D12EnableExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
+
 	CreateDevice();
     CreateMemoryAllocator();
 	LoadCapabilities();
@@ -247,13 +245,12 @@ void Renderer::Reload()
 {
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
+    
+    m_PipelineState.Reset();
     ClearModel();
-    LoadModel();
 
-    ERR_TRY
-    Shader sh;
-    sh.Init(ShaderType::Vertex, L"Data/VS.hlsl");
-    } CATCH_PRINT_ERROR(;)
+    CreatePipelineState();
+    LoadModel();
 }
 
 void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
@@ -644,31 +641,7 @@ void Renderer::CreateResources()
         SetD3D12ObjectName(m_RootSignature, L"Test root signature");
 	}
 
-	// Pipeline state
-	{
-		std::vector<char> vsCode = LoadFile(L"Data\\VS");
-		std::vector<char> psCode = LoadFile(L"Data\\PS");
-
-		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
-		desc.InputLayout.NumElements = Vertex::GetInputElementCount();
-		desc.InputLayout.pInputElementDescs = Vertex::GetInputElements();
-		desc.pRootSignature = m_RootSignature.Get();
-		desc.VS.BytecodeLength = vsCode.size();
-		desc.VS.pShaderBytecode = vsCode.data();
-		desc.PS.BytecodeLength = psCode.size();
-		desc.PS.pShaderBytecode = psCode.data();
-		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		desc.NumRenderTargets = 1;
-		desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
-		desc.DSVFormat = DEPTH_STENCIL_FORMAT;
-		desc.SampleDesc.Count = 1;
-		desc.SampleMask = UINT32_MAX;
-		SetDefaultRasterizerDesc(desc.RasterizerState);
-		SetDefaultBlendDesc(desc.BlendState);
-		SetDefaultDepthStencilDesc(desc.DepthStencilState);
-		CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_PipelineState));
-        SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
-	}
+	CreatePipelineState();
 
     // Font
     {
@@ -677,6 +650,41 @@ void Renderer::CreateResources()
     }
 
     ERR_CATCH_FUNC;
+}
+
+void Renderer::CreatePipelineState()
+{
+    m_PipelineState.Reset();
+
+    ERR_TRY
+    ERR_TRY
+
+    Shader vs, ps;
+    vs.Init(ShaderType::Vertex, L"Data/VS.hlsl", L"main");
+    ps.Init(ShaderType::Pixel,  L"Data/PS.hlsl", L"main");
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+	desc.InputLayout.NumElements = Vertex::GetInputElementCount();
+	desc.InputLayout.pInputElementDescs = Vertex::GetInputElements();
+	desc.pRootSignature = m_RootSignature.Get();
+	desc.VS.BytecodeLength = vs.GetCode().size();
+	desc.VS.pShaderBytecode = vs.GetCode().data();
+	desc.PS.BytecodeLength = ps.GetCode().size();
+	desc.PS.pShaderBytecode = ps.GetCode().data();
+	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	desc.NumRenderTargets = 1;
+	desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
+	desc.DSVFormat = DEPTH_STENCIL_FORMAT;
+	desc.SampleDesc.Count = 1;
+	desc.SampleMask = UINT32_MAX;
+	SetDefaultRasterizerDesc(desc.RasterizerState);
+	SetDefaultBlendDesc(desc.BlendState);
+	SetDefaultDepthStencilDesc(desc.DepthStencilState);
+	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_PipelineState));
+    SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
+
+    ERR_CATCH_MSG(L"Cannot create pipeline state.");
+    } CATCH_PRINT_ERROR(;);
 }
 
 void Renderer::CreateStandardTextures()
