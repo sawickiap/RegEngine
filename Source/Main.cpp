@@ -163,6 +163,8 @@ void Application::OnKeyDown(WPARAM key)
     {
     case VK_F5:
         LoadLoadSettings();
+        if(g_Renderer)
+            g_Renderer->Reload();
         break;
 
     case VK_ESCAPE:

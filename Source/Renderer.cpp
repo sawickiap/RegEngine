@@ -235,6 +235,19 @@ Renderer::~Renderer()
     }
 }
 
+void Renderer::Reload()
+{
+	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
+    WaitForFenceOnCPU(m_NextFenceValue++);
+
+    m_Textures.clear();
+    m_RootEntity = Entity{};
+    m_MeshMaterialIndices.clear();
+    m_Meshes.clear();
+
+    LoadModel();
+}
+
 void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
 {
     WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);

@@ -42,6 +42,7 @@ public:
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
 	~Renderer();
+    void Reload();
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
     const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
