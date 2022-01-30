@@ -40,7 +40,6 @@
 #include <cstdint>
 #include <cassert>
 #include <cmath>
-#include <cstdarg>
 #include <tchar.h>
 
 using std::unique_ptr;
