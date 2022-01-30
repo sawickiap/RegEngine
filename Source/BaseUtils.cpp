@@ -2,6 +2,10 @@
 #include "Settings.hpp"
 #include <DirectXTex.h>
 
+// Use this macro to pass the 2 parameters to formatting function matching formatting string like "%.*s", "%.*hs" etc.
+// for s of type like std::string, std::wstring, str_view, wstr_view.
+#define STR_TO_FORMAT(s) (int)(s).size(), (s).data()
+
 static constexpr D3D12_RANGE D3D12_RANGE_NONE_DATA = {0, 0};
 const D3D12_RANGE* D3D12_RANGE_NONE = &D3D12_RANGE_NONE_DATA;
 
@@ -15,13 +19,13 @@ static BoolSetting g_UseD3d12ObjectNames(SettingCategory::Startup, "UseD3d12Obje
 
 void Exception::Print() const
 {
-    LogErrorF(L"ERROR:");
+    LogError(L"ERROR:");
     for(auto it = m_entries.rbegin(); it != m_entries.rend(); ++it)
     {
         if(it->m_file && *it->m_file)
-            LogErrorF(L"%s(%u): %.*s", it->m_file, it->m_line, STR_TO_FORMAT(it->m_message));
+            LogErrorF(L"{}({}): {}", it->m_file, it->m_line, it->m_message);
         else
-            LogErrorF(L"%.*s", STR_TO_FORMAT(it->m_message));
+            LogError(it->m_message);
     }
 }
 
@@ -42,7 +46,7 @@ wstring GetWinAPIErrorMessage()
     while(msgLen && isspace(msg[msgLen-1]))
         --msgLen;
 
-	wstring result = Format(L"GetLastError() = 0x%08X: %.*s", err, (int)msgLen, msg);
+	wstring result = std::format(L"GetLastError() = 0x{:08X}: {}", err, wstr_view(msg, msgLen));
 	LocalFree(msg);
     return result;
 }
@@ -69,9 +73,9 @@ wstring GetHRESULTErrorMessage(HRESULT hr)
     }
 #undef KNOWN_SYMBOL
     if(msg)
-        return Format(L"HRESULT = 0x%08X (%s)", hr, msg);
+        return std::format(L"HRESULT = 0x{:08X} ({})", hr, msg);
     else
-        return Format(L"HRESULT = 0x%08X", hr);
+        return std::format(L"HRESULT = 0x{:08X}", hr);
 }
 
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage)
@@ -100,48 +104,6 @@ wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage)
     if(result == 0)
         return wstring{};
     return wstring{buf.data(), buf.size()};
-}
-
-string VFormat(const char* format, va_list argList)
-{
-    const size_t dstLen = (size_t)_vscprintf(format, argList);
-    if(dstLen)
-    {
-        std::vector<char> buf(dstLen + 1);
-        vsprintf_s(&buf[0], dstLen + 1, format, argList);
-        return string{buf.data(), buf.data() + dstLen};
-    }
-    else
-        return {};
-}
-wstring VFormat(const wchar_t* format, va_list argList)
-{
-    const size_t dstLen = (size_t)_vscwprintf(format, argList);
-    if(dstLen)
-    {
-        std::vector<wchar_t> buf(dstLen + 1);
-        vswprintf_s(&buf[0], dstLen + 1, format, argList);
-        return wstring{buf.data(), buf.data() + dstLen};
-    }
-    else
-        return {};
-}
-
-string Format(const char* format, ...)
-{
-    va_list argList;
-    va_start(argList, format);
-    auto result = VFormat(format, argList);
-    va_end(argList);
-    return result;
-}
-wstring Format(const wchar_t* format, ...)
-{
-    va_list argList;
-    va_start(argList, format);
-    auto result = VFormat(format, argList);
-    va_end(argList);
-    return result;
 }
 
 static void SetConsoleColor(LogLevel level)
@@ -185,16 +147,11 @@ void Log(LogLevel level, const wstr_view& msg)
         SetConsoleColor(LogLevel::Message);
 }
 
-void LogV(LogLevel level, const wchar_t* format, va_list argList)
-{
-    Log(level, VFormat(format, argList));
-}
-
 std::vector<char> LoadFile(const wstr_view& path)
 {
     ERR_TRY;
 
-    LogInfoF(L"Loading file \"%.*s\"...", STR_TO_FORMAT(path));
+    LogInfoF(L"Loading file \"{}\"...", path);
 
 	HANDLE handle = CreateFile(
 		path.c_str(), // lpFileName
@@ -221,7 +178,7 @@ std::vector<char> LoadFile(const wstr_view& path)
 	
 	return bytes;
 
-    ERR_CATCH_MSG(Format(L"Cannot load file \"%s\".", path.c_str()));
+    ERR_CATCH_MSG(std::format(L"Cannot load file \"{}\".", path));
 }
 
 // For C++ threads as threadId you can use:

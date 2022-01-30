@@ -13,29 +13,29 @@ static void AppendIndent(wstring& out, uint32_t indentLevel)
 
 static void AppendMeshInfo(wstring& out, uint32_t meshIndex, const aiMesh* mesh)
 {
-    out += Format(L"  Mesh %u: Name=\"%hs\", MaterialIndex=%u, PrimitiveTypes=0x%X\n",
+    out += std::format(L"  Mesh {}: Name=\"{}\", MaterialIndex={}, PrimitiveTypes=0x{:X}\n",
         meshIndex,
-        mesh->mName.C_Str(),
+        str_view(mesh->mName.C_Str()),
         mesh->mMaterialIndex,
         (uint32_t)mesh->mPrimitiveTypes);
-    out += Format(L"    NumFaces=%u, NumVertices=%u, NumColorChannels=%u, NumUVChannels=%u, NumBones=%u\n",
+    out += std::format(L"    NumFaces={}, NumVertices={}, NumColorChannels={}, NumUVChannels={}, NumBones={}\n",
         mesh->mNumVertices,
         mesh->mNumFaces,
         mesh->GetNumColorChannels(),
         mesh->GetNumUVChannels(),
         mesh->mNumBones);
-    out += Format(L"    HasPositions=%u, HasNormals=%u, HasTangentsAndBitangents=%u\n",
-        mesh->HasPositions() ? 1 : 0,
-        mesh->HasNormals() ? 1 : 0,
-        mesh->HasTangentsAndBitangents() ? 1 : 0);
-    out += Format(L"    AABB=%g %g %g; %g %g %g\n",
+    out += std::format(L"    HasPositions={:d}, HasNormals={:d}, HasTangentsAndBitangents={:d}\n",
+        mesh->HasPositions(),
+        mesh->HasNormals(),
+        mesh->HasTangentsAndBitangents());
+    out += std::format(L"    AABB={},{},{};{},{},{}\n",
         mesh->mAABB.mMin.x, mesh->mAABB.mMin.y, mesh->mAABB.mMin.z,
         mesh->mAABB.mMax.x, mesh->mAABB.mMax.y, mesh->mAABB.mMax.z);
     for(uint32_t i = 0; i < AI_MAX_NUMBER_OF_TEXTURECOORDS; ++i)
     {
         if(mesh->HasTextureCoords(i))
         {
-            out += Format(L"    TextureCoords %u: NumUVComponents=%u\n",
+            out += std::format(L"    TextureCoords {}: NumUVComponents={}\n",
                 i, mesh->mNumUVComponents[i]);
         }
     }
@@ -43,22 +43,22 @@ static void AppendMeshInfo(wstring& out, uint32_t meshIndex, const aiMesh* mesh)
     {
         if(mesh->HasVertexColors(i))
         {
-            out += Format(L"    VertexColors %u\n", i);
+            out += std::format(L"    VertexColors {}\n", i);
         }
     }
 }
 
 static void AppendMaterialPropertyDataItem(wstring& out, const float *v)
 {
-    out += Format(L"%g", (double)*v);
+    out += std::format(L"{}", *v);
 }
 static void AppendMaterialPropertyDataItem(wstring& out, const double *v)
 {
-    out += Format(L"%g", *v);
+    out += std::format(L"{}", *v);
 }
 static void AppendMaterialPropertyDataItem(wstring& out, const int32_t *v)
 {
-    out += Format(L"%d", *v);
+    out += std::format(L"{}", *v);
 }
 
 // Appends string inline, no indentation or new line.
@@ -132,10 +132,10 @@ static void AppendMaterialTextures(wstring& out, const aiMaterial* material)
             if(mapmodes[2] < 0 || mapmodes[2] > aiTextureMapMode_Decal)
                 mapmodes[2] = (aiTextureMapMode)(aiTextureMapMode_Decal + 1);
 
-            out += Format(L"    Texture %s %u: Path=\"%hs\", Mapping=%s, UVIndex=%u, Blend=%g, Op=%s, MapMode=%s,%s,%s\n",
+            out += std::format(L"    Texture {} {}: Path=\"{}\", Mapping={}, UVIndex={}, Blend={}, Op={}, MapMode={},{},{}\n",
                 TEXTURE_TYPE_NAMES[textureTypeIndex],
                 textureIndex,
-                path.C_Str(),
+                str_view(path.C_Str()),
                 TEXTURE_MAPPING_NAMES[mapping],
                 uvindex,
                 blend,
@@ -162,7 +162,7 @@ static wstring GetMaterialKeyStandardName(const aiMaterialProperty* matProp)
         return L"" #aiMatKeyMacro;
 #define TEXTURE_MATKEY(fullName, baseName) \
     if(str_view(matProp->mKey.C_Str()) == str_view(baseName)) \
-        return Format(L"%hs, Semantic=%s, Index=%u", #fullName, TEXTURE_TYPE_NAMES[matProp->mSemantic], matProp->mIndex);
+        return std::format(L"{}, Semantic={}, Index={}", str_view(#fullName), TEXTURE_TYPE_NAMES[matProp->mSemantic], matProp->mIndex);
 
     MATKEY(AI_MATKEY_NAME)
     MATKEY(AI_MATKEY_TWOSIDED)
@@ -218,10 +218,10 @@ static void AppendMaterialProperties(wstring& out, const aiMaterial* material)
 
         wstring keyName = GetMaterialKeyStandardName(prop);
         if(keyName.empty())
-            keyName = Format(L"\"%hs\", Semantic=%u, Index=%u", prop->mKey.C_Str(), prop->mSemantic, prop->mIndex);
+            keyName = std::format(L"\"{}\", Semantic={}, Index={}", str_view(prop->mKey.C_Str()), prop->mSemantic, prop->mIndex);
 
-        out += Format(L"    Property %u: Key=%.*s, DataLength=%u, Type=%s",
-            i, STR_TO_FORMAT(keyName), prop->mDataLength, TYPE_NAMES[prop->mType]);
+        out += std::format(L"    Property {}: Key={}, DataLength={}, Type={}",
+            i, keyName, prop->mDataLength, TYPE_NAMES[prop->mType]);
         
         switch(prop->mType)
         {
@@ -236,7 +236,7 @@ static void AppendMaterialProperties(wstring& out, const aiMaterial* material)
         case aiPTI_String:
         {
             const aiString* s = (const aiString*)prop->mData;
-            out += Format(L", Data: \"%hs\"", s->C_Str());
+            out += std::format(L", Data: \"{}\"", str_view(s->C_Str()));
             break;
         }
         case aiPTI_Integer:
@@ -256,7 +256,7 @@ static void AppendMaterialProperties(wstring& out, const aiMaterial* material)
 
 static void AppendMaterialInfo(wstring& out, uint32_t materialIndex, const aiMaterial* material)
 {
-    out += Format(L"  Material %u: NumProperties=%u\n", materialIndex, material->mNumProperties);
+    out += std::format(L"  Material {}: NumProperties={}\n", materialIndex, material->mNumProperties);
     AppendMaterialTextures(out, material);
     AppendMaterialProperties(out, material);
 }
@@ -273,32 +273,32 @@ static wstring FormatMetaDataProperty(const aiMetadataEntry& entry)
     case AI_INT32:
     {
         const int32_t* valPtr = (const int32_t*)entry.mData;
-        return Format(L"%d", *valPtr);
+        return std::format(L"{}", *valPtr);
     }
     case AI_UINT64:
     {
         const uint64_t* valPtr = (const uint64_t*)entry.mData;
-        return Format(L"%llu", *valPtr);
+        return std::format(L"{}", *valPtr);
     }
     case AI_FLOAT:
     {
         const float* valPtr = (const float*)entry.mData;
-        return Format(L"%g", (double)*valPtr);
+        return std::format(L"{}", (double)*valPtr);
     }
     case AI_DOUBLE:
     {
         const double* valPtr = (const double*)entry.mData;
-        return Format(L"%g", *valPtr);
+        return std::format(L"{}", *valPtr);
     }
     case AI_AISTRING:
     {
         const aiString* valPtr = (const aiString*)entry.mData;
-        return Format(L"%hs", valPtr->C_Str());
+        return ConvertCharsToUnicode(valPtr->C_Str(), CP_ACP);
     }
     case AI_AIVECTOR3D:
     {
         const aiVector3D* valPtr = (const aiVector3D*)entry.mData;
-        return Format(L"%g %g %g", valPtr->x, valPtr->y, valPtr->z);
+        return std::format(L"{},{},{}", valPtr->x, valPtr->y, valPtr->z);
     }
     default:
         assert(0); return {};
@@ -308,10 +308,10 @@ static wstring FormatMetaDataProperty(const aiMetadataEntry& entry)
 static void AppendNodeInfo(wstring& out, uint32_t indentLevel, const aiNode* node)
 {
     AppendIndent(out, indentLevel++);
-    out += Format(L"Node: Name=\"%hs\", NumMeshes=%u, NumChildren=%u\n",
-        node->mName.C_Str(), node->mNumMeshes, node->mNumChildren);
+    out += std::format(L"Node: Name=\"{}\", NumMeshes={}, NumChildren={}\n",
+        str_view(node->mName.C_Str()), node->mNumMeshes, node->mNumChildren);
     AppendIndent(out, indentLevel);
-    out += Format(L"Transformation: %g %g %g %g; %g %g %g %g; %g %g %g %g; %g %g %g %g\n",
+    out += std::format(L"Transformation: {},{},{},{};{},{},{},{};{},{},{},{};{},{},{},{}\n",
         node->mTransformation.a1, node->mTransformation.a2, node->mTransformation.a3, node->mTransformation.a4,
         node->mTransformation.b1, node->mTransformation.b2, node->mTransformation.b3, node->mTransformation.b4,
         node->mTransformation.c1, node->mTransformation.c2, node->mTransformation.c3, node->mTransformation.c4,
@@ -326,16 +326,16 @@ static void AppendNodeInfo(wstring& out, uint32_t indentLevel, const aiNode* nod
         {
             wstring valueStr = FormatMetaDataProperty(node->mMetaData->mValues[i]);
             AppendIndent(out, indentLevel + 1);
-            out += Format(L"%u \"%hs\" (%s) = %.*s\n",
-                i, node->mMetaData->mKeys[i].C_Str(),
+            out += std::format(L"{} \"{}\" ({}) = {}\n",
+                i, str_view(node->mMetaData->mKeys[i].C_Str()),
                 TYPE_NAMES[node->mMetaData->mValues[i].mType],
-                STR_TO_FORMAT(valueStr));
+                valueStr);
         }
     }
     for(uint32_t i = 0; i < node->mNumMeshes; ++i)
     {
         AppendIndent(out, indentLevel);
-        out += Format(L"Mesh %u: Index=%u\n", i, node->mMeshes[i]);
+        out += std::format(L"Mesh {}: Index={}\n", i, node->mMeshes[i]);
     }
     for(uint32_t i = 0; i < node->mNumChildren; ++i)
         AppendNodeInfo(out, indentLevel, node->mChildren[i]);
@@ -343,7 +343,7 @@ static void AppendNodeInfo(wstring& out, uint32_t indentLevel, const aiNode* nod
 
 void PrintAssimpSceneInfo(const aiScene* scene)
 {
-    wstring out = Format(L"Assimp scene: NumAnimations=%u, NumCameras=%u, NumLights=%u, NumMaterials=%u, NumMeshes=%u, NumTextures=%u\n",
+    wstring out = std::format(L"Assimp scene: NumAnimations={}, NumCameras={}, NumLights={}, NumMaterials={}, NumMeshes={}, NumTextures={}\n",
         scene->mNumAnimations,
         scene->mNumCameras,
         scene->mNumLights,

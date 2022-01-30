@@ -34,6 +34,7 @@
 #include <limits>
 #include <span>
 #include <filesystem>
+#include <format>
 
 #include <cstdio>
 #include <cstdint>
@@ -145,10 +146,6 @@ struct Exception
 wstring GetWinAPIErrorMessage();
 wstring GetHRESULTErrorMessage(HRESULT hr);
 
-// Use this macro to pass the 2 parameters to formatting function matching formatting string like "%.*s", "%.*hs" etc.
-// for s of type like std::string, std::wstring, str_view, wstr_view.
-#define STR_TO_FORMAT(s) (int)(s).size(), (s).data()
-
 #define __TFILE__ _T(__FILE__)
 #define FAIL(msgStr)  do { \
         throw Exception(__TFILE__, __LINE__, msgStr); \
@@ -175,7 +172,7 @@ wstring GetHRESULTErrorMessage(HRESULT hr);
     } \
     catch(const std::exception& ex) \
     { \
-        LogErrorF(L"ERROR: %hs", ex.what()); \
+        LogErrorF(L"ERROR: {}", str_view(ex.what())); \
         extraCatchCode \
     } \
     catch(...) \
@@ -208,28 +205,25 @@ void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_tem
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage);
 wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);
 
-string VFormat(const char* format, va_list argList);
-wstring VFormat(const wchar_t* format, va_list argList);
-string Format(const char* format, ...);
-wstring Format(const wchar_t* format, ...);
-
 enum class LogLevel { Info, Message, Warning, Error, Count };
 void Log(LogLevel level, const wstr_view& msg);
-void LogV(LogLevel level, const wchar_t* format, va_list argList);
-inline void LogF(LogLevel level, const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(level, format, argList); va_end(argList); }
+
+template<typename... Args>
+void LogF(LogLevel level, const wchar_t* format, Args&&... args) { Log(level, std::format(format, args...)); }
 
 inline void LogInfo(const wstr_view& msg) { Log(LogLevel::Info, msg); }
-inline void LogInfoV(const wchar_t* format, va_list argList) { LogV(LogLevel::Info, format, argList); }
-inline void LogInfoF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Info, format, argList); va_end(argList); }
 inline void LogMessage(const wstr_view& msg) { Log(LogLevel::Message, msg); }
-inline void LogMessageV(const wchar_t* format, va_list argList) { LogV(LogLevel::Message, format, argList); }
-inline void LogMessageF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Message, format, argList); va_end(argList); }
 inline void LogWarning(const wstr_view& msg) { Log(LogLevel::Warning, msg); }
-inline void LogWarningV(const wchar_t* format, va_list argList) { LogV(LogLevel::Warning, format, argList); }
-inline void LogWarningF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Warning, format, argList); va_end(argList); }
 inline void LogError(const wstr_view& msg) { Log(LogLevel::Error, msg); }
-inline void LogErrorV(const wchar_t* format, va_list argList) { LogV(LogLevel::Error, format, argList); }
-inline void LogErrorF(const wchar_t* format, ...) { va_list argList; va_start(argList, format); LogV(LogLevel::Error, format, argList); va_end(argList); }
+
+template<typename... Args>
+void LogInfoF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Info, format, args...); }
+template<typename... Args>
+void LogMessageF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Message, format, args...); }
+template<typename... Args>
+void LogWarningF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Warning, format, args...); }
+template<typename... Args>
+void LogErrorF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Error, format, args...); }
 
 std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);
@@ -237,3 +231,5 @@ void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }
 // On error returns 0.
 uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format);
+
+#include "Formatters.inl"

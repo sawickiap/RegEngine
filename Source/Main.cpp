@@ -208,7 +208,6 @@ int wmain(int argc, wchar_t** argv)
         g_App = &app;
         app.Init();
         const int result = app.Run();
-        g_App = nullptr;
         return result;
 	}
 	CATCH_PRINT_ERROR(return EXIT_CODE_RUNTIME_ERROR;);

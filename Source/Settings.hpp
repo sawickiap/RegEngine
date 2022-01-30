@@ -122,7 +122,7 @@ protected:
         if(LoadVecFromJSON<VecT>(vec, jsonVal))
             this->m_Value = vec;
         else
-            LogWarningF(L"Invalid vector setting \"%.*hs\".", STR_TO_FORMAT(this->GetName()));
+            LogWarningF(L"Invalid vector setting \"{}\".", str_view(this->GetName()));
     }
 };
 

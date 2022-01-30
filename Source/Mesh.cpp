@@ -47,7 +47,7 @@ void Mesh::Init(
             nullptr, // pOptimizedClearValue
             &m_VertexBuffer,
             IID_NULL, NULL)); // riidResource, ppvResource
-        SetD3D12ObjectName(m_VertexBuffer->GetResource(), Format(L"%.*s - vertex buffer", STR_TO_FORMAT(name)));
+        SetD3D12ObjectName(m_VertexBuffer->GetResource(), std::format(L"{} - vertex buffer", name));
     }
 
     // Map and fill vertex buffer.
@@ -73,7 +73,7 @@ void Mesh::Init(
                 nullptr, // pOptimizedClearValue
                 &m_IndexBuffer,
                 IID_NULL, NULL)); // riidResource, ppvResource
-            SetD3D12ObjectName(m_IndexBuffer->GetResource(), Format(L"%.*s - index buffer", STR_TO_FORMAT(name)));
+            SetD3D12ObjectName(m_IndexBuffer->GetResource(), std::format(L"{} - index buffer", name));
         }
 
         // Map and fill vertex buffer.

@@ -14,7 +14,7 @@ void Texture::LoadFromFile(const wstr_view& filePath)
 
     ERR_TRY;
 
-    LogMessageF(L"Loading texture from \"%.*s\"...", STR_TO_FORMAT(filePath));
+    LogMessageF(L"Loading texture from \"{}\"...", filePath);
 
     DirectX::ScratchImage scratchImage;
 
@@ -43,7 +43,7 @@ void Texture::LoadFromFile(const wstr_view& filePath)
     CHECK_BOOL(img->height == metadata.height);
     CHECK_BOOL(img->format == metadata.format);
 
-    LogInfoF(L"  Width=%zu, Height=%zu, Format=%u",
+    LogInfoF(L"  Width={}, Height={}, Format={}",
         metadata.width, metadata.height, (uint32_t)metadata.format);
 
     D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
@@ -64,7 +64,7 @@ void Texture::LoadFromFile(const wstr_view& filePath)
 
     LoadFromMemory(resDesc, subresourceData, filePath);
 
-    ERR_CATCH_MSG(Format(L"Cannot load texture from \"%.*s\".", STR_TO_FORMAT(filePath)));
+    ERR_CATCH_MSG(std::format(L"Cannot load texture from \"{}\".", filePath));
 }
 
 void Texture::LoadFromMemory(

@@ -464,7 +464,7 @@ void Renderer::CreateFrameResources()
 			m_CmdAllocator.Get(), NULL,
 			IID_PPV_ARGS(&m_FrameResources[i].m_CmdList)));
 		CHECK_HR(m_FrameResources[i].m_CmdList->Close());
-        SetD3D12ObjectName(m_FrameResources[i].m_CmdList, Format(L"Command list %u", i).c_str());
+        SetD3D12ObjectName(m_FrameResources[i].m_CmdList, std::format(L"Command list {}", i));
 
         ID3D12Resource* backBuffer = nullptr;
 		CHECK_HR(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
@@ -675,7 +675,7 @@ void Renderer::LoadModel()
     */
 
     const wstr_view filePath = g_AssimpModelPath.GetValue();
-    LogMessageF(L"Loading model from \"%.*hs\"...", STR_TO_FORMAT(filePath));
+    LogMessageF(L"Loading model from \"{}\"...", filePath);
     ERR_TRY;
 
     {
@@ -721,7 +721,7 @@ void Renderer::LoadModel()
         }
     }
 
-    ERR_CATCH_MSG(Format(L"Cannot load model from \"%.*s\".", STR_TO_FORMAT(filePath)));
+    ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
 }
 
 void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)
