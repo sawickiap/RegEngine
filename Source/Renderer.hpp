@@ -10,6 +10,7 @@ class Mesh;
 struct ShaderResourceDescriptor;
 class ShaderResourceDescriptorManager;
 class TemporaryConstantBufferManager;
+class ShaderCompiler;
 
 struct aiScene;
 struct aiNode;
@@ -50,6 +51,7 @@ public:
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
     ShaderResourceDescriptorManager* GetShaderResourceDescriptorManager() { return m_ShaderResourceDescriptorManager.get(); }
     TemporaryConstantBufferManager* GetTemporaryConstantBufferManager() { return m_TemporaryConstantBufferManager.get(); }
+    ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
     void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList(CommandList& cmdList);
@@ -83,6 +85,7 @@ private:
 	ComPtr<ID3D12DescriptorHeap> m_DSVDescriptor;
     unique_ptr<ShaderResourceDescriptorManager> m_ShaderResourceDescriptorManager;
     unique_ptr<TemporaryConstantBufferManager> m_TemporaryConstantBufferManager;
+    unique_ptr<ShaderCompiler> m_ShaderCompiler;
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;

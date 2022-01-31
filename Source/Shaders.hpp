@@ -6,6 +6,7 @@ enum class ShaderType
 };
 
 class ShaderPimpl;
+class ShaderCompilerPimpl;
 
 class Shader
 {
@@ -18,4 +19,18 @@ public:
 
 private:
     unique_ptr<ShaderPimpl> m_Pimpl;
+};
+
+class ShaderCompiler
+{
+public:
+    ShaderCompiler();
+    void Init();
+    ~ShaderCompiler();
+
+private:
+    friend class Shader;
+    friend class IncludeHandler;
+
+    unique_ptr<ShaderCompilerPimpl> m_Pimpl;
 };

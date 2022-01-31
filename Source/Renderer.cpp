@@ -215,6 +215,8 @@ void Renderer::Init()
     m_ShaderResourceDescriptorManager->Init();
     m_TemporaryConstantBufferManager = std::make_unique<TemporaryConstantBufferManager>();
     m_TemporaryConstantBufferManager->Init();
+    m_ShaderCompiler= std::make_unique<ShaderCompiler>();
+    m_ShaderCompiler->Init();
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();

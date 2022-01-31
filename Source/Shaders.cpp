@@ -1,5 +1,6 @@
 #include "BaseUtils.hpp"
 #include "Shaders.hpp"
+#include "Renderer.hpp"
 #include "Settings.hpp"
 #include <dxcapi.h>
 #pragma comment(lib, "dxcompiler.lib")
@@ -20,20 +21,7 @@ public:
 
     virtual HRESULT STDMETHODCALLTYPE LoadSource(
         _In_z_ LPCWSTR pFilename,
-        _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource)
-    {
-        ComPtr<IDxcUtils> utils;
-        CHECK_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils)));
-
-        std::filesystem::path filePath = m_Directory / pFilename;
-        const wchar_t* const filePathNative = filePath.native().c_str();
-        LogInfoF(L"Loading included file \"{}\"...", filePathNative);
-        uint32_t codePage = CP_UTF8;
-        IDxcBlobEncoding* blobEncoding = nullptr;
-        HRESULT hr = utils->LoadFile(filePathNative, &codePage, &blobEncoding);
-        *ppIncludeSource = blobEncoding;
-        return hr;
-    }
+        _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource);
 
 private:
     std::filesystem::path m_Directory;
@@ -44,6 +32,28 @@ class ShaderPimpl
 public:
     ComPtr<IDxcBlob> m_CompiledObject;
 };
+
+class ShaderCompilerPimpl
+{
+public:
+    ComPtr<IDxcUtils> m_Utils;
+    ComPtr<IDxcCompiler3> m_Compiler;
+};
+
+HRESULT STDMETHODCALLTYPE IncludeHandler::LoadSource(_In_z_ LPCWSTR pFilename, _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource)
+{
+    assert(g_Renderer && g_Renderer->GetShaderCompiler());
+    ShaderCompilerPimpl* compiler = g_Renderer->GetShaderCompiler()->m_Pimpl.get();
+
+    std::filesystem::path filePath = m_Directory / pFilename;
+    const wchar_t* const filePathNative = filePath.native().c_str();
+    LogInfoF(L"Loading included file \"{}\"...", filePathNative);
+    uint32_t codePage = CP_UTF8;
+    IDxcBlobEncoding* blobEncoding = nullptr;
+    HRESULT hr = compiler->m_Utils->LoadFile(filePathNative, &codePage, &blobEncoding);
+    *ppIncludeSource = blobEncoding;
+    return hr;
+}
 
 Shader::Shader() :
     m_Pimpl(std::make_unique<ShaderPimpl>())
@@ -57,6 +67,9 @@ Shader::~Shader()
 
 void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& entryPointName)
 {
+    assert(g_Renderer && g_Renderer->GetShaderCompiler());
+    ShaderCompilerPimpl* compiler = g_Renderer->GetShaderCompiler()->m_Pimpl.get();
+
     ERR_TRY;
 
     LogMessageF(L"Compiling shader from \"{}\"...", filePath);
@@ -64,9 +77,6 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
     std::filesystem::path dir(filePath.begin(), filePath.end(), std::filesystem::path::format::native_format);
     dir = dir.parent_path();
     IncludeHandler includeHandler(std::move(dir));
-
-    ComPtr<IDxcCompiler3> compiler;
-    CHECK_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)));
 
     const std::vector<char> source = LoadFile(filePath);
     CHECK_BOOL(!source.empty());
@@ -99,7 +109,7 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
 
     ComPtr<IDxcResult> result;
     // This seems to always succeed. Real success is returned by IDxcOperationResult::GetStatus.
-    CHECK_HR(compiler->Compile(
+    CHECK_HR(compiler->m_Compiler->Compile(
         &sourceDxcBuffer,
         arguments.data(), (uint32_t)arguments.size(),
         &includeHandler,
@@ -151,4 +161,25 @@ std::span<const char> Shader::GetCode() const
     return std::span<const char>(
         (const char*)m_Pimpl->m_CompiledObject->GetBufferPointer(),
         m_Pimpl->m_CompiledObject->GetBufferSize());
+}
+
+ShaderCompiler::ShaderCompiler() :
+    m_Pimpl(std::make_unique<ShaderCompilerPimpl>())
+{
+
+}
+
+void ShaderCompiler::Init()
+{
+    ERR_TRY;
+    
+    CHECK_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_Pimpl->m_Utils)));
+    CHECK_HR(DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_Pimpl->m_Compiler)));
+    
+    ERR_CATCH_MSG(L"Cannot initialize shader compiler.");
+}
+
+ShaderCompiler::~ShaderCompiler()
+{
+
 }
