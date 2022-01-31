@@ -1,7 +1,10 @@
 #include "BaseUtils.hpp"
 #include "Shaders.hpp"
+#include "Settings.hpp"
 #include <dxcapi.h>
 #pragma comment(lib, "dxcompiler.lib")
+
+static StringSequenceSetting g_ShaderExtraParameters(SettingCategory::Load, "Shaders.ExtraParameters");
 
 class IncludeHandler : public IDxcIncludeHandler
 {
@@ -23,9 +26,11 @@ public:
         CHECK_HR(DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils)));
 
         std::filesystem::path filePath = m_Directory / pFilename;
+        const wchar_t* const filePathNative = filePath.native().c_str();
+        LogInfoF(L"Loading included file \"{}\"...", filePathNative);
         uint32_t codePage = CP_UTF8;
         IDxcBlobEncoding* blobEncoding = nullptr;
-        HRESULT hr = utils->LoadFile(filePath.native().c_str(), &codePage, &blobEncoding);
+        HRESULT hr = utils->LoadFile(filePathNative, &codePage, &blobEncoding);
         *ppIncludeSource = blobEncoding;
         return hr;
     }
@@ -82,8 +87,15 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
 
     std::vector<const wchar_t*> arguments = {
         profileParam,
-        entryPointParam.c_str(),
-        DXC_ARG_OPTIMIZATION_LEVEL3};
+        entryPointParam.c_str()};
+    
+    const size_t extraParamCount = g_ShaderExtraParameters.m_Strings.size();
+    std::vector<wstring> extraParamsUnicode(extraParamCount);
+    for(size_t i = 0; i < extraParamCount; ++i)
+    {
+        extraParamsUnicode[i] = ConvertCharsToUnicode(g_ShaderExtraParameters.m_Strings[i], CP_UTF8);
+        arguments.push_back(extraParamsUnicode[i].c_str());
+    }
 
     ComPtr<IDxcResult> result;
     // This seems to always succeed. Real success is returned by IDxcOperationResult::GetStatus.

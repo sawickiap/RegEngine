@@ -1,6 +1,8 @@
 {
     "UsePIXEvents": true,
     "SyncInterval": 1,
+    // Array of strings to be passed as parameters to every shader compilation using DXC compiler.
+    "Shaders.ExtraParameters": [ "-O3" ],
     //"Assimp.ModelPath": "f:\\Libraries\\Assimp\\assimp-5.0.1\\test\\models\\MS3D\\jeep1.ms3d",
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\FairyTower\\FairyTower.fbx",
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",

@@ -218,21 +218,21 @@ void FloatSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJSON(m_Value, *realVal))
-        LogWarningF(L"Invalid float setting \"%.*hs\".", str_view(GetName()));
+        LogWarningF(L"Invalid float setting \"{}\".", str_view(GetName()));
 }
 
 void UintSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJSON(m_Value, *realVal))
-        LogWarningF(L"Invalid uint setting \"%.*hs\".", str_view(GetName()));
+        LogWarningF(L"Invalid uint setting \"{}\".", str_view(GetName()));
 }
 
 void IntSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJSON(m_Value, *realVal))
-        LogWarningF(L"Invalid int setting \"%.*hs\".", str_view(GetName()));
+        LogWarningF(L"Invalid int setting \"{}\".", str_view(GetName()));
 }
 
 void StringSetting::LoadFromJSON(const void* jsonVal)
@@ -241,7 +241,37 @@ void StringSetting::LoadFromJSON(const void* jsonVal)
     if(realVal->IsString())
         m_Value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
     else
-        LogWarningF(L"Invalid string setting \"%.*hs\".", str_view(GetName()));
+        LogWarningF(L"Invalid string setting \"{}\".", str_view(GetName()));
+}
+
+StringSequenceSetting::StringSequenceSetting(SettingCategory category, const str_view& name) :
+    Setting(category, name)
+{
+
+}
+
+void StringSequenceSetting::LoadFromJSON(const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsArray())
+    {
+        const auto arr = realVal->GetArray();
+        m_Strings.resize(arr.Size());
+        bool ok = true;
+        for(uint32_t i = 0; i < arr.Size() && ok; ++i)
+        {
+            if(arr[i].IsString())
+            {
+                m_Strings[i].assign(arr[i].GetString(), arr[i].GetStringLength());
+            }
+            else
+                ok = false;
+        }
+        if(ok)
+            return;
+    }
+    m_Strings.clear();
+    LogWarningF(L"Invalid string array setting \"{}\".", str_view(GetName()));
 }
 
 void LoadStartupSettings()

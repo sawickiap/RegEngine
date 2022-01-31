@@ -167,6 +167,17 @@ private:
     wstring m_Value;
 };
 
+class StringSequenceSetting : public Setting
+{
+public:
+    std::vector<string> m_Strings;
+
+    StringSequenceSetting(SettingCategory category, const str_view& name);
+
+protected:
+    void LoadFromJSON(const void* jsonVal) override;
+};
+
 // On error throws Exception.
 void LoadStartupSettings();
 // On error prints error.
