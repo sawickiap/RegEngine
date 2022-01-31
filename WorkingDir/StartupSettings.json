@@ -3,6 +3,8 @@
     "UseD3d12ObjectNames": true,
     "FrameCount": 3,
     "Size": [ 1920, 1080 ],
+    // Set to true to accept unsigned shaders.
+    "EnableExperimentalShaderModels": true,
 
     "Font.FaceName": "Segoe UI",
     "Font.Height": 32,

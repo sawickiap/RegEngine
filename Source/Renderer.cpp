@@ -40,6 +40,7 @@ static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
 static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
 static UintSetting g_AssimpLogSeverity(SettingCategory::Startup, "Assimp.LogSeverity", 3);
 static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFilePath");
+static BoolSetting g_EnableExperimentalShaderModels(SettingCategory::Startup, "EnableExperimentalShaderModels", true);
 
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
@@ -206,7 +207,8 @@ void Renderer::Init()
     ERR_TRY;
     CHECK_BOOL(g_FrameCount.GetValue() >= 2 && g_FrameCount.GetValue() <= MAX_FRAME_COUNT);
 
-    D3D12EnableExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
+    if(g_EnableExperimentalShaderModels.GetValue())
+        D3D12EnableExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
 
 	CreateDevice();
     CreateMemoryAllocator();
@@ -313,65 +315,67 @@ void Renderer::Render()
 
 	    cmdList.GetCmdList()->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, &dsvDescriptorHandle);
 
-	    cmdList.SetPipelineState(m_PipelineState.Get());
-
-	    cmdList.SetRootSignature(m_RootSignature.Get());
-
-        // Set per-frame constants.
+        if(m_PipelineState && m_RootSignature)
         {
-            PerFrameConstants myData = {};
-            myData.m_FrameIndex = m_FrameIndex;
-            myData.m_SceneTime = time;
+            cmdList.SetPipelineState(m_PipelineState.Get());
+	        cmdList.SetRootSignature(m_RootSignature.Get());
 
-            void* mappedPtr = nullptr;
-            D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle;
-            m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, descriptorHandle);
-            memcpy(mappedPtr, &myData, sizeof(myData));
+            // Set per-frame constants.
+            {
+                PerFrameConstants myData = {};
+                myData.m_FrameIndex = m_FrameIndex;
+                myData.m_SceneTime = time;
 
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
-        }
+                void* mappedPtr = nullptr;
+                D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle;
+                m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, descriptorHandle);
+                memcpy(mappedPtr, &myData, sizeof(myData));
+
+                cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
+            }
         
-        D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
-        cmdList.SetViewport(viewport);
+            D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
+            cmdList.SetViewport(viewport);
 
-	    const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
-	    cmdList.SetScissorRect(scissorRect);
+	        const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
+	        cmdList.SetScissorRect(scissorRect);
 
-        const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
-        const mat4 view = glm::lookAtLH(
-            vec3(0.f, 10.f, 3.f), // eye
-            vec3(0.f, 0.f, 1.f), // center
-            vec3(0.f, 0.f, 1.f)); // up
-        const mat4 proj = MakeInfReversedZProjLH(
-            glm::radians(80.f),
-            (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
-            0.5f); // zNear
-        //const mat4 worldViewProj = proj * view * world;
-        m_ViewProj = proj * view * world;
+            const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
+            const mat4 view = glm::lookAtLH(
+                vec3(0.f, 10.f, 3.f), // eye
+                vec3(0.f, 0.f, 1.f), // center
+                vec3(0.f, 0.f, 1.f)); // up
+            const mat4 proj = MakeInfReversedZProjLH(
+                glm::radians(80.f),
+                (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
+                0.5f); // zNear
+            //const mat4 worldViewProj = proj * view * world;
+            m_ViewProj = proj * view * world;
 
-        // A) Testing texture SRV descriptors as persistent.
+            // A) Testing texture SRV descriptors as persistent.
 #if 0
-        const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Font->GetTexture()->GetDescriptor()) :
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
-        // B) Testing texture SRV descriptors as temporary.
-        if(false){
-            ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
-            ID3D12Resource* const textureRes = /*fmod(time, 1.f) > 0.5f ?
-                m_Font->GetTexture()->GetResource() :*/
-                m_Texture->GetResource();
-            m_Device->CreateShaderResourceView(textureRes, nullptr,
-                m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV,
-                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
-        }
+            const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
+                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Font->GetTexture()->GetDescriptor()) :
+                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
+            // B) Testing texture SRV descriptors as temporary.
+            if(false){
+                ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
+                ID3D12Resource* const textureRes = /*fmod(time, 1.f) > 0.5f ?
+                    m_Font->GetTexture()->GetResource() :*/
+                    m_Texture->GetResource();
+                m_Device->CreateShaderResourceView(textureRes, nullptr,
+                    m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
+                cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV,
+                    m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
+            }
 #endif
 
-        vec3 scaleVec = vec3(g_AssimpScale.GetValue());
-        mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
-        //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
-        RenderEntity(cmdList, globalXform, m_RootEntity);
+            vec3 scaleVec = vec3(g_AssimpScale.GetValue());
+            mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
+            //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
+            RenderEntity(cmdList, globalXform, m_RootEntity);
+    }
 
 	    /*
 	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};

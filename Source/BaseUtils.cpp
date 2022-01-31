@@ -73,9 +73,9 @@ wstring GetHRESULTErrorMessage(HRESULT hr)
     }
 #undef KNOWN_SYMBOL
     if(msg)
-        return std::format(L"HRESULT = 0x{:08X} ({})", hr, msg);
+        return std::format(L"HRESULT = {:#010X} ({})", hr, msg);
     else
-        return std::format(L"HRESULT = 0x{:08X}", hr);
+        return std::format(L"HRESULT = {:#010X}", hr);
 }
 
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage)
