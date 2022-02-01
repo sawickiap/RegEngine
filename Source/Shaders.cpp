@@ -2,8 +2,8 @@
 #include "Shaders.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
-#include <dxcapi.h>
-#pragma comment(lib, "dxcompiler.lib")
+#include "../ThirdParty/dxc_2021_12_08/inc/dxcapi.h"
+#pragma comment(lib, "../ThirdParty/dxc_2021_12_08/lib/x64/dxcompiler.lib")
 
 static StringSequenceSetting g_ShaderExtraParameters(SettingCategory::Load, "Shaders.ExtraParameters");
 
