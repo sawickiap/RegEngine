@@ -59,6 +59,9 @@ public:
     ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
     OrbitingCamera* GetCamera() { return m_Camera.get(); }
 
+    uvec2 GetFinalResolutionU();
+    vec2 GetFinalResolutionF();
+
     void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList(CommandList& cmdList);

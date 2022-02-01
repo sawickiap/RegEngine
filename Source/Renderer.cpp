@@ -218,7 +218,7 @@ void Renderer::Init()
     LoadModel();
     
     m_Camera = std::make_unique<OrbitingCamera>();
-    m_Camera->SetAspectRatio((float)g_Size.GetValue().x / (float)g_Size.GetValue().y);
+    m_Camera->SetAspectRatio(GetFinalResolutionF().x / GetFinalResolutionF().y);
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -248,6 +248,16 @@ void Renderer::Reload()
 
     CreatePipelineState();
     LoadModel();
+}
+
+uvec2 Renderer::GetFinalResolutionU()
+{
+    return g_Size.GetValue();
+}
+
+vec2 Renderer::GetFinalResolutionF()
+{
+    return vec2((float)g_Size.GetValue().x, (float)g_Size.GetValue().y);
 }
 
 void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
@@ -327,10 +337,10 @@ void Renderer::Render()
                 cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
             }
         
-            D3D12_VIEWPORT viewport = {0.f, 0.f, (float)g_Size.GetValue().x, (float)g_Size.GetValue().y, 0.f, 1.f};
+            D3D12_VIEWPORT viewport = {0.f, 0.f, GetFinalResolutionF().x, GetFinalResolutionF().y, 0.f, 1.f};
             cmdList.SetViewport(viewport);
 
-	        const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
+	        const D3D12_RECT scissorRect = {0, 0, (LONG)GetFinalResolutionU().x, (LONG)GetFinalResolutionU().y};
 	        cmdList.SetScissorRect(scissorRect);
 
             // A) Testing texture SRV descriptors as persistent.
@@ -425,8 +435,8 @@ void Renderer::CreateSwapChain()
 {
 	DXGI_SWAP_CHAIN_DESC swapChainDesc = {};
 	swapChainDesc.BufferCount = g_FrameCount.GetValue();
-	swapChainDesc.BufferDesc.Width = g_Size.GetValue().x;
-	swapChainDesc.BufferDesc.Height = g_Size.GetValue().y;
+	swapChainDesc.BufferDesc.Width = GetFinalResolutionU().x;
+	swapChainDesc.BufferDesc.Height = GetFinalResolutionU().y;
 	swapChainDesc.BufferDesc.Format = RENDER_TARGET_FORMAT;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;//DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -534,7 +544,7 @@ void Renderer::CreateResources()
     {
         const D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
             DEPTH_STENCIL_FORMAT,
-            g_Size.GetValue().x, g_Size.GetValue().y,
+            GetFinalResolutionU().x, GetFinalResolutionU().y,
             1, // arraySize
             1, // mipLevels
             1, // sampleCount
