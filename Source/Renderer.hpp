@@ -11,6 +11,7 @@ struct ShaderResourceDescriptor;
 class ShaderResourceDescriptorManager;
 class TemporaryConstantBufferManager;
 class ShaderCompiler;
+class OrbitingCamera;
 
 struct aiScene;
 struct aiNode;
@@ -37,6 +38,10 @@ struct Entity
     std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
 };
 
+/*
+Represents the main object responsible for rendering graphics.
+It creates and keeps ID3D12Device and other key objects.
+*/
 class Renderer
 {
 public:
@@ -52,6 +57,8 @@ public:
     ShaderResourceDescriptorManager* GetShaderResourceDescriptorManager() { return m_ShaderResourceDescriptorManager.get(); }
     TemporaryConstantBufferManager* GetTemporaryConstantBufferManager() { return m_TemporaryConstantBufferManager.get(); }
     ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
+    OrbitingCamera* GetCamera() { return m_Camera.get(); }
+
     void BeginUploadCommandList(CommandList& dstCmdList);
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList(CommandList& cmdList);
@@ -94,6 +101,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
+    unique_ptr<OrbitingCamera> m_Camera;
 
     std::vector<unique_ptr<Mesh>> m_Meshes;
     // Indices of this array match m_Meshes.
@@ -103,8 +111,6 @@ private:
     // Indices to this array are material indices from the Assimp scene.
     // Elements can be null - use some standard texture then.
     std::vector<unique_ptr<Texture>> m_Textures;
-
-    mat4 m_ViewProj;
 
 	void CreateDevice();
 	void CreateMemoryAllocator();

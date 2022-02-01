@@ -105,9 +105,11 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="AssimpUtils.cpp" />
+    <ClCompile Include="Cameras.cpp" />
     <ClCompile Include="CommandList.cpp" />
     <ClCompile Include="ConstantBuffers.cpp" />
     <ClCompile Include="Descriptors.cpp" />
+    <ClCompile Include="Game.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="BaseUtils.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -128,9 +130,11 @@
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
     <ClInclude Include="AssimpUtils.hpp" />
     <ClInclude Include="BaseUtils.hpp" />
+    <ClInclude Include="Cameras.hpp" />
     <ClInclude Include="CommandList.hpp" />
     <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="Descriptors.hpp" />
+    <ClInclude Include="Game.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="MultiFrameRingBuffer.hpp" />
     <ClInclude Include="Renderer.hpp" />

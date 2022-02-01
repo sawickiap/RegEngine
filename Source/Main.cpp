@@ -1,6 +1,8 @@
 #include "BaseUtils.hpp"
-#include "Settings.hpp"
+#include "Game.hpp"
 #include "Renderer.hpp"
+#include "Settings.hpp"
+#include <windowsx.h>
 
 enum EXIT_CODE
 {
@@ -13,6 +15,10 @@ static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 
 VecSetting<glm::uvec2> g_Size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
 
+/*
+Represents the main object responsible for application initialization and management
+of a Windows window.
+*/
 class Application
 {
 public:
@@ -26,6 +32,7 @@ private:
     ComPtr<IDXGIFactory4> m_DXGIFactory;
     ComPtr<IDXGIAdapter1> m_Adapter;
     unique_ptr<Renderer> m_Renderer;
+    Game m_Game;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     void SelectAdapter();
@@ -58,6 +65,7 @@ void Application::Init()
     CreateWindow_();
     m_Renderer = make_unique<Renderer>(m_DXGIFactory.Get(), m_Adapter.Get(), m_Wnd);
     m_Renderer->Init();
+    m_Game.Init();
     ERR_CATCH_MSG(L"Failed to initialize application.");
 }
 
@@ -120,6 +128,26 @@ void Application::CreateWindow_()
     assert(m_Wnd);
 }
 
+static uint32_t WParamToMouseButtonDownFlags(WPARAM wParam)
+{
+    uint32_t result = 0;
+    if((wParam & MK_CONTROL) != 0)
+        result |= MOUSE_BUTTON_DOWN_CONTROL;
+    if((wParam & MK_LBUTTON) != 0)
+        result |= MOUSE_BUTTON_DOWN_LBUTTON;
+    if((wParam & MK_MBUTTON) != 0)
+        result |= MOUSE_BUTTON_DOWN_MBUTTON;
+    if((wParam & MK_RBUTTON) != 0)
+        result |= MOUSE_BUTTON_DOWN_RBUTTON;
+    if((wParam & MK_SHIFT) != 0)
+        result |= MOUSE_BUTTON_DOWN_SHIFT;
+    if((wParam & MK_XBUTTON1) != 0)
+        result |= MOUSE_BUTTON_DOWN_XBUTTON1;
+    if((wParam & MK_XBUTTON2) != 0)
+        result |= MOUSE_BUTTON_DOWN_XBUTTON2;
+    return result;
+}
+
 LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if(m_Wnd == NULL)
@@ -146,6 +174,14 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
+
+    case WM_MOUSEMOVE:
+    {
+        uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
+        ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        m_Game.OnMouseMove(mouseButtonDownFlag, pos);
+        return 0;
+    }
     }
 
     return DefWindowProc(wnd, msg, wParam, lParam);
@@ -194,9 +230,11 @@ int Application::Run()
             g_Time = (float)newTimeValue * 0.001f;
             */
 
-            //Update();
             if(m_Renderer)
+            {
+                m_Game.Update();
                 m_Renderer->Render();
+            }
         }
     }
     LogMessage(L"Application exiting.");

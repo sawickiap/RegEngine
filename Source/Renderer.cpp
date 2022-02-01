@@ -1,4 +1,5 @@
 #include "BaseUtils.hpp"
+#include "Renderer.hpp"
 #include "CommandList.hpp"
 #include "RenderingResource.hpp"
 #include "Texture.hpp"
@@ -6,7 +7,7 @@
 #include "Descriptors.hpp"
 #include "ConstantBuffers.hpp"
 #include "Shaders.hpp"
-#include "Renderer.hpp"
+#include "Cameras.hpp"
 #include "Settings.hpp"
 #include "AssimpUtils.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
@@ -73,17 +74,6 @@ enum ROOT_PARAM
     ROOT_PARAM_PER_OBJECT_CBV,
     ROOT_PARAM_TEXTURE_SRV,
 };
-
-// Source: "Reversed-Z in OpenGL", https://nlguillemot.wordpress.com/2016/12/07/reversed-z-in-opengl/
-static mat4 MakeInfReversedZProjLH(float fovY_radians, float aspectWbyH, float zNear)
-{
-    float f = 1.0f / tan(fovY_radians / 2.0f);
-    return mat4(
-        f / aspectWbyH, 0.0f,  0.0f,  0.0f,
-        0.0f,    f,  0.0f,  0.0f,
-        0.0f, 0.0f,  0.0f,  1.0f,
-        0.0f, 0.0f, zNear,  0.0f);
-}
 
 class AssimpInit
 {
@@ -226,6 +216,9 @@ void Renderer::Init()
     CreateStandardTextures();
     m_AssimpInit = std::make_unique<AssimpInit>();
     LoadModel();
+    
+    m_Camera = std::make_unique<OrbitingCamera>();
+    m_Camera->SetAspectRatio((float)g_Size.GetValue().x / (float)g_Size.GetValue().y);
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -339,18 +332,6 @@ void Renderer::Render()
 
 	        const D3D12_RECT scissorRect = {0, 0, (LONG)g_Size.GetValue().x, (LONG)g_Size.GetValue().y};
 	        cmdList.SetScissorRect(scissorRect);
-
-            const mat4 world = glm::rotate(glm::identity<mat4>(), time, vec3(0.f, 0.f, 1.f));
-            const mat4 view = glm::lookAtLH(
-                vec3(0.f, 10.f, 3.f), // eye
-                vec3(0.f, 0.f, 1.f), // center
-                vec3(0.f, 0.f, 1.f)); // up
-            const mat4 proj = MakeInfReversedZProjLH(
-                glm::radians(80.f),
-                (float)g_Size.GetValue().x / (float)g_Size.GetValue().y,
-                0.5f); // zNear
-            //const mat4 worldViewProj = proj * view * world;
-            m_ViewProj = proj * view * world;
 
             // A) Testing texture SRV descriptors as persistent.
 #if 0
@@ -944,7 +925,7 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
     if(!entity.m_Meshes.empty())
     {
         PerObjectConstants perObjConstants = {};
-        perObjConstants.m_WorldViewProj = m_ViewProj * entityXform;
+        perObjConstants.m_WorldViewProj = m_Camera->GetViewProjection() * entityXform;
 
         void* perObjectConstantsPtr = nullptr;
         D3D12_GPU_DESCRIPTOR_HANDLE perObjectConstantsDescriptorHandle;
