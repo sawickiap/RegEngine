@@ -99,6 +99,12 @@ enum ROOT_PARAM
     ROOT_PARAM_TEXTURE_SRV,
 };
 
+enum POSTPROCESSING_ROOT_PARAM
+{
+    POSTPROCESSING_ROOT_PARAM_TEXTURE,
+    POSTPROCESSING_ROOT_PARAM_COUNT
+};
+
 class AssimpInit
 {
 public:
@@ -301,6 +307,7 @@ void Renderer::Reload()
     ClearModel();
 
     CreatePipelineState();
+    CreatePostprocessingPipelineState();
     LoadModel();
 }
 
@@ -347,21 +354,28 @@ void Renderer::Render()
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
+        D3D12_VIEWPORT viewport = {0.f, 0.f, GetFinalResolutionF().x, GetFinalResolutionF().y, 0.f, 1.f};
+        cmdList.SetViewport(viewport);
+
+	    const D3D12_RECT scissorRect = {0, 0, (LONG)GetFinalResolutionU().x, (LONG)GetFinalResolutionU().y};
+	    cmdList.SetScissorRect(scissorRect);
+        
         frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
         float time = (float)GetTickCount() * 1e-3f;
 	    //float pos = fmod(time * 100.f, (float)SIZE_X);
 
         {
-            PIX_EVENT_SCOPE(cmdList, L"Clear");
+            PIX_EVENT_SCOPE(cmdList, L"Clears");
+
+            m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
 	        const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
 	        cmdList.GetCmdList()->ClearRenderTargetView(
-                frameRes.m_BackBuffer->GetD3D12RTV(),
+                m_ColorRenderTarget->GetD3D12RTV(),
                 clearRGBA,
                 0,
                 nullptr);
-            
             cmdList.GetCmdList()->ClearDepthStencilView(
                 m_DepthTexture->GetD3D12DSV(),
                 D3D12_CLEAR_FLAG_DEPTH,
@@ -370,10 +384,12 @@ void Renderer::Render()
                 0, nullptr); // NumRects, prects
         }
 
-        cmdList.SetRenderTargets(m_DepthTexture.get(), frameRes.m_BackBuffer.get());
+        cmdList.SetRenderTargets(m_DepthTexture.get(), m_ColorRenderTarget.get());
 
         if(m_PipelineState && m_RootSignature)
         {
+            PIX_EVENT_SCOPE(cmdList, L"3D");
+
             cmdList.SetPipelineState(m_PipelineState.Get());
 	        cmdList.SetRootSignature(m_RootSignature.Get());
 
@@ -397,45 +413,27 @@ void Renderer::Render()
                 cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
             }
         
-            D3D12_VIEWPORT viewport = {0.f, 0.f, GetFinalResolutionF().x, GetFinalResolutionF().y, 0.f, 1.f};
-            cmdList.SetViewport(viewport);
-
-	        const D3D12_RECT scissorRect = {0, 0, (LONG)GetFinalResolutionU().x, (LONG)GetFinalResolutionU().y};
-	        cmdList.SetScissorRect(scissorRect);
-
-            // A) Testing texture SRV descriptors as persistent.
-#if 0
-            const D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle = fmod(time, 0.5f) > 0.25f ?
-                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Font->GetTexture()->GetDescriptor()) :
-                m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Texture->GetDescriptor());
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
-            // B) Testing texture SRV descriptors as temporary.
-            if(false){
-                ShaderResourceDescriptor textureSRVDescriptor = m_ShaderResourceDescriptorManager->AllocateTemporaryDescriptor(1);
-                ID3D12Resource* const textureRes = /*fmod(time, 1.f) > 0.5f ?
-                    m_Font->GetTexture()->GetResource() :*/
-                    m_Texture->GetResource();
-                m_Device->CreateShaderResourceView(textureRes, nullptr,
-                    m_ShaderResourceDescriptorManager->GetDescriptorCPUHandle(textureSRVDescriptor));
-                cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV,
-                    m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(textureSRVDescriptor));
-            }
-#endif
-
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
             mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
             RenderEntity(cmdList, globalXform, m_RootEntity);
+        }
     }
 
-	    /*
-	    const float whiteRGBA[] = {1.0f, 1.0f, 1.0f, 1.0f};
-	    const D3D12_RECT clearRect = {(int)pos, 32, (int)pos + 32, 32 + 32};
-	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
-	    */
+    if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
+    {
+        PIX_EVENT_SCOPE(cmdList, L"Postprocessing");
+        m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+        cmdList.SetRenderTargets(nullptr, frameRes.m_BackBuffer.get());
+        cmdList.SetPipelineState(m_PostprocessingPipelineState.Get());
+        cmdList.SetRootSignature(m_PostprocessingRootSignature.Get());
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            POSTPROCESSING_ROOT_PARAM_TEXTURE, m_ColorRenderTarget->GetD3D12SRV());
+        cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
 
-        frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
+    frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     cmdList.Execute(m_CmdQueue.Get());
 
 	frameRes.m_SubmittedFenceValue = m_NextFenceValue++;
@@ -676,19 +674,34 @@ void Renderer::CreateResources()
         SetD3D12ObjectName(m_RootSignature, L"Test root signature");
 	}
 
-	CreatePipelineState();
-
     // Font
     {
         m_Font = std::make_unique<Font>();
         m_Font->Init();
     }
 
+    {
+        D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            GetFinalResolutionU().x, GetFinalResolutionU().y,
+            1, // arraySize
+            1, // mipLevels
+            1, 0, // sampleCount, sampleQuality
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+        m_ColorRenderTarget = std::make_unique<RenderingResource>();
+        m_ColorRenderTarget->Init(resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, L"ColorRenderTarget");
+    }
+
+	CreatePipelineState();
+	CreatePostprocessingPipelineState();
+
     ERR_CATCH_FUNC;
 }
 
 void Renderer::CreatePipelineState()
 {
+    assert(m_ColorRenderTarget);
+
     m_PipelineState.Reset();
 
     ERR_TRY
@@ -708,7 +721,7 @@ void Renderer::CreatePipelineState()
 	desc.PS.pShaderBytecode = ps.GetCode().data();
 	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 	desc.NumRenderTargets = 1;
-	desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
+	desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
 	desc.DSVFormat = DEPTH_STENCIL_FORMAT;
 	desc.SampleDesc.Count = 1;
 	desc.SampleMask = UINT32_MAX;
@@ -719,6 +732,88 @@ void Renderer::CreatePipelineState()
     SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
 
     ERR_CATCH_MSG(L"Cannot create pipeline state.");
+    } CATCH_PRINT_ERROR(;);
+}
+
+void Renderer::CreatePostprocessingPipelineState()
+{
+    m_PostprocessingRootSignature.Reset();
+    m_PostprocessingPipelineState.Reset();
+
+    ERR_TRY
+    ERR_TRY
+
+    // Root signature
+    {
+        D3D12_ROOT_PARAMETER params[POSTPROCESSING_ROOT_PARAM_COUNT] = {};
+
+        const CD3DX12_DESCRIPTOR_RANGE descRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].DescriptorTable.NumDescriptorRanges = 1;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].DescriptorTable.pDescriptorRanges = &descRange;
+
+		D3D12_ROOT_SIGNATURE_DESC desc = {};
+		desc.NumParameters = (uint32_t)_countof(params);
+        desc.pParameters = params;
+		desc.Flags = //D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+		ComPtr<ID3DBlob> blob;
+		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
+		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+			__uuidof(ID3D12RootSignature), &m_PostprocessingRootSignature));
+        SetD3D12ObjectName(m_PostprocessingRootSignature, L"Postprocessing root signature");
+	}
+
+    Shader vs, ps;
+    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
+    ps.Init(ShaderType::Pixel,  L"Data/PostprocessingPS.hlsl", L"main");
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+	//desc.InputLayout.NumElements = ;
+	//desc.InputLayout.pInputElementDescs = ;
+	desc.pRootSignature = m_PostprocessingRootSignature.Get();
+	desc.VS.BytecodeLength = vs.GetCode().size();
+	desc.VS.pShaderBytecode = vs.GetCode().data();
+	desc.PS.BytecodeLength = ps.GetCode().size();
+	desc.PS.pShaderBytecode = ps.GetCode().data();
+	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	desc.NumRenderTargets = 1;
+	desc.RTVFormats[0] = RENDER_TARGET_FORMAT;
+	desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	desc.SampleDesc.Count = 1;
+	desc.SampleMask = UINT32_MAX;
+
+    desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    desc.RasterizerState.DepthClipEnable = TRUE;
+
+    const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
+        FALSE,FALSE,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_LOGIC_OP_NOOP,
+        D3D12_COLOR_WRITE_ENABLE_ALL };
+    for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        desc.BlendState.RenderTarget[i] = defaultRenderTargetBlendDesc;
+
+    desc.DepthStencilState.DepthEnable = FALSE;
+    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+    desc.DepthStencilState.StencilEnable = FALSE;
+    desc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    desc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
+        D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+    desc.DepthStencilState.FrontFace = defaultStencilOp;
+    desc.DepthStencilState.BackFace = defaultStencilOp;
+
+	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_PostprocessingPipelineState));
+    SetD3D12ObjectName(m_PostprocessingPipelineState, L"Test pipeline state");
+
+    ERR_CATCH_MSG(L"Cannot create postprocessing pipeline state.");
     } CATCH_PRINT_ERROR(;);
 }
 

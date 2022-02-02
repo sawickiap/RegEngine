@@ -108,14 +108,16 @@ void CommandList::SetRenderTargets(RenderingResource* depthStencil, std::initial
 
     if(depthStencil)
     {
+        assert(depthStencil->HasCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE));
         assert(!depthStencil->GetDSV().IsNull());
         DSVDescriptor = DSVDescriptorManager->GetCPUHandle(depthStencil->GetDSV());
     }
     auto RTIt = renderTargets.begin();
-    for(size_t i = 0; i < renderTargets.size(); ++i)
+    for(size_t i = 0; i < renderTargets.size(); ++i, ++RTIt)
     {
         if(*RTIt)
         {
+            assert((*RTIt)->HasCurrentState(D3D12_RESOURCE_STATE_RENDER_TARGET));
             assert(!(*RTIt)->GetRTV().IsNull());
             RTVDescriptors[i] = RTVDescriptorManager->GetCPUHandle((*RTIt)->GetRTV());
         }
@@ -125,7 +127,7 @@ void CommandList::SetRenderTargets(RenderingResource* depthStencil, std::initial
         (UINT)renderTargets.size(),
         RTVDescriptors,
         FALSE, // RTsSingleHandleToDescriptorRange
-        &DSVDescriptor);
+        depthStencil ? &DSVDescriptor : nullptr);
 }
 
 void CommandList::SetRenderTargets(RenderingResource* depthStencil, RenderingResource* renderTarget)

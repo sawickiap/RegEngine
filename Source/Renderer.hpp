@@ -100,11 +100,14 @@ private:
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;
     unique_ptr<Texture> m_StandardTextures[(size_t)StandardTexture::Count];
+    unique_ptr<RenderingResource> m_ColorRenderTarget;
 	ComPtr<ID3D12RootSignature> m_RootSignature;
 	ComPtr<ID3D12PipelineState> m_PipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<OrbitingCamera> m_Camera;
+	ComPtr<ID3D12RootSignature> m_PostprocessingRootSignature;
+	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
 
     std::vector<unique_ptr<Mesh>> m_Meshes;
     // Indices of this array match m_Meshes.
@@ -123,6 +126,7 @@ private:
 	void CreateFrameResources();
 	void CreateResources();
     void CreatePipelineState();
+    void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
     void ClearModel();
     void LoadModel();

@@ -99,5 +99,11 @@
     <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
       <Filter>Shaders\Include</Filter>
     </Text>
+    <Text Include="..\WorkingDir\Data\FullScreenQuadVS.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Data\PostprocessingPS.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
   </ItemGroup>
 </Project>

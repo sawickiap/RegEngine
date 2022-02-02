@@ -25,6 +25,7 @@ public:
     
     ID3D12Resource* GetResource() const { return m_MyRes ? m_MyRes->GetResource() : m_ExternallyOwnedRes; }
     const D3D12_RESOURCE_DESC& GetDesc() const { return m_Desc; }
+    bool HasCurrentState(D3D12_RESOURCE_STATES state) const;
 
     // These can return null descriptors.
     Descriptor GetSRV() const { return m_SRV; }
@@ -33,6 +34,7 @@ public:
     Descriptor GetUAV() const { return m_UAV; }
 
     // You can call these functions only when sure that these descriptors are not null.
+    D3D12_GPU_DESCRIPTOR_HANDLE GetD3D12SRV() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetD3D12RTV() const;
     D3D12_CPU_DESCRIPTOR_HANDLE GetD3D12DSV() const;
     

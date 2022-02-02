@@ -48,6 +48,11 @@ RenderingResource::~RenderingResource()
     g_Renderer->GetSRVDescriptorManager()->FreePersistent(m_SRV);
 }
 
+bool RenderingResource::HasCurrentState(D3D12_RESOURCE_STATES state) const
+{
+    return NewStatesAreSubset(state, m_States);
+}
+
 void RenderingResource::InitExternallyOwned(
     ID3D12Resource* res,
     D3D12_RESOURCE_STATES currentStates,
@@ -63,6 +68,12 @@ void RenderingResource::InitExternallyOwned(
     m_States = currentStates;
 
     InitDescriptors();
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE RenderingResource::GetD3D12SRV() const
+{
+    assert(g_Renderer && g_Renderer->GetSRVDescriptorManager() && !m_SRV.IsNull());
+    return g_Renderer->GetSRVDescriptorManager()->GetGPUHandle(m_SRV);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE RenderingResource::GetD3D12RTV() const
