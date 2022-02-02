@@ -147,6 +147,8 @@
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\WorkingDir\LoadSettings.json" />
+    <None Include="..\WorkingDir\StartupSettings.json" />
     <None Include="Formatters.inl" />
     <None Include="packages.config" />
   </ItemGroup>

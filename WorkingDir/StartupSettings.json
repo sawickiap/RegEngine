@@ -12,8 +12,13 @@
     // 1 = bold, 2 = italic
     "Font.Flags": 0,
 
-    "ShaderResourceDescriptors.Persistent.MaxCount": 1024,
-    "ShaderResourceDescriptors.Temporary.MaxCountPerFrame": 1024,
+    "SRVDescriptors.Persistent.MaxCount": 1024,
+    "SRVDescriptors.Temporary.MaxCountPerFrame": 1024,
+    // Keep in mind that "limit for shader visible sampler heaps is 2048".
+    "SamplerDescriptors.Persistent.MaxCount": 128,
+    "SamplerDescriptors.Temporary.MaxCountPerFrame": 128,
+    "RTVDescriptors.Persistent.MaxCount": 128,
+    "DSVDescriptors.Persistent.MaxCount": 128,
     "ConstantBuffers.Temporary.MaxSizePerFrame": 65536,
     /*
     Level of logging from Assimp library:

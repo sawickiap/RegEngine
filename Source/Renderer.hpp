@@ -7,8 +7,8 @@ class CommandList;
 class RenderingResource;
 class Texture;
 class Mesh;
-struct ShaderResourceDescriptor;
-class ShaderResourceDescriptorManager;
+struct Descriptor;
+class DescriptorManager;
 class TemporaryConstantBufferManager;
 class ShaderCompiler;
 class OrbitingCamera;
@@ -25,10 +25,6 @@ enum class StandardTexture
 
 struct RendererCapabilities
 {
-	UINT m_DescriptorSize_CVB_SRV_UAV = UINT32_MAX;
-	UINT m_DescriptorSize_Sampler = UINT32_MAX;
-	UINT m_DescriptorSize_RTV = UINT32_MAX;
-	UINT m_DescriptorSize_DSV = UINT32_MAX;
 };
 
 struct Entity
@@ -54,7 +50,10 @@ public:
     const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
     D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
-    ShaderResourceDescriptorManager* GetShaderResourceDescriptorManager() { return m_ShaderResourceDescriptorManager.get(); }
+    DescriptorManager* GetSRVDescriptorManager() { return m_SRVDescriptorManager.get(); }
+    DescriptorManager* GetSamplerDescriptorManager() { return m_SamplerDescriptorManager.get(); }
+    DescriptorManager* GetRTVDescriptorManager() { return m_RTVDescriptorManager.get(); }
+    DescriptorManager* GetDSVDescriptorManager() { return m_DSVDescriptorManager.get(); }
     TemporaryConstantBufferManager* GetTemporaryConstantBufferManager() { return m_TemporaryConstantBufferManager.get(); }
     ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
     OrbitingCamera* GetCamera() { return m_Camera.get(); }
@@ -90,13 +89,14 @@ private:
 	ComPtr<ID3D12Fence> m_Fence;
 	UINT64 m_NextFenceValue = 1;
 	ComPtr<IDXGISwapChain3> m_SwapChain;
-	ComPtr<ID3D12DescriptorHeap> m_SwapChainRTVDescriptors;
-	unique_ptr<RenderingResource> m_DepthTexture;
-	ComPtr<ID3D12DescriptorHeap> m_DSVDescriptor;
-    unique_ptr<ShaderResourceDescriptorManager> m_ShaderResourceDescriptorManager;
+    unique_ptr<DescriptorManager> m_SRVDescriptorManager;
+    unique_ptr<DescriptorManager> m_SamplerDescriptorManager;
+    unique_ptr<DescriptorManager> m_RTVDescriptorManager;
+    unique_ptr<DescriptorManager> m_DSVDescriptorManager;
     unique_ptr<TemporaryConstantBufferManager> m_TemporaryConstantBufferManager;
     unique_ptr<ShaderCompiler> m_ShaderCompiler;
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
+	unique_ptr<RenderingResource> m_DepthTexture;
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;
     unique_ptr<Texture> m_StandardTextures[(size_t)StandardTexture::Count];

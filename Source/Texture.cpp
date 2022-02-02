@@ -7,7 +7,7 @@
 
 Texture::~Texture()
 {
-    g_Renderer->GetShaderResourceDescriptorManager()->FreePersistentDescriptor(m_Descriptor);
+    g_Renderer->GetSRVDescriptorManager()->FreePersistent(m_Descriptor);
 }
 
 void Texture::LoadFromFile(const wstr_view& filePath)
@@ -171,8 +171,8 @@ void Texture::CreateDescriptor()
     // If not true, we need a conversion from D3D12_RESOURCE_DIMENSION to D3D12_SRV_DIMENSION.
     CHECK_BOOL(m_Desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE2D);
 
-    ShaderResourceDescriptorManager* SRVDescManager = g_Renderer->GetShaderResourceDescriptorManager();
-    m_Descriptor = SRVDescManager->AllocatePersistentDescriptor(1);
+    DescriptorManager* SRVDescManager = g_Renderer->GetSRVDescriptorManager();
+    m_Descriptor = SRVDescManager->AllocatePersistent(1);
 
     /*
     D3D12_SHADER_RESOURCE_VIEW_DESC SRVDesc = {
@@ -190,5 +190,5 @@ void Texture::CreateDescriptor()
         .ResourceMinLODClamp = 0.f};
     */
     g_Renderer->GetDevice()->CreateShaderResourceView(
-        m_Resource.Get(), nullptr, SRVDescManager->GetDescriptorCPUHandle(m_Descriptor));
+        m_Resource.Get(), nullptr, SRVDescManager->GetCPUHandle(m_Descriptor));
 }

@@ -5,83 +5,111 @@
 
 extern UintSetting g_FrameCount;
 
-static UintSetting g_PersistentDescriptorMaxCount(SettingCategory::Startup,
-    "ShaderResourceDescriptors.Persistent.MaxCount", 0);
-static UintSetting g_TemporaryDescriptorMaxCountPerFrame(SettingCategory::Startup,
-    "ShaderResourceDescriptors.Temporary.MaxCountPerFrame", 0);
+static const wchar_t* DESCRIPTOR_HEAP_TYPE_NAMES[] = {
+    L"CBV_SRV_UAV", L"SAMPLER", L"RTV", L"DSV",
+};
+static_assert(_countof(DESCRIPTOR_HEAP_TYPE_NAMES) == (size_t)D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES);
 
-void ShaderResourceDescriptorManager::Init()
+void DescriptorManager::Init(
+    D3D12_DESCRIPTOR_HEAP_TYPE type,
+    uint32_t persistentDescriptorMaxCount,
+    uint32_t temporaryDescriptorMaxCountPerFrame)
 {
     assert(g_Renderer);
+    assert(persistentDescriptorMaxCount > 0 || temporaryDescriptorMaxCountPerFrame > 0);
 
-    CHECK_BOOL(g_PersistentDescriptorMaxCount.GetValue() > 0);
-    CHECK_BOOL(g_TemporaryDescriptorMaxCountPerFrame.GetValue() > 0);
-    m_TemporaryDescriptorOffset = g_PersistentDescriptorMaxCount.GetValue();
+    m_Type = type;
+    m_PersistentDescriptorMaxCount = persistentDescriptorMaxCount;
+    m_TemporaryDescriptorMaxCountPerFrame = temporaryDescriptorMaxCountPerFrame;
     
-    m_TemporaryDescriptorRingBuffer.Init(
-        g_TemporaryDescriptorMaxCountPerFrame.GetValue() * g_FrameCount.GetValue(),
-        g_FrameCount.GetValue());
+    if(temporaryDescriptorMaxCountPerFrame)
+    {
+        m_TemporaryDescriptorRingBuffer.Init(
+            temporaryDescriptorMaxCountPerFrame * g_FrameCount.GetValue(),
+            g_FrameCount.GetValue());
+    }
 
     // Create m_DescriptorHeap.
     {
         D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-        desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-        desc.NumDescriptors = m_TemporaryDescriptorOffset +
-            g_TemporaryDescriptorMaxCountPerFrame.GetValue() * g_FrameCount.GetValue();
-        desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+        desc.Type = type;
+        desc.NumDescriptors = persistentDescriptorMaxCount +
+            temporaryDescriptorMaxCountPerFrame * g_FrameCount.GetValue();
+        if(type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER)
+            desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         CHECK_HR(g_Renderer->GetDevice()->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_DescriptorHeap)));
-        SetD3D12ObjectName(m_DescriptorHeap, L"Shader resource descriptor heap");
+        SetD3D12ObjectName(m_DescriptorHeap, std::format(L"{} descriptor heap",
+            DESCRIPTOR_HEAP_TYPE_NAMES[(uint32_t)type]));
 
         m_GPUHandleForHeapStart = m_DescriptorHeap->GetGPUDescriptorHandleForHeapStart();
         m_CPUHandleForHeapStart = m_DescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-        m_DescriptorSize = g_Renderer->GetCapabilities().m_DescriptorSize_CVB_SRV_UAV;
+        m_DescriptorSize = g_Renderer->GetDevice()->GetDescriptorHandleIncrementSize(type);
     }
 
     // Create m_VirtualBlock.
+    if(persistentDescriptorMaxCount)
     {
         D3D12MA::VIRTUAL_BLOCK_DESC desc = {};
-        desc.Size = g_PersistentDescriptorMaxCount.GetValue();
+        desc.Size = persistentDescriptorMaxCount;
         CHECK_HR(D3D12MA::CreateVirtualBlock(&desc, &m_VirtualBlock));
     }
 }
 
-void ShaderResourceDescriptorManager::NewFrame()
+DescriptorManager::~DescriptorManager()
 {
-    m_TemporaryDescriptorRingBuffer.NewFrame();
+    if(m_VirtualBlock)
+    {
+        D3D12MA::StatInfo stats = {};
+        m_VirtualBlock->CalculateStats(&stats);
+        assert(stats.AllocationCount == 0 && "Unfreed persistent descriptors. Inspect m_Type to check their type.");
+    }
 }
 
-ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocatePersistentDescriptor(uint32_t descriptorCount)
+void DescriptorManager::NewFrame()
 {
+    if(m_TemporaryDescriptorMaxCountPerFrame > 0)
+        m_TemporaryDescriptorRingBuffer.NewFrame();
+}
+
+Descriptor DescriptorManager::AllocatePersistent(uint32_t descriptorCount)
+{
+    assert(m_PersistentDescriptorMaxCount);
     D3D12MA::VIRTUAL_ALLOCATION_DESC virtualAllocDesc = {};
     virtualAllocDesc.Size = descriptorCount;
-    ShaderResourceDescriptor descriptor;
+    Descriptor descriptor;
     CHECK_HR(m_VirtualBlock->Allocate(&virtualAllocDesc, &descriptor.m_Index));
     return descriptor;
 }
 
-ShaderResourceDescriptor ShaderResourceDescriptorManager::AllocateTemporaryDescriptor(uint32_t descriptorCount)
+Descriptor DescriptorManager::AllocateTemporary(uint32_t descriptorCount)
 {
-    ShaderResourceDescriptor descriptor;
+    assert(m_TemporaryDescriptorMaxCountPerFrame);
+    Descriptor descriptor;
     CHECK_BOOL(m_TemporaryDescriptorRingBuffer.Allocate(descriptorCount, descriptor.m_Index));
-    descriptor.m_Index += m_TemporaryDescriptorOffset;
+    descriptor.m_Index += m_PersistentDescriptorMaxCount;
     return descriptor;
 }
 
-void ShaderResourceDescriptorManager::FreePersistentDescriptor(ShaderResourceDescriptor desc)
+void DescriptorManager::FreePersistent(Descriptor desc)
 {
     if(!desc.IsNull())
+    {
+        assert(m_PersistentDescriptorMaxCount);
         m_VirtualBlock->FreeAllocation(desc.m_Index);
+    }
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE ShaderResourceDescriptorManager::GetDescriptorGPUHandle(ShaderResourceDescriptor desc)
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorManager::GetGPUHandle(Descriptor desc)
 {
+    assert(!desc.IsNull());
     return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_GPUHandleForHeapStart,
         (int32_t)desc.m_Index, // offsetInDescriptors
         m_DescriptorSize); // descriptorIncrementSize
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE ShaderResourceDescriptorManager::GetDescriptorCPUHandle(ShaderResourceDescriptor desc)
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle(Descriptor desc)
 {
+    assert(!desc.IsNull());
     return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_CPUHandleForHeapStart,
         (int32_t)desc.m_Index, // offsetInDescriptors
         m_DescriptorSize); // descriptorIncrementSize

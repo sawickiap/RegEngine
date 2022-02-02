@@ -1,6 +1,9 @@
 #include "BaseUtils.hpp"
 #include "CommandList.hpp"
+#include "RenderingResource.hpp"
+#include "Descriptors.hpp"
 #include "Settings.hpp"
+#include "Renderer.hpp"
 #include <pix3.h>
 
 static BoolSetting g_UsePIXEvents(SettingCategory::Load, "UsePIXEvents", true);
@@ -9,10 +12,16 @@ void CommandList::Init(
     ID3D12CommandAllocator* cmdAllocator,
     ID3D12GraphicsCommandList* cmdList)
 {
+    assert(g_Renderer);
     assert(m_CmdList == nullptr);
     m_CmdList = cmdList;
 
     CHECK_HR(m_CmdList->Reset(cmdAllocator, nullptr));
+
+    ID3D12DescriptorHeap* descriptorHeaps[] = {
+        g_Renderer->GetSRVDescriptorManager()->GetHeap(),
+        g_Renderer->GetSamplerDescriptorManager()->GetHeap()};
+    m_CmdList->SetDescriptorHeaps(2, descriptorHeaps);
 }
 
 void CommandList::Execute(ID3D12CommandQueue* cmdQueue)
@@ -89,34 +98,37 @@ void CommandList::SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY primitiveTopolog
     }
 }
 
-void CommandList::SetDescriptorHeaps(
-    ID3D12DescriptorHeap* descriptorHeap_CBV_SRV_UAV,
-    ID3D12DescriptorHeap* descriptorHeap_Sampler)
+void CommandList::SetRenderTargets(RenderingResource* depthStencil, std::initializer_list<RenderingResource*> renderTargets)
 {
-    assert(m_CmdList);
-    if(descriptorHeap_CBV_SRV_UAV != m_State.m_DescriptorHeap_CBV_SRV_UAV ||
-        descriptorHeap_Sampler != m_State.m_DescriptorHeap_Sampler)
-    {
-        m_State.m_DescriptorHeap_CBV_SRV_UAV = descriptorHeap_CBV_SRV_UAV;
-        m_State.m_DescriptorHeap_Sampler = descriptorHeap_Sampler;
-        /*
-        Documentation of SetDescriptorHeaps says:
+    DescriptorManager* const RTVDescriptorManager = g_Renderer->GetRTVDescriptorManager();
+    DescriptorManager* const DSVDescriptorManager = g_Renderer->GetDSVDescriptorManager();
 
-        Only one descriptor heap of each type can be set at one time, which means a
-        maximum of 2 heaps (one sampler, one CBV/SRV/UAV) can be set at one time.
-        All previously set heaps are unset by the call. At most one heap of each
-        shader-visible type can be set in the call.
-        */
-        if(m_State.m_DescriptorHeap_CBV_SRV_UAV && m_State.m_DescriptorHeap_Sampler)
-        {
-            ID3D12DescriptorHeap* heaps[] = {m_State.m_DescriptorHeap_CBV_SRV_UAV, m_State.m_DescriptorHeap_Sampler};
-            m_CmdList->SetDescriptorHeaps(2, heaps);
-        }
-        else if(m_State.m_DescriptorHeap_CBV_SRV_UAV)
-            m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_CBV_SRV_UAV);
-        else if(m_State.m_DescriptorHeap_Sampler)
-            m_CmdList->SetDescriptorHeaps(1, &m_State.m_DescriptorHeap_Sampler);
-        else
-            m_CmdList->SetDescriptorHeaps(0, nullptr);
+    D3D12_CPU_DESCRIPTOR_HANDLE RTVDescriptors[RENDER_TARGET_MAX_COUNT] = {};
+    D3D12_CPU_DESCRIPTOR_HANDLE DSVDescriptor = {};
+
+    if(depthStencil)
+    {
+        assert(!depthStencil->GetDSV().IsNull());
+        DSVDescriptor = DSVDescriptorManager->GetCPUHandle(depthStencil->GetDSV());
     }
+    auto RTIt = renderTargets.begin();
+    for(size_t i = 0; i < renderTargets.size(); ++i)
+    {
+        if(*RTIt)
+        {
+            assert(!(*RTIt)->GetRTV().IsNull());
+            RTVDescriptors[i] = RTVDescriptorManager->GetCPUHandle((*RTIt)->GetRTV());
+        }
+    }
+
+    m_CmdList->OMSetRenderTargets(
+        (UINT)renderTargets.size(),
+        RTVDescriptors,
+        FALSE, // RTsSingleHandleToDescriptorRange
+        &DSVDescriptor);
+}
+
+void CommandList::SetRenderTargets(RenderingResource* depthStencil, RenderingResource* renderTarget)
+{
+    SetRenderTargets(depthStencil, {renderTarget});
 }

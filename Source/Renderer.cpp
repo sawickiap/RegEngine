@@ -43,11 +43,28 @@ static UintSetting g_AssimpLogSeverity(SettingCategory::Startup, "Assimp.LogSeve
 static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFilePath");
 static BoolSetting g_EnableExperimentalShaderModels(SettingCategory::Startup, "EnableExperimentalShaderModels", true);
 
+static UintSetting g_SRVPersistentDescriptorMaxCount(SettingCategory::Startup,
+    "SRVDescriptors.Persistent.MaxCount", 0);
+static UintSetting g_SRVTemporaryDescriptorMaxCountPerFrame(SettingCategory::Startup,
+    "SRVDescriptors.Temporary.MaxCountPerFrame", 0);
+static UintSetting g_SamplerPersistentDescriptorMaxCount(SettingCategory::Startup,
+    "SamplerDescriptors.Persistent.MaxCount", 0);
+static UintSetting g_SamplerTemporaryDescriptorMaxCountPerFrame(SettingCategory::Startup,
+    "SamplerDescriptors.Temporary.MaxCountPerFrame", 0);
+static UintSetting g_RTVPersistentDescriptorMaxCount(SettingCategory::Startup,
+    "RTVDescriptors.Persistent.MaxCount", 0);
+static UintSetting g_DSVPersistentDescriptorMaxCount(SettingCategory::Startup,
+    "DSVDescriptors.Persistent.MaxCount", 0);
+
+
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
+static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLight", vec3(0.f, 1.f, 0.f));
+static VecSetting<vec3> g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
+static VecSetting<vec3> g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
 
 Renderer* g_Renderer;
 
@@ -61,11 +78,18 @@ struct PerFrameConstants
     uint32_t m_FrameIndex;
     float m_SceneTime;
     uint32_t _padding0[2];
+    packed_vec3 m_DirToLight_View;
+    uint32_t _padding1;
+	packed_vec3 m_LightColor;
+	uint32_t _padding2;
+	packed_vec3 m_AmbientColor;
+	uint32_t _padding3;
 };
 
 struct PerObjectConstants
 {
     packed_mat4 m_WorldViewProj;
+    packed_mat4 m_WorldView;
 };
 
 enum ROOT_PARAM
@@ -195,7 +219,16 @@ Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd)
 void Renderer::Init()
 {
     ERR_TRY;
+
+    LogMessage(L"Initializing renderer...\n");
+
     CHECK_BOOL(g_FrameCount.GetValue() >= 2 && g_FrameCount.GetValue() <= MAX_FRAME_COUNT);
+    CHECK_BOOL(g_SRVPersistentDescriptorMaxCount.GetValue() > 0);
+    CHECK_BOOL(g_SRVTemporaryDescriptorMaxCountPerFrame.GetValue() > 0);
+    CHECK_BOOL(g_SamplerPersistentDescriptorMaxCount.GetValue() > 0);
+    CHECK_BOOL(g_SamplerTemporaryDescriptorMaxCountPerFrame.GetValue() > 0);
+    CHECK_BOOL(g_RTVPersistentDescriptorMaxCount.GetValue() > 0);
+    CHECK_BOOL(g_DSVPersistentDescriptorMaxCount.GetValue() > 0);
 
     if(g_EnableExperimentalShaderModels.GetValue())
         D3D12EnableExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
@@ -203,8 +236,26 @@ void Renderer::Init()
 	CreateDevice();
     CreateMemoryAllocator();
 	LoadCapabilities();
-    m_ShaderResourceDescriptorManager = std::make_unique<ShaderResourceDescriptorManager>();
-    m_ShaderResourceDescriptorManager->Init();
+    m_SRVDescriptorManager = std::make_unique<DescriptorManager>();
+    m_SRVDescriptorManager->Init(
+        D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+        g_SRVPersistentDescriptorMaxCount.GetValue(),
+        g_SRVTemporaryDescriptorMaxCountPerFrame.GetValue());
+    m_SamplerDescriptorManager = std::make_unique<DescriptorManager>();
+    m_SamplerDescriptorManager->Init(
+        D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+        g_SamplerPersistentDescriptorMaxCount.GetValue(),
+        g_SamplerTemporaryDescriptorMaxCountPerFrame.GetValue());
+    m_RTVDescriptorManager = std::make_unique<DescriptorManager>();
+    m_RTVDescriptorManager->Init(
+        D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+        g_RTVPersistentDescriptorMaxCount.GetValue(),
+        0);
+    m_DSVDescriptorManager = std::make_unique<DescriptorManager>();
+    m_DSVDescriptorManager->Init(
+        D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+        g_DSVPersistentDescriptorMaxCount.GetValue(),
+        0);
     m_TemporaryConstantBufferManager = std::make_unique<TemporaryConstantBufferManager>();
     m_TemporaryConstantBufferManager->Init();
     m_ShaderCompiler= std::make_unique<ShaderCompiler>();
@@ -236,6 +287,9 @@ Renderer::~Renderer()
     }
 
     ClearModel();
+
+    for(uint32_t i = g_FrameCount.GetValue(); i--; )
+        m_FrameResources[i].m_BackBuffer.reset();
 }
 
 void Renderer::Reload()
@@ -282,7 +336,10 @@ void Renderer::Render()
 	FrameResources& frameRes = m_FrameResources[m_FrameIndex];
     WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
 
-    m_ShaderResourceDescriptorManager->NewFrame();
+    m_SRVDescriptorManager->NewFrame();
+    m_SamplerDescriptorManager->NewFrame();
+    m_RTVDescriptorManager->NewFrame();
+    m_DSVDescriptorManager->NewFrame();
     m_TemporaryConstantBufferManager->NewFrame();
 
     CommandList cmdList;
@@ -290,33 +347,30 @@ void Renderer::Render()
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
-        cmdList.SetDescriptorHeaps(m_ShaderResourceDescriptorManager->GetDescriptorHeap(), nullptr);
-
-        frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+        frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
         float time = (float)GetTickCount() * 1e-3f;
 	    //float pos = fmod(time * 100.f, (float)SIZE_X);
-        const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
-		    m_SwapChainRTVDescriptors->GetCPUDescriptorHandleForHeapStart(),
-		    (INT)m_FrameIndex, m_Capabilities.m_DescriptorSize_RTV};
-        const D3D12_CPU_DESCRIPTOR_HANDLE dsvDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE{
-            m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart()};
 
         {
             PIX_EVENT_SCOPE(cmdList, L"Clear");
 
 	        const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
-	        cmdList.GetCmdList()->ClearRenderTargetView(rtvDescriptorHandle, clearRGBA, 0, nullptr);
+	        cmdList.GetCmdList()->ClearRenderTargetView(
+                frameRes.m_BackBuffer->GetD3D12RTV(),
+                clearRGBA,
+                0,
+                nullptr);
             
             cmdList.GetCmdList()->ClearDepthStencilView(
-                dsvDescriptorHandle,
+                m_DepthTexture->GetD3D12DSV(),
                 D3D12_CLEAR_FLAG_DEPTH,
                 0.f, // depth
                 0, // stencil
                 0, nullptr); // NumRects, prects
         }
 
-	    cmdList.GetCmdList()->OMSetRenderTargets(1, &rtvDescriptorHandle, TRUE, &dsvDescriptorHandle);
+        cmdList.SetRenderTargets(m_DepthTexture.get(), frameRes.m_BackBuffer.get());
 
         if(m_PipelineState && m_RootSignature)
         {
@@ -325,9 +379,15 @@ void Renderer::Render()
 
             // Set per-frame constants.
             {
+                const vec3 dirToLight_World = g_DirectionToLight.GetValue();
+                const vec3 dirToLight_View = glm::normalize(vec3(m_Camera->GetView() * vec4(dirToLight_World, 0.f)));
+
                 PerFrameConstants myData = {};
                 myData.m_FrameIndex = m_FrameIndex;
                 myData.m_SceneTime = time;
+                myData.m_DirToLight_View = dirToLight_View;
+                myData.m_LightColor = g_LightColor.GetValue();
+                myData.m_AmbientColor = g_AmbientColor.GetValue();
 
                 void* mappedPtr = nullptr;
                 D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle;
@@ -374,7 +434,7 @@ void Renderer::Render()
 	    cmdList->ClearRenderTargetView(rtvDescriptorHandle, whiteRGBA, 1, &clearRect);
 	    */
 
-        frameRes.m_BackBuffer->SetStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
+        frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
     cmdList.Execute(m_CmdQueue.Get());
 
@@ -402,10 +462,6 @@ void Renderer::CreateMemoryAllocator()
 
 void Renderer::LoadCapabilities()
 {
-	m_Capabilities.m_DescriptorSize_CVB_SRV_UAV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	m_Capabilities.m_DescriptorSize_Sampler = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
-	m_Capabilities.m_DescriptorSize_RTV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	m_Capabilities.m_DescriptorSize_DSV = m_Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 }
 
 void Renderer::CreateCommandQueues()
@@ -454,14 +510,11 @@ void Renderer::CreateFrameResources()
 	D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 	desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	desc.NumDescriptors = g_FrameCount.GetValue();
-	CHECK_HR(m_Device->CreateDescriptorHeap(&desc, __uuidof(ID3D12DescriptorHeap), &m_SwapChainRTVDescriptors));
-    SetD3D12ObjectName(m_SwapChainRTVDescriptors, L"Swap chain RTV descriptors");
 
 	HANDLE fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 	CHECK_BOOL(fenceEvent);
 	m_FenceEvent.reset(fenceEvent);
 
-	D3D12_CPU_DESCRIPTOR_HANDLE backBufferRtvHandle = m_SwapChainRTVDescriptors->GetCPUDescriptorHandleForHeapStart();
 	for(uint32_t i = 0; i < g_FrameCount.GetValue(); ++i)
 	{
 		CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -474,10 +527,6 @@ void Renderer::CreateFrameResources()
 		CHECK_HR(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
         m_FrameResources[i].m_BackBuffer = std::make_unique<RenderingResource>();
         m_FrameResources[i].m_BackBuffer->InitExternallyOwned(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
-
-		m_Device->CreateRenderTargetView(m_FrameResources[i].m_BackBuffer->GetResource(), nullptr, backBufferRtvHandle);
-		
-		backBufferRtvHandle.ptr += m_Capabilities.m_DescriptorSize_RTV;
 	}
 }
 
@@ -555,17 +604,6 @@ void Renderer::CreateResources()
         clearValue.DepthStencil.Depth = 0.f;
         m_DepthTexture = std::make_unique<RenderingResource>();
         m_DepthTexture->Init(resDesc, D3D12_RESOURCE_STATE_DEPTH_WRITE, L"Depth", &clearValue);
-
-	    D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-	    descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
-	    descHeapDesc.NumDescriptors = 1;
-	    CHECK_HR(m_Device->CreateDescriptorHeap(&descHeapDesc, IID_PPV_ARGS(&m_DSVDescriptor)));
-        SetD3D12ObjectName(m_DSVDescriptor, L"DSV descriptor");
-
-        D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
-        dsvDesc.Format = resDesc.Format;
-        dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
-        m_Device->CreateDepthStencilView(m_DepthTexture->GetResource(), &dsvDesc, m_DSVDescriptor->GetCPUDescriptorHandleForHeapStart());
     }
 
     /*
@@ -771,6 +809,7 @@ void Renderer::LoadModel()
             aiProcess_JoinIdenticalVertices |
             aiProcess_SortByPType |
             aiProcess_FlipWindingOrder |
+            aiProcess_GenSmoothNormals |
             aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
         // aiProcess_CalcTangentSpace
         // aiProcess_MakeLeftHanded
@@ -820,13 +859,16 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
     CHECK_BOOL(assimpMesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE);
     CHECK_BOOL(assimpMesh->HasTextureCoords(0) || !assimpMesh->HasTextureCoords(1));
     CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
+    CHECK_BOOL(assimpMesh->HasNormals());
 
     std::vector<Vertex> vertices(vertexCount);
     for(uint32_t i = 0; i < vertexCount; ++i)
     {
         const aiVector3D pos = assimpMesh->mVertices[i];
         const aiVector3D texCoord = assimpMesh->mTextureCoords[0][i];
+        const aiVector3D normal = assimpMesh->mNormals[i];
         vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
+        vertices[i].m_Normal = packed_vec3(normal.x, normal.z, normal.y); // Same here.
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
@@ -936,6 +978,7 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
     {
         PerObjectConstants perObjConstants = {};
         perObjConstants.m_WorldViewProj = m_Camera->GetViewProjection() * entityXform;
+        perObjConstants.m_WorldView = m_Camera->GetView() * entityXform;
 
         void* perObjectConstantsPtr = nullptr;
         D3D12_GPU_DESCRIPTOR_HANDLE perObjectConstantsDescriptorHandle;
@@ -962,12 +1005,12 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     if(texture)
     {
         textureDescriptorHandle =
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_Textures[materialIndex]->GetDescriptor());
+            m_SRVDescriptorManager->GetGPUHandle(m_Textures[materialIndex]->GetDescriptor());
     }
     else
     {
         textureDescriptorHandle =
-            m_ShaderResourceDescriptorManager->GetDescriptorGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
+            m_SRVDescriptorManager->GetGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
     }
     cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
 

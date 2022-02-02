@@ -72,12 +72,12 @@ void TemporaryConstantBufferManager::CreateBuffer(uint32_t size,
     D3D12_GPU_VIRTUAL_ADDRESS newBufGPUVA;
     CreateBuffer(alignedSize, outMappedPtr, newBufGPUVA);
     
-    ShaderResourceDescriptorManager* const descMgr = g_Renderer->GetShaderResourceDescriptorManager();
-    const ShaderResourceDescriptor descriptor = descMgr->AllocateTemporaryDescriptor(1);
+    DescriptorManager* const descMgr = g_Renderer->GetSRVDescriptorManager();
+    const Descriptor descriptor = descMgr->AllocateTemporary(1);
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC CBVDesc = {};
     CBVDesc.BufferLocation = newBufGPUVA;
     CBVDesc.SizeInBytes = alignedSize;
-    g_Renderer->GetDevice()->CreateConstantBufferView(&CBVDesc, descMgr->GetDescriptorCPUHandle(descriptor));
-    outCBVDescriptorHandle = descMgr->GetDescriptorGPUHandle(descriptor);
+    g_Renderer->GetDevice()->CreateConstantBufferView(&CBVDesc, descMgr->GetCPUHandle(descriptor));
+    outCBVDescriptorHandle = descMgr->GetGPUHandle(descriptor);
 }

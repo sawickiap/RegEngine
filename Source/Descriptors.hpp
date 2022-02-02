@@ -3,11 +3,11 @@
 #include "MultiFrameRingBuffer.hpp"
 
 /*
-Represents a single or a sequence of several shader-visible CBV/SRV/UAV
-descriptors, allocated from ShaderResourceDescriptorManager.
+Represents a single or a sequence of several shader-visible descriptors,
+allocated from ShaderResourceDescriptorManager.
 A lightweight object to be passed by value.
 */
-struct ShaderResourceDescriptor
+struct Descriptor
 {
     uint64_t m_Index = UINT64_MAX;
 
@@ -15,7 +15,7 @@ struct ShaderResourceDescriptor
 };
 
 /*
-Represents a collection of shader-visible CBV/SRV/UAV descriptors.
+Represents a collection of descriptors.
 There is only one all-encompassing ID3D12DescriptorHeap from which you can
 allocate descriptors of two types:
 
@@ -26,36 +26,43 @@ allocate descriptors of two types:
 
 Space in m_DescriptorHeap is divided into two sections:
 
-1. (g_PersistentDescriptorMaxCount) for persistent descriptors, managed by
+1. (persistentDescriptorMaxCount) for persistent descriptors, managed by
    D3D12MA::VirtualAllocator.
-2. (g_TemporaryDescriptorMaxCountPerFrame * g_FrameCount) for temporary
+2. (temporaryDescriptorMaxCountPerFrame * g_FrameCount) for temporary
    descriptors, managed by MultiFrameRingBuffer.
 */
-class ShaderResourceDescriptorManager
+class DescriptorManager
 {
 public:
-    void Init();
+    void Init(
+        D3D12_DESCRIPTOR_HEAP_TYPE type,
+        uint32_t persistentDescriptorMaxCount,
+        uint32_t temporaryDescriptorMaxCountPerFrame);
+    ~DescriptorManager();
     void NewFrame();
 
-    ID3D12DescriptorHeap* GetDescriptorHeap() { return m_DescriptorHeap.Get(); }
+    ID3D12DescriptorHeap* GetHeap() { return m_DescriptorHeap.Get(); }
 
-    ShaderResourceDescriptor AllocatePersistentDescriptor(uint32_t descriptorCount);
-    ShaderResourceDescriptor AllocateTemporaryDescriptor(uint32_t descriptorCount);
-    void FreePersistentDescriptor(ShaderResourceDescriptor desc);
+    Descriptor AllocatePersistent(uint32_t descriptorCount);
+    Descriptor AllocateTemporary(uint32_t descriptorCount);
+    void FreePersistent(Descriptor desc);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE GetDescriptorGPUHandle(ShaderResourceDescriptor desc);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorCPUHandle(ShaderResourceDescriptor desc);
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(Descriptor desc);
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(Descriptor desc);
 
 private:
+    D3D12_DESCRIPTOR_HEAP_TYPE m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
+    uint32_t m_PersistentDescriptorMaxCount = UINT32_MAX;
+    uint32_t m_TemporaryDescriptorMaxCountPerFrame = UINT32_MAX;
     ComPtr<ID3D12DescriptorHeap> m_DescriptorHeap;
     D3D12_GPU_DESCRIPTOR_HANDLE m_GPUHandleForHeapStart = { UINT64_MAX };
     D3D12_CPU_DESCRIPTOR_HANDLE m_CPUHandleForHeapStart = { UINT64_MAX };
     // Size of one descriptor, in bytes.
     // Copy of g_Renderer->GetCapabilities().m_DescriptorSize_CVB_SRV_UAV.
     uint32_t m_DescriptorSize = UINT32_MAX;
+    // Not null if m_PersistentDescriptorMaxCount > 0.
     // Unit used in this allocator is entire descriptors NOT single bytes.
     ComPtr<D3D12MA::VirtualBlock> m_VirtualBlock;
-    // These offsets and sizes are also in descriptors.
-    uint32_t m_TemporaryDescriptorOffset = UINT32_MAX;
+    // Initialized if m_TemporaryDescriptorMaxCountPerFrame > 0.
     MultiFrameRingBuffer<uint64_t> m_TemporaryDescriptorRingBuffer;
 };

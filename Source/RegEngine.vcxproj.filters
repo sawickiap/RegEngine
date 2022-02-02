@@ -42,6 +42,9 @@
     <Filter Include="Shaders\Include">
       <UniqueIdentifier>{a89f3837-609c-4538-b9da-efd7d780a7ca}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ConfigFiles">
+      <UniqueIdentifier>{8d665066-43b7-4386-919a-4684141589c2}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
@@ -79,6 +82,12 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="Formatters.inl" />
+    <None Include="..\WorkingDir\LoadSettings.json">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\WorkingDir\StartupSettings.json">
+      <Filter>ConfigFiles</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Text Include="..\WorkingDir\Data\PS.hlsl">

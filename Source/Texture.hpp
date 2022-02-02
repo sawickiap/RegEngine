@@ -20,7 +20,7 @@ public:
     ID3D12Resource* GetResource() const { return m_Resource.Get(); }
     const D3D12_RESOURCE_DESC& GetDesc() const { return m_Desc; }
     uvec2 GetSize() const { return uvec2((uint32_t)GetDesc().Width, (uint32_t)GetDesc().Height); }
-    ShaderResourceDescriptor GetDescriptor() const { return m_Descriptor; }
+    Descriptor GetDescriptor() const { return m_Descriptor; }
 
 private:
     // May be null in case m_Resource was created by DirectXTK12, without D3D12MA.
@@ -28,7 +28,7 @@ private:
     ComPtr<D3D12MA::Allocation> m_Allocation;
     ComPtr<ID3D12Resource> m_Resource;
     D3D12_RESOURCE_DESC m_Desc = {};
-    ShaderResourceDescriptor m_Descriptor;
+    Descriptor m_Descriptor;
 
     void CreateDescriptor();
 };

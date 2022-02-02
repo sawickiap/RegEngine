@@ -36,6 +36,16 @@ void RenderingResource::Init(
     
     if(!name.empty())
         SetD3D12ObjectName(m_MyRes->GetResource(), name);
+
+    InitDescriptors();
+}
+
+RenderingResource::~RenderingResource()
+{
+    g_Renderer->GetDSVDescriptorManager()->FreePersistent(m_DSV);
+    g_Renderer->GetRTVDescriptorManager()->FreePersistent(m_RTV);
+    g_Renderer->GetSRVDescriptorManager()->FreePersistent(m_UAV);
+    g_Renderer->GetSRVDescriptorManager()->FreePersistent(m_SRV);
 }
 
 void RenderingResource::InitExternallyOwned(
@@ -51,9 +61,23 @@ void RenderingResource::InitExternallyOwned(
     else
         m_Desc = res->GetDesc();
     m_States = currentStates;
+
+    InitDescriptors();
 }
 
-void RenderingResource::SetStates(CommandList& cmdList, D3D12_RESOURCE_STATES states)
+D3D12_CPU_DESCRIPTOR_HANDLE RenderingResource::GetD3D12RTV() const
+{
+    assert(g_Renderer && g_Renderer->GetRTVDescriptorManager() && !m_RTV.IsNull());
+    return g_Renderer->GetRTVDescriptorManager()->GetCPUHandle(m_RTV);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE RenderingResource::GetD3D12DSV() const
+{
+    assert(g_Renderer && g_Renderer->GetDSVDescriptorManager() && !m_DSV.IsNull());
+    return g_Renderer->GetDSVDescriptorManager()->GetCPUHandle(m_DSV);
+}
+
+void RenderingResource::TransitionToStates(CommandList& cmdList, D3D12_RESOURCE_STATES states)
 {
     if(!NewStatesAreSubset(states, m_States))
     {
@@ -61,5 +85,34 @@ void RenderingResource::SetStates(CommandList& cmdList, D3D12_RESOURCE_STATES st
             GetResource(), m_States, states);
         cmdList.GetCmdList()->ResourceBarrier(1, &barrier);
         m_States = states;
+    }
+}
+
+void RenderingResource::InitDescriptors()
+{
+    DescriptorManager* const SRVManager = g_Renderer->GetSRVDescriptorManager();
+    DescriptorManager* const RTVManager = g_Renderer->GetRTVDescriptorManager();
+    DescriptorManager* const DSVManager = g_Renderer->GetDSVDescriptorManager();
+    ID3D12Device* dev = g_Renderer->GetDevice();
+    
+    if((m_Desc.Flags & D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE) == 0)
+    {
+        m_SRV = SRVManager->AllocatePersistent(1);
+        dev->CreateShaderResourceView(GetResource(), nullptr, SRVManager->GetCPUHandle(m_SRV));
+    }
+    if((m_Desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0)
+    {
+        m_UAV = SRVManager->AllocatePersistent(1);
+        dev->CreateUnorderedAccessView(GetResource(), nullptr, nullptr, SRVManager->GetCPUHandle(m_UAV));
+    }
+    if((m_Desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET) != 0)
+    {
+        m_RTV = RTVManager->AllocatePersistent(1);
+        dev->CreateRenderTargetView(GetResource(), nullptr, RTVManager->GetCPUHandle(m_RTV));
+    }
+    if((m_Desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0)
+    {
+        m_DSV = DSVManager->AllocatePersistent(1);
+        dev->CreateDepthStencilView(GetResource(), nullptr, DSVManager->GetCPUHandle(m_DSV));
     }
 }
