@@ -59,6 +59,7 @@ static UintSetting g_DSVPersistentDescriptorMaxCount(SettingCategory::Startup,
 
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
+static StringSetting g_TexturePath(SettingCategory::Load, "TexturePath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
@@ -418,22 +419,24 @@ void Renderer::Render()
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
             RenderEntity(cmdList, globalXform, m_RootEntity);
         }
+
+        if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
+        {
+            PIX_EVENT_SCOPE(cmdList, L"Postprocessing");
+            m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            cmdList.SetRenderTargets(nullptr, frameRes.m_BackBuffer.get());
+            cmdList.SetPipelineState(m_PostprocessingPipelineState.Get());
+            cmdList.SetRootSignature(m_PostprocessingRootSignature.Get());
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                POSTPROCESSING_ROOT_PARAM_TEXTURE, m_ColorRenderTarget->GetD3D12SRV());
+            cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+
+        }
+
+        frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
 
-    if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
-    {
-        PIX_EVENT_SCOPE(cmdList, L"Postprocessing");
-        m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-        cmdList.SetRenderTargets(nullptr, frameRes.m_BackBuffer.get());
-        cmdList.SetPipelineState(m_PostprocessingPipelineState.Get());
-        cmdList.SetRootSignature(m_PostprocessingRootSignature.Get());
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-            POSTPROCESSING_ROOT_PARAM_TEXTURE, m_ColorRenderTarget->GetD3D12SRV());
-        cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
-
-    }
-    frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     cmdList.Execute(m_CmdQueue.Get());
 
 	frameRes.m_SubmittedFenceValue = m_NextFenceValue++;
@@ -1040,7 +1043,14 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     
     if(textureRelativePath.empty())
     {
-        m_Textures.push_back(unique_ptr<Texture>());
+        if(!g_TexturePath.GetValue().empty())
+        {
+            auto texture = std::make_unique<Texture>();
+            texture->LoadFromFile(g_TexturePath.GetValue());
+            m_Textures.push_back(std::move(texture));
+        }
+        else
+            m_Textures.push_back(unique_ptr<Texture>());
         return;
     }
 

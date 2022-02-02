@@ -14,7 +14,8 @@ struct PS_INPUT
 float4 main(PS_INPUT input) : SV_Target
 {
 	float3 normal_View = normalize(input.normal_View);
-	float3 albedoColor = input.color.rgb * t.Sample(s, input.texCoord).rgb;
+	float3 albedoColor = t.Sample(s, input.texCoord).rgb;
+	albedoColor *= input.color.rgb;
 	float3 lighting = perFrameConstants.AmbientColor;
 	lighting += max(0, dot(normal_View, perFrameConstants.DirToLight_View)) * perFrameConstants.LightColor;
 	return float4(albedoColor * lighting, 1);
