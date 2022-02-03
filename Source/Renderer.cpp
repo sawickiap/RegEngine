@@ -4,7 +4,6 @@
 #include "RenderingResource.hpp"
 #include "Texture.hpp"
 #include "Mesh.hpp"
-#include "Descriptors.hpp"
 #include "ConstantBuffers.hpp"
 #include "Shaders.hpp"
 #include "Cameras.hpp"
@@ -55,6 +54,8 @@ static UintSetting g_RTVPersistentDescriptorMaxCount(SettingCategory::Startup,
     "RTVDescriptors.Persistent.MaxCount", 0);
 static UintSetting g_DSVPersistentDescriptorMaxCount(SettingCategory::Startup,
     "DSVDescriptors.Persistent.MaxCount", 0);
+// 0 = anisotropic filtering disabled, 1..16 = D3D12_SAMPLER_DESC::MaxAnisotropy.
+static UintSetting g_MaxAnisotropy(SettingCategory::Startup, "MaxAnisotropy", 16);
 
 
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
@@ -79,12 +80,15 @@ struct PerFrameConstants
     uint32_t m_FrameIndex;
     float m_SceneTime;
     uint32_t _padding0[2];
+    
     packed_vec3 m_DirToLight_View;
     uint32_t _padding1;
-	packed_vec3 m_LightColor;
-	uint32_t _padding2;
-	packed_vec3 m_AmbientColor;
-	uint32_t _padding3;
+    
+    packed_vec3 m_LightColor;
+    uint32_t _padding2;
+    
+    packed_vec3 m_AmbientColor;
+    uint32_t _padding3;
 };
 
 struct PerObjectConstants
@@ -98,6 +102,8 @@ enum ROOT_PARAM
     ROOT_PARAM_PER_FRAME_CBV,
     ROOT_PARAM_PER_OBJECT_CBV,
     ROOT_PARAM_TEXTURE_SRV,
+    ROOT_PARAM_SAMPLER,
+    ROOT_PARAM_COUNT
 };
 
 enum POSTPROCESSING_ROOT_PARAM
@@ -265,6 +271,7 @@ void Renderer::Init()
         0);
     m_TemporaryConstantBufferManager = std::make_unique<TemporaryConstantBufferManager>();
     m_TemporaryConstantBufferManager->Init();
+    m_StandardSamplers.Init();
     m_ShaderCompiler= std::make_unique<ShaderCompiler>();
     m_ShaderCompiler->Init();
 	CreateCommandQueues();
@@ -413,7 +420,10 @@ void Renderer::Render()
 
                 cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
             }
-        
+
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_SAMPLER,
+                m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
+
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
             mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
@@ -639,7 +649,7 @@ void Renderer::CreateResources()
 
 	// Root signature
 	{
-        D3D12_ROOT_PARAMETER params[3] = {};
+        D3D12_ROOT_PARAMETER params[ROOT_PARAM_COUNT] = {};
 
         const CD3DX12_DESCRIPTOR_RANGE perFrameCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
         params[ROOT_PARAM_PER_FRAME_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
@@ -659,13 +669,15 @@ void Renderer::CreateResources()
         params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.NumDescriptorRanges = 1;
         params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.pDescriptorRanges = &textureSRVDescRange;
 
-        CD3DX12_STATIC_SAMPLER_DESC staticSampler{0};
+        const CD3DX12_DESCRIPTOR_RANGE samplerDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0};
+        params[ROOT_PARAM_SAMPLER].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[ROOT_PARAM_SAMPLER].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[ROOT_PARAM_SAMPLER].DescriptorTable.NumDescriptorRanges = 1;
+        params[ROOT_PARAM_SAMPLER].DescriptorTable.pDescriptorRanges = &samplerDescRange;
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
 		desc.NumParameters = (uint32_t)_countof(params);
         desc.pParameters = params;
-        desc.NumStaticSamplers = 1;
-        desc.pStaticSamplers = &staticSampler;
 		desc.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
 			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
@@ -1135,4 +1147,88 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
         cmdList.GetCmdList()->IASetIndexBuffer(nullptr);
     	cmdList.GetCmdList()->DrawInstanced(mesh->GetVertexCount(), 1, 0, 0);
     }
+}
+
+void StandardSamplers::Init()
+{
+    ERR_TRY;
+
+    assert(g_Renderer && g_Renderer->GetSamplerDescriptorManager());
+    DescriptorManager* descMngr = g_Renderer->GetSamplerDescriptorManager();
+    m_Descriptors = descMngr->AllocatePersistent(COUNT);
+
+    const uint32_t maxAnisotropy = g_MaxAnisotropy.GetValue();
+    CHECK_BOOL(maxAnisotropy <= 16);
+
+    D3D12_SAMPLER_DESC desc = {};
+    desc.AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+    desc.MaxAnisotropy = std::max<uint32_t>(maxAnisotropy, 1);
+    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    desc.MaxLOD = FLT_MAX;
+
+    uint32_t descIndex = 0;
+    for(uint32_t filterIndex = 0; filterIndex < 4; ++filterIndex)
+    {
+        switch(filterIndex)
+        {
+        case 0: desc.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT; break;
+        case 1: desc.Filter = D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT; break;
+        case 2: desc.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; break;
+        case 3: desc.Filter = maxAnisotropy > 0 ? D3D12_FILTER_ANISOTROPIC : D3D12_FILTER_MIN_MAG_MIP_LINEAR; break;
+        default: assert(0);
+        }
+
+        for(uint32_t addressIndex = 0; addressIndex < 2; ++addressIndex, ++descIndex)
+        {
+            switch(addressIndex)
+            {
+            case 0: desc.AddressU = desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP; break;
+            case 1: desc.AddressU = desc.AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP; break;
+            default: assert(0);
+            }
+
+            const D3D12_CPU_DESCRIPTOR_HANDLE CPUDescHandle = descMngr->GetCPUHandle(m_Descriptors, descIndex);
+            g_Renderer->GetDevice()->CreateSampler(&desc, CPUDescHandle);
+        }
+    }
+
+    ERR_CATCH_FUNC;
+}
+
+StandardSamplers::~StandardSamplers()
+{
+    assert(g_Renderer && g_Renderer->GetSamplerDescriptorManager());
+    g_Renderer->GetSamplerDescriptorManager()->FreePersistent(m_Descriptors);
+}
+
+Descriptor StandardSamplers::Get(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address) const
+{
+    uint32_t index = 0;
+    switch(filter)
+    {
+    case D3D12_FILTER_MIN_MAG_MIP_POINT:        index = 0; break;
+    case D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT: index = 1; break;
+    case D3D12_FILTER_MIN_MAG_MIP_LINEAR:       index = 2; break;
+    case D3D12_FILTER_ANISOTROPIC:              index = 3; break;
+    default: assert(0);
+    }
+
+    index *= 2;
+    switch(address)
+    {
+    case D3D12_TEXTURE_ADDRESS_MODE_WRAP: break;
+    case D3D12_TEXTURE_ADDRESS_MODE_CLAMP: index += 1; break;
+    default: assert(0);
+    }
+
+    Descriptor result = m_Descriptors;
+    result.m_Index += index;
+    return result;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE StandardSamplers::GetD3D12(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address) const
+{
+    Descriptor desc = Get(filter, address);
+    assert(g_Renderer && g_Renderer->GetSamplerDescriptorManager());
+    return g_Renderer->GetSamplerDescriptorManager()->GetGPUHandle(desc);
 }

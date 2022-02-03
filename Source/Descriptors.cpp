@@ -99,18 +99,18 @@ void DescriptorManager::FreePersistent(Descriptor desc)
     }
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE DescriptorManager::GetGPUHandle(Descriptor desc)
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorManager::GetGPUHandle(Descriptor desc, uint32_t descIndex)
 {
     assert(!desc.IsNull());
     return CD3DX12_GPU_DESCRIPTOR_HANDLE(m_GPUHandleForHeapStart,
-        (int32_t)desc.m_Index, // offsetInDescriptors
+        (int32_t)(desc.m_Index + descIndex), // offsetInDescriptors
         m_DescriptorSize); // descriptorIncrementSize
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle(Descriptor desc)
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorManager::GetCPUHandle(Descriptor desc, uint32_t descIndex)
 {
     assert(!desc.IsNull());
     return CD3DX12_CPU_DESCRIPTOR_HANDLE(m_CPUHandleForHeapStart,
-        (int32_t)desc.m_Index, // offsetInDescriptors
+        (int32_t)(desc.m_Index + descIndex), // offsetInDescriptors
         m_DescriptorSize); // descriptorIncrementSize
 }

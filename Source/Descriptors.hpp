@@ -47,8 +47,9 @@ public:
     Descriptor AllocateTemporary(uint32_t descriptorCount);
     void FreePersistent(Descriptor desc);
 
-    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(Descriptor desc);
-    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(Descriptor desc);
+    // Pass non-zero descIndex if desc represents a sequence of multiple descriptors you want to index individually.
+    D3D12_GPU_DESCRIPTOR_HANDLE GetGPUHandle(Descriptor desc, uint32_t descIndex = 0);
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCPUHandle(Descriptor desc, uint32_t descIndex = 0);
 
 private:
     D3D12_DESCRIPTOR_HEAP_TYPE m_Type = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;

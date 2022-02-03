@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Descriptors.hpp"
+
 class Font;
 class AssimpInit;
 
@@ -7,8 +9,6 @@ class CommandList;
 class RenderingResource;
 class Texture;
 class Mesh;
-struct Descriptor;
-class DescriptorManager;
 class TemporaryConstantBufferManager;
 class ShaderCompiler;
 class OrbitingCamera;
@@ -25,6 +25,30 @@ enum class StandardTexture
 
 struct RendererCapabilities
 {
+};
+
+/*
+The only accepted values are:
+    D3D12_FILTER_MIN_MAG_MIP_POINT
+    D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT
+    D3D12_FILTER_MIN_MAG_MIP_LINEAR
+    D3D12_FILTER_ANISOTROPIC
+X
+    D3D12_TEXTURE_ADDRESS_MODE_WRAP
+    D3D12_TEXTURE_ADDRESS_MODE_CLAMP
+*/
+class StandardSamplers
+{
+public:
+    void Init();
+    ~StandardSamplers();
+    
+    Descriptor Get(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address) const;
+    D3D12_GPU_DESCRIPTOR_HANDLE GetD3D12(D3D12_FILTER filter, D3D12_TEXTURE_ADDRESS_MODE address) const;
+
+private:
+    static constexpr size_t COUNT = 4 * 2;
+    Descriptor m_Descriptors;
 };
 
 struct Entity
@@ -55,6 +79,7 @@ public:
     DescriptorManager* GetRTVDescriptorManager() { return m_RTVDescriptorManager.get(); }
     DescriptorManager* GetDSVDescriptorManager() { return m_DSVDescriptorManager.get(); }
     TemporaryConstantBufferManager* GetTemporaryConstantBufferManager() { return m_TemporaryConstantBufferManager.get(); }
+    StandardSamplers* GetStandardSamplers() { return &m_StandardSamplers; }
     ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
     OrbitingCamera* GetCamera() { return m_Camera.get(); }
 
@@ -94,6 +119,7 @@ private:
     unique_ptr<DescriptorManager> m_RTVDescriptorManager;
     unique_ptr<DescriptorManager> m_DSVDescriptorManager;
     unique_ptr<TemporaryConstantBufferManager> m_TemporaryConstantBufferManager;
+    StandardSamplers m_StandardSamplers;
     unique_ptr<ShaderCompiler> m_ShaderCompiler;
 	std::array<FrameResources, MAX_FRAME_COUNT> m_FrameResources;
 	unique_ptr<RenderingResource> m_DepthTexture;

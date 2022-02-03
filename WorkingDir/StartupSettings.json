@@ -20,6 +20,10 @@
     "RTVDescriptors.Persistent.MaxCount": 128,
     "DSVDescriptors.Persistent.MaxCount": 128,
     "ConstantBuffers.Temporary.MaxSizePerFrame": 65536,
+
+    // Between 0 (for anisotropic filtering disabled) and 16 (max quality).
+    "MaxAnisotropy": 16,
+
     /*
     Level of logging from Assimp library:
     0 = none, 1 = errors, 2 = also warnings, 3 = also information, 4 = also verbose debug information
