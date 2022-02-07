@@ -1,6 +1,32 @@
 #include "BaseUtils.hpp"
 #include "Streams.hpp"
 
+size_t FileStreamBase::GetFileSize()
+{
+    assert(m_Handle.get() != INVALID_HANDLE_VALUE);
+    LARGE_INTEGER i;
+    CHECK_BOOL_WINAPI(GetFileSizeEx(m_Handle.get(), &i));
+    return (size_t)i.QuadPart;
+}
+
+size_t FileStreamBase::GetFilePointer()
+{
+    assert(m_Handle.get() != INVALID_HANDLE_VALUE);
+    LARGE_INTEGER distanceToMove;
+    distanceToMove.QuadPart = 0;
+    LARGE_INTEGER newPointer;
+    CHECK_BOOL_WINAPI(SetFilePointerEx(m_Handle.get(), distanceToMove, &newPointer, FILE_CURRENT));
+    return (size_t)newPointer.QuadPart;
+}
+
+void FileStreamBase::SetFilePointer(ptrdiff_t distance, MoveMethod method)
+{
+    assert(m_Handle.get() != INVALID_HANDLE_VALUE);
+    LARGE_INTEGER distanceToMove;
+    distanceToMove.QuadPart = (LONGLONG)distance;
+    CHECK_BOOL_WINAPI(SetFilePointerEx(m_Handle.get(), distanceToMove, NULL, (DWORD)method));
+}
+
 void FileReadStream::Init(const wstr_view& path, uint32_t flags)
 {
     ERR_TRY

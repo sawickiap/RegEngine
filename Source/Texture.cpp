@@ -162,11 +162,24 @@ void Texture::LoadFromCacheFile(uint32_t flags, const std::filesystem::path& pat
     char header[32];
     stream.ReadData(header, headerLen);
     if(memcmp(header, CACHE_FILE_HEADER, headerLen) != 0)
-        FAIL(L"Invalid header.");
+        FAIL(L"Invalid begin header.");
 
     uint32_t contentLen;
     stream.ReadValue(contentLen);
     CHECK_BOOL(contentLen > 0);
+
+    // Validate header at the end.
+    {
+        const size_t fileSize = stream.GetFileSize();
+        size_t pos = stream.GetFilePointer();
+        CHECK_BOOL(pos + contentLen + headerLen == fileSize);
+        stream.SetFilePointer((ptrdiff_t)contentLen, FileStreamBase::MoveMethod::Current);
+        stream.ReadData(header, headerLen);
+        if(memcmp(header, CACHE_FILE_HEADER, headerLen) != 0)
+            FAIL(L"Invalid end header.");
+        stream.SetFilePointer((ptrdiff_t)pos, FileStreamBase::MoveMethod::Begin);
+    }
+
     std::vector<char> content(contentLen);
     stream.ReadData(content.data(), contentLen);
 

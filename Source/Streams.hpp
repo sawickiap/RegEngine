@@ -5,7 +5,20 @@ enum FILE_STREAM_FLAGS
     FILE_STREAM_FLAG_SEQUENTIAL = 0x1,
 };
 
-class FileReadStream
+class FileStreamBase
+{
+public:
+    enum class MoveMethod { Begin = 0, Current = 1, End = 2 };
+
+    size_t GetFileSize();
+    size_t GetFilePointer();
+    void SetFilePointer(ptrdiff_t distance, MoveMethod method);
+
+protected:
+    unique_ptr<HANDLE, CloseHandleDeleter> m_Handle;
+};
+
+class FileReadStream : public FileStreamBase
 {
 public:
     void Init(const wstr_view& path, uint32_t flags);
@@ -24,12 +37,9 @@ public:
     {   
         ReadData((char*)&outValue, sizeof(T));
     }
-
-private:
-    unique_ptr<HANDLE, CloseHandleDeleter> m_Handle;
 };
 
-class FileWriteStream
+class FileWriteStream : public FileStreamBase
 {
 public:
     void Init(const wstr_view& path, uint32_t flags);
@@ -53,7 +63,4 @@ public:
     {
         WriteData(s.data(), s.length() * sizeof(wchar_t));
     }
-
-private:
-    unique_ptr<HANDLE, CloseHandleDeleter> m_Handle;
 };
