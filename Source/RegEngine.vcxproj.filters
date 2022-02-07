@@ -19,6 +19,7 @@
     <ClCompile Include="Shaders.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Cameras.cpp" />
+    <ClCompile Include="Streams.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -73,6 +74,7 @@
     <ClInclude Include="Shaders.hpp" />
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="Cameras.hpp" />
+    <ClInclude Include="Streams.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

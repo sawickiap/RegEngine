@@ -210,7 +210,7 @@ void Font::Init()
     D3D12_SUBRESOURCE_DATA subresourceData = {};
     subresourceData.pData = textureDataPtr;
     subresourceData.RowPitch = textureDataRowPitch;
-    m_Texture->LoadFromMemory(0, resDesc, subresourceData, L"Font texture");
+    m_Texture->LoadFromMemory(resDesc, subresourceData, L"Font texture");
 
     m_WinFont.FreeTextureData();
 
@@ -881,7 +881,7 @@ void Renderer::CreateStandardTextures()
 
         unique_ptr<Texture>& texPtr = m_StandardTextures[textureIndex];
         texPtr = std::make_unique<Texture>();
-        texPtr->LoadFromMemory(0, resDesc, data, NAMES[textureIndex]);
+        texPtr->LoadFromMemory(resDesc, data, NAMES[textureIndex]);
     }
 }
 
@@ -1058,7 +1058,9 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         if(!g_TexturePath.GetValue().empty())
         {
             auto texture = std::make_unique<Texture>();
-            texture->LoadFromFile(Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS, g_TexturePath.GetValue());
+            texture->LoadFromFile(
+                Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
+                g_TexturePath.GetValue());
             m_Textures.push_back(std::move(texture));
         }
         else
@@ -1069,7 +1071,9 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     std::filesystem::path textureAbsolutePath = modelDir / textureRelativePath;
 
     auto texture = std::make_unique<Texture>();
-    texture->LoadFromFile(Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS, textureAbsolutePath.native());
+    texture->LoadFromFile(
+        Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
+        textureAbsolutePath.native());
     m_Textures.push_back(std::move(texture));
 
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));

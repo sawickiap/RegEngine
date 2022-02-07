@@ -2,7 +2,7 @@
 #include "Texture.hpp"
 #include "CommandList.hpp"
 #include "Renderer.hpp"
-//#include <WICTextureLoader.h>
+#include "Streams.hpp"
 #include <DirectXTex.h>
 
 Texture::~Texture()
@@ -21,98 +21,46 @@ void Texture::LoadFromFile(uint32_t flags, const wstr_view& filePath)
 
     LogMessageF(L"Loading texture from \"{}\"...", filePath);
 
-    DirectX::ScratchImage scratchImage;
+    const std::filesystem::path sourceFilePath = StrToPath(filePath);
+    const size_t hash = CalculateHash(flags, sourceFilePath);
+    const std::filesystem::path cacheFilePath = StrToPath(std::format(L"Cache/Textures/{:016X}", hash));
+    const bool sourceFileExists = FileExists(sourceFilePath);
 
-    if(filePath.ends_with(L".tga", false))
+    bool cacheIsValid = (flags & FLAG_CACHE_LOAD) != 0 && FileExists(cacheFilePath);
+    if(cacheIsValid)
     {
-        constexpr DirectX::TGA_FLAGS TGAFlags = DirectX::TGA_FLAGS_NONE;//DirectX::TGA_FLAGS_IGNORE_SRGB | DirectX::TGA_FLAGS_FORCE_SRGB;
-        CHECK_HR(DirectX::LoadFromTGAFile(filePath.c_str(), TGAFlags, nullptr, scratchImage));
-    }
-    else
-    {
-        constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_NONE;//DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_SRGB;
-        CHECK_HR(DirectX::LoadFromWICFile(filePath.c_str(), WICFlags, nullptr, scratchImage));
-    }
-
-    const DirectX::TexMetadata& metadata = scratchImage.GetMetadata();
-    CHECK_BOOL(metadata.depth == 1);
-    CHECK_BOOL(metadata.arraySize == 1);
-    CHECK_BOOL(metadata.mipLevels == 1);
-    CHECK_BOOL(metadata.miscFlags == 0); // The only option is TEX_MISC_TEXTURECUBE
-    CHECK_BOOL(metadata.miscFlags2 == 0); // The only option is TEX_MISC2_ALPHA_MODE_MASK
-    CHECK_BOOL(metadata.dimension == DirectX::TEX_DIMENSION_TEXTURE2D);
-
-    CHECK_BOOL(scratchImage.GetImageCount() == 1);
-    const DirectX::Image* const img = scratchImage.GetImage(0, 0, 0);
-    CHECK_BOOL(img->width == metadata.width);
-    CHECK_BOOL(img->height == metadata.height);
-    CHECK_BOOL(img->format == metadata.format);
-
-    if((flags & FLAG_SRGB) != 0)
-    {
-        const DXGI_FORMAT SRGBFormat = DirectX::MakeSRGB(img->format);
-        CHECK_BOOL(SRGBFormat != DXGI_FORMAT_UNKNOWN);
-        scratchImage.OverrideFormat(SRGBFormat);
-    }
-
-    LogInfoF(L"  Width={}, Height={}, Format={}",
-        metadata.width, metadata.height, (uint32_t)metadata.format);
-
-    if((flags & FLAG_GENERATE_MIPMAPS) != 0)
-    {
-        LogInfo(L"  Generating mipmaps...");
-
-        DirectX::ScratchImage mipScratchImage;
-        CHECK_HR(DirectX::GenerateMipMaps(*img, DirectX::TEX_FILTER_DEFAULT, 0, mipScratchImage));
-        const DirectX::TexMetadata& mipMetadata = mipScratchImage.GetMetadata();
-        m_Desc = CD3DX12_RESOURCE_DESC::Tex2D(
-            mipMetadata.format,
-            (uint64_t)mipMetadata.width,
-            (uint32_t)mipMetadata.height,
-            (uint16_t)mipMetadata.arraySize,
-            (uint16_t)mipMetadata.mipLevels,
-            1, // sampleCount
-            0, // sampleQuality
-            D3D12_RESOURCE_FLAG_NONE);
-            CreateTexture(filePath);
-        CHECK_BOOL(mipScratchImage.GetImageCount() == mipMetadata.mipLevels);
-        for(uint32_t mip = 0; mip < (uint32_t)mipMetadata.mipLevels; ++mip)
+        std::filesystem::file_time_type cacheWriteTime;
+        cacheIsValid = GetFileLastWriteTime(cacheWriteTime, cacheFilePath);
+        if(cacheIsValid)
         {
-            const DirectX::Image* const mipImg = mipScratchImage.GetImage(mip, 0, 0);
-            D3D12_SUBRESOURCE_DATA subresourceData = {
-                .pData = mipImg->pixels,
-                .RowPitch = (LONG_PTR)mipImg->rowPitch,
-                .SlicePitch = (LONG_PTR)mipImg->slicePitch
-            };
-            const bool lastLevel = mip == mipMetadata.mipLevels - 1;
-            UploadMipLevel(mip, uvec2((uint32_t)mipImg->width, (uint32_t)mipImg->height), subresourceData, lastLevel);
+            if(sourceFileExists)
+            {
+                std::filesystem::file_time_type sourceWriteTime;
+                cacheIsValid = GetFileLastWriteTime(sourceWriteTime, sourceFilePath) &&
+                    cacheWriteTime > sourceWriteTime;
+            }
+            // else: Can load only from cache not from source file. Cache is always valid.
         }
-        CreateDescriptor();
     }
-    else
+    if(cacheIsValid)
     {
-        D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-            metadata.format,
-            (uint64_t)metadata.width,
-            (uint32_t)metadata.height,
-            (uint16_t)metadata.arraySize,
-            (uint16_t)metadata.mipLevels,
-            1, // sampleCount
-            0, // sampleQuality
-            D3D12_RESOURCE_FLAG_NONE);
-        D3D12_SUBRESOURCE_DATA subresourceData = {
-            .pData = img->pixels,
-            .RowPitch = (LONG_PTR)img->rowPitch,
-            .SlicePitch = (LONG_PTR)img->slicePitch
-        };
-        LoadFromMemory(0, resDesc, subresourceData, filePath);
+        try
+        {
+            LoadFromCacheFile(flags, cacheFilePath);
+        } CATCH_PRINT_ERROR(;)
     }
+
+    if(IsEmpty())
+        LoadFromSourceFile(flags, filePath, cacheFilePath);
+
+    assert(!IsEmpty());
+    SetD3D12ObjectName(m_Resource, filePath);
+    CreateDescriptor();
 
     ERR_CATCH_MSG(std::format(L"Cannot load texture from \"{}\".", filePath));
 }
 
 void Texture::LoadFromMemory(
-    uint32_t flags,
     const D3D12_RESOURCE_DESC& resDesc,
     const D3D12_SUBRESOURCE_DATA& data,
     const wstr_view& name)
@@ -122,7 +70,10 @@ void Texture::LoadFromMemory(
     ERR_TRY;
     
     m_Desc = resDesc;
-    CreateTexture(name);
+    CreateTexture();
+    assert(m_Resource.Get());
+    if(!name.empty())
+        SetD3D12ObjectName(m_Resource.Get(), name);
     UploadMipLevel(0, uvec2((uint32_t)resDesc.Width, resDesc.Height), data,
         true); // lastLevel
     CreateDescriptor();
@@ -130,7 +81,164 @@ void Texture::LoadFromMemory(
     ERR_CATCH_FUNC;
 }
 
-void Texture::CreateTexture(const wstr_view& name)
+size_t Texture::CalculateHash(uint32_t flags, const std::filesystem::path& filePath)
+{
+    flags &= FLAG_SRGB | FLAG_GENERATE_MIPMAPS;
+    size_t hash = std::hash<uint32_t>()(flags);
+    
+    wstring processedPath = std::filesystem::canonical(std::filesystem::absolute(filePath)).native();
+    ToUpperCase(processedPath);
+    hash = CombineHash(hash, std::hash<wstring>()(processedPath));
+
+    return hash;
+}
+
+void Texture::LoadFromSourceFile(uint32_t flags, const wstr_view& filePath,
+    const std::filesystem::path& cacheFilePath)
+{
+    DirectX::ScratchImage image;
+
+    if(filePath.ends_with(L".tga", false))
+    {
+        constexpr DirectX::TGA_FLAGS TGAFlags = DirectX::TGA_FLAGS_NONE;//DirectX::TGA_FLAGS_IGNORE_SRGB | DirectX::TGA_FLAGS_FORCE_SRGB;
+        CHECK_HR(DirectX::LoadFromTGAFile(filePath.c_str(), TGAFlags, nullptr, image));
+    }
+    else
+    {
+        constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_NONE;//DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_SRGB;
+        CHECK_HR(DirectX::LoadFromWICFile(filePath.c_str(), WICFlags, nullptr, image));
+    }
+
+    Load(flags, image);
+
+    if((flags & FLAG_CACHE_SAVE) != 0)
+    {
+        ERR_TRY;
+        SaveCacheFile(cacheFilePath, image);
+       } CATCH_PRINT_ERROR(;)
+    }
+}
+
+static const char* const CACHE_FILE_HEADER = "RegEngine Cache Texture 100";
+
+void Texture::SaveCacheFile(const std::filesystem::path& cacheFilePath, const DirectX::ScratchImage& image) const
+{
+    const wstring pathStr = cacheFilePath.native();
+    LogInfoF(L"Saving texture cache to file \"{}\"...", pathStr);
+
+    ERR_TRY;
+
+    DirectX::Blob DDSBlob;
+    CHECK_HR(DirectX::SaveToDDSMemory(
+        image.GetImages(),
+        image.GetImageCount(),
+        image.GetMetadata(),
+        DirectX::DDS_FLAGS_NONE,
+        DDSBlob));
+
+    {
+        FileWriteStream stream;
+        stream.Init(pathStr, FILE_STREAM_FLAG_SEQUENTIAL);
+        const str_view headerStr{CACHE_FILE_HEADER};
+        stream.WriteString(headerStr);
+        stream.WriteValue((uint32_t)DDSBlob.GetBufferSize());
+        stream.WriteData(DDSBlob.GetBufferPointer(), DDSBlob.GetBufferSize());
+        stream.WriteString(headerStr);
+    }
+       
+    ERR_CATCH_MSG(std::format(L"Cannot save texture cache file \"{}\".", pathStr));
+}
+
+void Texture::LoadFromCacheFile(uint32_t flags, const std::filesystem::path& path)
+{
+    const wstring pathStr = path.native();
+    LogInfoF(L"Loading texture cache from file \"{}\"...", pathStr);
+    ERR_TRY;
+
+    FileReadStream stream;
+    stream.Init(pathStr, 0);
+    
+    const size_t headerLen = strlen(CACHE_FILE_HEADER);
+    char header[32];
+    stream.ReadData(header, headerLen);
+    if(memcmp(header, CACHE_FILE_HEADER, headerLen) != 0)
+        FAIL(L"Invalid header.");
+
+    uint32_t contentLen;
+    stream.ReadValue(contentLen);
+    CHECK_BOOL(contentLen > 0);
+    std::vector<char> content(contentLen);
+    stream.ReadData(content.data(), contentLen);
+
+    DirectX::ScratchImage image;
+    CHECK_HR(DirectX::LoadFromDDSMemory(content.data(), contentLen, DirectX::DDS_FLAGS_NONE, NULL, image));
+
+    Load(flags, image);
+
+    ERR_CATCH_MSG(std::format(L"Cannot load texture cache from file \"{}\"...", pathStr));
+}
+
+void Texture::Load(uint32_t flags, DirectX::ScratchImage& image)
+{
+    const DirectX::TexMetadata* metadata = &image.GetMetadata();
+    CHECK_BOOL(metadata->depth == 1);
+    CHECK_BOOL(metadata->arraySize == 1);
+    CHECK_BOOL(metadata->miscFlags == 0); // The only option is TEX_MISC_TEXTURECUBE
+    CHECK_BOOL(metadata->miscFlags2 == 0); // The only option is TEX_MISC2_ALPHA_MODE_MASK
+    CHECK_BOOL(metadata->dimension == DirectX::TEX_DIMENSION_TEXTURE2D);
+
+    CHECK_BOOL(image.GetImageCount() > 0);
+    const DirectX::Image* const img0 = image.GetImage(0, 0, 0);
+    CHECK_BOOL(img0->width == metadata->width);
+    CHECK_BOOL(img0->height == metadata->height);
+    CHECK_BOOL(img0->format == metadata->format);
+
+    if((flags & FLAG_SRGB) != 0 && !DirectX::IsSRGB(img0->format))
+    {
+        const DXGI_FORMAT SRGBFormat = DirectX::MakeSRGB(img0->format);
+        CHECK_BOOL(SRGBFormat != DXGI_FORMAT_UNKNOWN);
+        image.OverrideFormat(SRGBFormat);
+    }
+
+    LogInfoF(L"Width={}, Height={}, Format={}, MipLevels={}",
+        metadata->width, metadata->height, (uint32_t)metadata->format, metadata->mipLevels);
+
+    if(metadata->mipLevels == 1 && (flags & FLAG_GENERATE_MIPMAPS) != 0)
+    {
+        LogInfo(L"Generating mipmaps...");
+
+        DirectX::ScratchImage mipImage;
+        CHECK_HR(DirectX::GenerateMipMaps(*img0, DirectX::TEX_FILTER_DEFAULT, 0, mipImage));
+        const DirectX::TexMetadata& mipMetadata = mipImage.GetMetadata();
+        image = std::move(mipImage);
+        metadata = &image.GetMetadata(); // Have to refresh.
+    }
+
+    m_Desc = CD3DX12_RESOURCE_DESC::Tex2D(
+        metadata->format,
+        (uint64_t)metadata->width,
+        (uint32_t)metadata->height,
+        (uint16_t)metadata->arraySize,
+        (uint16_t)metadata->mipLevels,
+        1, // sampleCount
+        0, // sampleQuality
+        D3D12_RESOURCE_FLAG_NONE);
+    CreateTexture();
+    CHECK_BOOL(image.GetImageCount() == metadata->mipLevels);
+    for(uint32_t mip = 0; mip < (uint32_t)metadata->mipLevels; ++mip)
+    {
+        const DirectX::Image* const currImg = image.GetImage(mip, 0, 0);
+        D3D12_SUBRESOURCE_DATA subresourceData = {
+            .pData = currImg->pixels,
+            .RowPitch = (LONG_PTR)currImg->rowPitch,
+            .SlicePitch = (LONG_PTR)currImg->slicePitch
+        };
+        const bool lastLevel = mip == metadata->mipLevels - 1;
+        UploadMipLevel(mip, uvec2((uint32_t)currImg->width, (uint32_t)currImg->height), subresourceData, lastLevel);
+    }
+}
+
+void Texture::CreateTexture()
 {
     assert(m_Desc.Format != DXGI_FORMAT_UNKNOWN);
     D3D12MA::ALLOCATION_DESC allocDesc = {};
@@ -142,8 +250,6 @@ void Texture::CreateTexture(const wstr_view& name)
         nullptr, // pOptimizedClearValue
         &m_Allocation,
         IID_PPV_ARGS(&m_Resource))); // riidResource, ppvResource
-    if(!name.empty())
-        SetD3D12ObjectName(m_Resource.Get(), name);
 }
 
 void Texture::UploadMipLevel(uint32_t mipLevel, const uvec2& size, const D3D12_SUBRESOURCE_DATA& data,

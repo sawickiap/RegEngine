@@ -35,6 +35,7 @@
 #include <span>
 #include <filesystem>
 #include <format>
+#include <functional>
 
 #include <cstdio>
 #include <cstdint>
@@ -102,10 +103,15 @@ static inline T DivideRoudingUp(T x, T y)
     return (x + y - 1) / y;
 }
 
+// Custom deleter for STL smart pointers that uses HANDLE and CloseFile().
 struct CloseHandleDeleter
 {
     typedef HANDLE pointer;
-    void operator()(HANDLE handle) const { CloseHandle(handle); }
+    void operator()(HANDLE handle) const
+    {
+        if(handle != INVALID_HANDLE_VALUE)
+            CloseHandle(handle);
+    }
 };
 
 struct Exception
@@ -187,6 +193,32 @@ extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_DEFAULT;
 extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_UPLOAD;
 extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_READBACK;
 
+/*
+Based on boost::hash_combine, as quoted on page:
+https://stackoverflow.com/questions/2590677/how-do-i-combine-hash-values-in-c0x
+*/
+inline size_t CombineHash(size_t lhs, size_t rhs)
+{
+    return lhs ^ (rhs + 0x9e3779b9 + (lhs << 6) + (lhs >> 2));
+}
+
+template<>
+struct std::hash<str_view>
+{
+    size_t operator()(const str_view& str) const
+    {
+        return std::hash<std::string_view>()(std::string_view(str.data(), str.length()));
+    }
+};
+template<>
+struct std::hash<wstr_view>
+{
+    size_t operator()(const wstr_view& str) const
+    {
+        return std::hash<std::wstring_view>()(std::wstring_view(str.data(), str.length()));
+    }
+};
+
 template<typename CharT>
 void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_template<CharT>& str, size_t offset)
 {
@@ -203,6 +235,10 @@ void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_tem
 // As codePage use e.g. CP_ACP (system ASCII code page), CP_UTF8, 125 for Windows-1250.
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage);
 wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);
+
+void ToUpperCase(wstring& inoutStr);
+
+std::filesystem::path StrToPath(const wstr_view& str);
 
 enum class LogLevel { Info, Message, Warning, Error, Count };
 void Log(LogLevel level, const wstr_view& msg);
@@ -230,5 +266,9 @@ void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }
 // On error returns 0.
 uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format);
+
+// Returns true if file exists and is a file not directory or something else. Doesn't throw exceptions.
+bool FileExists(const std::filesystem::path& path);
+bool GetFileLastWriteTime(std::filesystem::file_time_type& outTime, const std::filesystem::path& path);
 
 #include "Formatters.inl"

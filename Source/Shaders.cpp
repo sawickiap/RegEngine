@@ -74,7 +74,7 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
 
     LogMessageF(L"Compiling shader from \"{}\"...", filePath);
 
-    std::filesystem::path dir(filePath.begin(), filePath.end(), std::filesystem::path::format::native_format);
+    std::filesystem::path dir = StrToPath(filePath);
     dir = dir.parent_path();
     IncludeHandler includeHandler(std::move(dir));
 

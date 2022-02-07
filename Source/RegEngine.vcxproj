@@ -120,6 +120,7 @@
     <ClCompile Include="RenderingResource.cpp" />
     <ClCompile Include="Settings.cpp" />
     <ClCompile Include="Shaders.cpp" />
+    <ClCompile Include="Streams.cpp" />
     <ClCompile Include="Texture.cpp" />
     <ClCompile Include="WinFontRenderImpl.cpp" />
   </ItemGroup>
@@ -141,6 +142,7 @@
     <ClInclude Include="RenderingResource.hpp" />
     <ClInclude Include="Settings.hpp" />
     <ClInclude Include="Shaders.hpp" />
+    <ClInclude Include="Streams.hpp" />
     <ClInclude Include="Texture.hpp" />
   </ItemGroup>
   <ItemGroup>

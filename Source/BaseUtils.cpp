@@ -106,6 +106,16 @@ wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage)
     return wstring{buf.data(), buf.size()};
 }
 
+void ToUpperCase(wstring& inoutStr)
+{
+    std::transform(inoutStr.begin(), inoutStr.end(), inoutStr.begin(), ::towupper);
+}
+
+std::filesystem::path StrToPath(const wstr_view& str)
+{
+    return std::filesystem::path(str.begin(), str.end(), std::filesystem::path::native_format);
+}
+
 static void SetConsoleColor(LogLevel level)
 {
     WORD attr = 0;
@@ -227,4 +237,17 @@ void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name)
 uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format)
 {
     return (uint8_t)DirectX::BitsPerPixel(format);
+}
+
+bool FileExists(const std::filesystem::path& path)
+{
+    std::error_code errorCode;
+    return std::filesystem::is_regular_file(path, errorCode);
+}
+
+bool GetFileLastWriteTime(std::filesystem::file_time_type& outTime, const std::filesystem::path& path)
+{
+    std::error_code errorCode;
+    outTime = std::filesystem::last_write_time(path, errorCode);
+    return !errorCode;
 }
