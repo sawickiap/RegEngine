@@ -362,3 +362,19 @@ void Texture::CreateDescriptor()
     g_Renderer->GetDevice()->CreateShaderResourceView(
         m_Resource.Get(), nullptr, SRVDescManager->GetCPUHandle(m_Descriptor));
 }
+
+/*
+Texture cache:
+
+File path: std::format("Cache/Textures/{:016X}", hash)
+
+Validation: last write time of cache file > last write time of source file
+
+File format:
+
+- Header: chars = "RegEngine Cache Texture 100"
+- ContentSize: uint32
+- Content: bytes[ContentSize] - contents of DDS file
+- Header: chars - same as above
+
+*/
