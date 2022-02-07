@@ -888,9 +888,9 @@ void Renderer::CreateStandardTextures()
 void Renderer::ClearModel()
 {
     m_Textures.clear();
-    m_RootEntity = Entity{};
-    m_MeshMaterialIndices.clear();
+    m_Materials.clear();
     m_Meshes.clear();
+    m_RootEntity = Entity{};
 }
 
 void Renderer::LoadModel()
@@ -995,15 +995,16 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         }
     }
 
-    unique_ptr<Mesh> rendererMesh = std::make_unique<Mesh>();
-    rendererMesh->Init(
+    SceneMesh mesh;
+    mesh.m_MaterialIndex = assimpMesh->mMaterialIndex;
+    mesh.m_Mesh = std::make_unique<Mesh>();
+    mesh.m_Mesh->Init(
         L"Mesh",
         D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
         D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
         std::span<const Vertex>(vertices.begin(), vertices.end()),
         std::span<const Mesh::IndexType>(indices.begin(), indices.end()));
-    m_Meshes.push_back(std::move(rendererMesh));
-    m_MeshMaterialIndices.push_back(assimpMesh->mMaterialIndex);
+    m_Meshes.push_back(std::move(mesh));
 }
 
 const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
@@ -1032,7 +1033,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 {
     ERR_TRY;
 
-    string textureRelativePath;
+    string texturePath;
     // Canonical way - GetTexture.
     if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
     {
@@ -1045,36 +1046,51 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         const aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0,
             &s, &mapping, &uvindex, &blend, &op, mapmodes);
         if(ret == aiReturn_SUCCESS)
-            textureRelativePath = s.C_Str();
+            texturePath = s.C_Str();
     }
     // Method found in a model from Turbosquid made in Maya.
-    if(textureRelativePath.empty())
+    if(texturePath.empty())
     {
-        GetStringMaterialProperty(textureRelativePath, material, "$raw.Maya|baseColor|file");
+        GetStringMaterialProperty(texturePath, material, "$raw.Maya|baseColor|file");
     }
-    
-    if(textureRelativePath.empty())
+
+    std::filesystem::path texturePathP;
+    if(!texturePath.empty())
+        texturePathP = StrToPath(ConvertCharsToUnicode(texturePath, CP_ACP));
+    else if(!g_TexturePath.GetValue().empty())
+        // "TexturePath" setting - relative to working directory not model path!
+        texturePathP = std::filesystem::absolute(StrToPath(g_TexturePath.GetValue()));
+
+    if(texturePathP.empty())
+        m_Materials.push_back(SceneMaterial{});
+    else
     {
-        if(!g_TexturePath.GetValue().empty())
+        if(!texturePathP.is_absolute())
+            texturePathP = modelDir / texturePathP;
+
+        wstring processedPath = std::filesystem::canonical(std::filesystem::absolute(texturePathP));
+        ToUpperCase(processedPath);
+
+        // Find existing texture.
+        for(size_t i = 0, count = m_Textures.size(); i < count; ++i)
         {
-            auto texture = std::make_unique<Texture>();
-            texture->LoadFromFile(
-                Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
-                g_TexturePath.GetValue());
-            m_Textures.push_back(std::move(texture));
+            if(m_Textures[i].m_ProcessedPath == processedPath)
+            {
+               m_Materials.push_back(SceneMaterial{i});
+               return;
+            }
         }
-        else
-            m_Textures.push_back(unique_ptr<Texture>());
-        return;
+
+        // Not found - load new texture.
+        SceneTexture tex;
+        tex.m_ProcessedPath = std::move(processedPath);
+        tex.m_Texture = std::make_unique<Texture>();
+        tex.m_Texture->LoadFromFile(
+            Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
+            texturePathP.native());
+        m_Textures.push_back(std::move(tex));
+        m_Materials.push_back(SceneMaterial{m_Textures.size() - 1});
     }
-
-    std::filesystem::path textureAbsolutePath = modelDir / textureRelativePath;
-
-    auto texture = std::make_unique<Texture>();
-    texture->LoadFromFile(
-        Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
-        textureAbsolutePath.native());
-    m_Textures.push_back(std::move(texture));
 
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
 }
@@ -1118,15 +1134,16 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
 
 void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex)
 {
-    const Mesh* const mesh = m_Meshes[meshIndex].get();
-    const size_t materialIndex = m_MeshMaterialIndices[meshIndex];
-
-    Texture* texture = m_Textures[materialIndex].get();
+    const Mesh* const mesh = m_Meshes[meshIndex].m_Mesh.get();
+    const size_t materialIndex = m_Meshes[meshIndex].m_MaterialIndex;
+    assert(materialIndex < m_Materials.size());
+    const SceneMaterial& mat = m_Materials[materialIndex];
+    Texture* texture = mat.m_TextureIndex != SIZE_MAX ? m_Textures[mat.m_TextureIndex].m_Texture.get() : nullptr;
     D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle;
     if(texture)
     {
         textureDescriptorHandle =
-            m_SRVDescriptorManager->GetGPUHandle(m_Textures[materialIndex]->GetDescriptor());
+            m_SRVDescriptorManager->GetGPUHandle(m_Textures[mat.m_TextureIndex].m_Texture->GetDescriptor());
     }
     else
     {

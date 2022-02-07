@@ -135,14 +135,26 @@ private:
 	ComPtr<ID3D12RootSignature> m_PostprocessingRootSignature;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
 
-    std::vector<unique_ptr<Mesh>> m_Meshes;
-    // Indices of this array match m_Meshes.
-    // Values are indices into m_Textures.
-    std::vector<size_t> m_MeshMaterialIndices;
+    struct SceneMesh
+    {
+        unique_ptr<Mesh> m_Mesh;
+        size_t m_MaterialIndex = SIZE_MAX;
+    };
+    struct SceneMaterial
+    {
+        size_t m_TextureIndex = SIZE_MAX;
+    };
+    struct SceneTexture
+    {
+        wstring m_ProcessedPath;
+        // Can be null - use some standard texture then.
+        unique_ptr<Texture> m_Texture;
+    };
+
     Entity m_RootEntity;
-    // Indices to this array are material indices from the Assimp scene.
-    // Elements can be null - use some standard texture then.
-    std::vector<unique_ptr<Texture>> m_Textures;
+    std::vector<SceneMesh> m_Meshes;
+    std::vector<SceneMaterial> m_Materials;
+    std::vector<SceneTexture> m_Textures;
 
 	void CreateDevice();
 	void CreateMemoryAllocator();
