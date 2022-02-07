@@ -1068,7 +1068,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         if(!texturePathP.is_absolute())
             texturePathP = modelDir / texturePathP;
 
-        wstring processedPath = std::filesystem::canonical(std::filesystem::absolute(texturePathP));
+        wstring processedPath = std::filesystem::weakly_canonical(texturePathP);
         ToUpperCase(processedPath);
 
         // Find existing texture.

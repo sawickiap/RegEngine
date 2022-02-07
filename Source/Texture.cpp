@@ -86,7 +86,7 @@ size_t Texture::CalculateHash(uint32_t flags, const std::filesystem::path& fileP
     flags &= FLAG_SRGB | FLAG_GENERATE_MIPMAPS;
     size_t hash = std::hash<uint32_t>()(flags);
     
-    wstring processedPath = std::filesystem::canonical(std::filesystem::absolute(filePath)).native();
+    wstring processedPath = std::filesystem::weakly_canonical(filePath).native();
     ToUpperCase(processedPath);
     hash = CombineHash(hash, std::hash<wstring>()(processedPath));
 
