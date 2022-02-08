@@ -92,7 +92,13 @@ struct PerFrameConstants
 {
     uint32_t m_FrameIndex;
     float m_SceneTime;
+    packed_vec2 m_RenderResolution;
+    
+    packed_vec2 m_RenderResolutionInv;
     uint32_t _padding0[2];
+
+    packed_mat4 m_Proj;
+    packed_mat4 m_ProjInv;
     
     packed_vec3 m_DirToLight_View;
     uint32_t _padding1;
@@ -404,6 +410,10 @@ void Renderer::Render()
             PerFrameConstants myData = {};
             myData.m_FrameIndex = m_FrameIndex;
             myData.m_SceneTime = time;
+            myData.m_RenderResolution = GetFinalResolutionF();
+            myData.m_RenderResolutionInv = packed_vec2(1.f / myData.m_RenderResolution.x, 1.f / myData.m_RenderResolution.y);
+            myData.m_Proj = m_Camera->GetProjection();
+            myData.m_ProjInv = m_Camera->GetProjectionInverse();
             myData.m_DirToLight_View = dirToLight_View;
             myData.m_LightColor = g_LightColor.GetValue();
             myData.m_AmbientColor = g_AmbientColor.GetValue();

@@ -26,11 +26,12 @@ public:
 
     const mat4& GetView();
     const mat4& GetProjection();
+    const mat4& GetProjectionInverse();
     const mat4& GetViewProjection();
 
 protected:
     void InvalidateView() { m_ViewValid = false; m_ViewProjectionValid = false; }
-    void InvalidateProjection() { m_ProjectionValid = false; m_ViewProjectionValid = false; }
+    void InvalidateProjection() { m_ProjectionValid = m_ProjectionInverseValid = m_ViewProjectionValid = false; }
     virtual mat4 CalculateView() = 0;
 
 private:
@@ -38,9 +39,11 @@ private:
     float m_AspectRatio= 1.f;
     float m_ZNear = 0.5f;
     mat4 m_Projection;
+    mat4 m_ProjectionInverse;
     mat4 m_View;
     mat4 m_ViewProjection;
     bool m_ProjectionValid = false;
+    bool m_ProjectionInverseValid = false;
     bool m_ViewValid = false;
     bool m_ViewProjectionValid = false;
 };

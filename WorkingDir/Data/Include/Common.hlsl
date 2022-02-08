@@ -2,7 +2,13 @@ struct PerFrameConstants
 {
 	uint FrameIndex;
 	float SceneTime;
-	uint2 _padding0;
+	float2 RenderResolution;
+	
+	float2 RenderResolutionInv;
+	uint _padding0;
+
+	float4x4 Proj;
+	float4x4 ProjInv;
 
 	float3 DirToLight_View; // Normalized
 	uint _padding1;

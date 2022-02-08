@@ -22,6 +22,16 @@ const mat4& Camera::GetProjection()
     return m_Projection;
 }
 
+const mat4& Camera::GetProjectionInverse()
+{
+    if(!m_ProjectionInverseValid)
+    {
+        m_ProjectionInverse = glm::inverse(GetProjection());
+        m_ProjectionInverseValid = true;
+    }
+    return m_ProjectionInverse;
+}
+
 const mat4& Camera::GetViewProjection()
 {
     if(!m_ViewProjectionValid)
