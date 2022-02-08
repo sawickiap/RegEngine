@@ -1,8 +1,5 @@
 #include "Include/Common.hlsl"
-
-Texture2D<float> Depth : register(t0);
-Texture2D<float4> GBufferAlbedo : register(t1);
-Texture2D<float4> GBufferNormal : register(t2);
+#include "Include/LightingCommon.hlsl"
 
 float4 main(float4 pos : SV_Position) : SV_Target
 {
@@ -23,8 +20,7 @@ float4 main(float4 pos : SV_Position) : SV_Target
 	float3 dirToCam_View = float3(0., 0., -1.);
 	float specularTerm = pow(max(0.0, dot(dirToCam_View, reflected_View)), 15.0);
 	
-	float3 color = perFrameConstants.AmbientColor * albedo;
-	color += diffuseTerm * albedo * perFrameConstants.LightColor;
+	float3 color = diffuseTerm * albedo * perFrameConstants.LightColor;
 	color += specularTerm * diffuseTerm * perFrameConstants.LightColor;
 
 	return float4(color, 1.0);

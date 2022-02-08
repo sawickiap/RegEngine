@@ -126,13 +126,13 @@ enum LIGHTING_ROOT_PARAM
 {
     LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
     LIGHTING_ROOT_PARAM_DEPTH_SRV,
-    LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO,
-    LIGHTING_ROOT_PARAM_GBUFFER_NORMAL,
+    LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV,
+    LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV,
     LIGHTING_ROOT_PARAM_COUNT
 };
 enum POSTPROCESSING_ROOT_PARAM
 {
-    POSTPROCESSING_ROOT_PARAM_TEXTURE,
+    POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV,
     POSTPROCESSING_ROOT_PARAM_COUNT
 };
 
@@ -340,7 +340,7 @@ void Renderer::Reload()
 
     Create3DPipelineState();
     CreatePostprocessingPipelineState();
-    CreateLightingPipelineState();
+    CreateLightingPipelineStates();
     LoadModel();
 }
 
@@ -462,26 +462,42 @@ void Renderer::Render()
             RenderEntity(cmdList, globalXform, m_RootEntity);
         }
 
-        if(m_LightingRootSignature && m_LightingPipelineState)
+        if(m_LightingRootSignature && m_AmbientPipelineState && m_LightingPipelineState)
         {
             PIX_EVENT_SCOPE(cmdList, L"Lighting");
+            m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
                 m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-            m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+
+            const float clearColor[4] = {};
+            cmdList.GetCmdList()->ClearRenderTargetView(
+                m_ColorRenderTarget->GetD3D12RTV(), clearColor, 0, nullptr);
+
             cmdList.SetRenderTargets(nullptr, m_ColorRenderTarget.get());
-            cmdList.SetPipelineState(m_LightingPipelineState.Get());
             cmdList.SetRootSignature(m_LightingRootSignature.Get());
+            
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 LIGHTING_ROOT_PARAM_DEPTH_SRV, m_DepthTexture->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
+                LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_GBUFFER_NORMAL, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
+                LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-            cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+
+            {
+                PIX_EVENT_SCOPE(cmdList, L"Ambient");
+                cmdList.SetPipelineState(m_AmbientPipelineState.Get());
+                cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+            }
+
+            {
+                PIX_EVENT_SCOPE(cmdList, L"Light");
+                cmdList.SetPipelineState(m_LightingPipelineState.Get());
+                cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+            }
         }
 
         if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
@@ -492,7 +508,7 @@ void Renderer::Render()
             cmdList.SetPipelineState(m_PostprocessingPipelineState.Get());
             cmdList.SetRootSignature(m_PostprocessingRootSignature.Get());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                POSTPROCESSING_ROOT_PARAM_TEXTURE, m_ColorRenderTarget->GetD3D12SRV());
+                POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV, m_ColorRenderTarget->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
 
@@ -775,7 +791,7 @@ void Renderer::CreateResources()
     }
 
 	Create3DPipelineState();
-	CreateLightingPipelineState();
+	CreateLightingPipelineStates();
 	CreatePostprocessingPipelineState();
 
     ERR_CATCH_FUNC;
@@ -819,10 +835,11 @@ void Renderer::Create3DPipelineState()
     } CATCH_PRINT_ERROR(;);
 }
 
-void Renderer::CreateLightingPipelineState()
+void Renderer::CreateLightingPipelineStates()
 {
     m_LightingRootSignature.Reset();
     m_LightingPipelineState.Reset();
+    m_AmbientPipelineState.Reset();
 
     ERR_TRY
     ERR_TRY
@@ -844,16 +861,16 @@ void Renderer::CreateLightingPipelineState()
         params[LIGHTING_ROOT_PARAM_DEPTH_SRV].DescriptorTable.pDescriptorRanges = &descRangeDepthSRV;
 
         const CD3DX12_DESCRIPTOR_RANGE descRange0{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1};
-        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.NumDescriptorRanges = 1;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.pDescriptorRanges = &descRange0;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV].DescriptorTable.pDescriptorRanges = &descRange0;
 
         const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
-        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.NumDescriptorRanges = 1;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.pDescriptorRanges = &descRange2;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV].DescriptorTable.pDescriptorRanges = &descRange2;
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
 		desc.NumParameters = (uint32_t)_countof(params);
@@ -869,53 +886,113 @@ void Renderer::CreateLightingPipelineState()
         SetD3D12ObjectName(m_LightingRootSignature, L"Lighting root signature");
 	}
 
-    Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
-    ps.Init(ShaderType::Pixel,  L"Data/LightingPS.hlsl", L"main");
+    // Ambient root signature
+    {
+        Shader vs, ps;
+        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
+        ps.Init(ShaderType::Pixel,  L"Data/AmbientPS.hlsl", L"main");
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
-	//desc.InputLayout.NumElements = ;
-	//desc.InputLayout.pInputElementDescs = ;
-	desc.pRootSignature = m_LightingRootSignature.Get();
-	desc.VS.BytecodeLength = vs.GetCode().size();
-	desc.VS.pShaderBytecode = vs.GetCode().data();
-	desc.PS.BytecodeLength = ps.GetCode().size();
-	desc.PS.pShaderBytecode = ps.GetCode().data();
-	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	desc.NumRenderTargets = 1;
-	desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
-	desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
-	desc.SampleDesc.Count = 1;
-	desc.SampleMask = UINT32_MAX;
+	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+	    //desc.InputLayout.NumElements = ;
+	    //desc.InputLayout.pInputElementDescs = ;
+	    desc.pRootSignature = m_LightingRootSignature.Get();
+	    desc.VS.BytecodeLength = vs.GetCode().size();
+	    desc.VS.pShaderBytecode = vs.GetCode().data();
+	    desc.PS.BytecodeLength = ps.GetCode().size();
+	    desc.PS.pShaderBytecode = ps.GetCode().data();
+	    desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	    desc.NumRenderTargets = 1;
+	    desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
+	    desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	    desc.SampleDesc.Count = 1;
+	    desc.SampleMask = UINT32_MAX;
 
-    desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-    desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-    desc.RasterizerState.DepthClipEnable = TRUE;
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        desc.RasterizerState.DepthClipEnable = TRUE;
 
-    const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
-        FALSE, FALSE,
-        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
-        D3D12_LOGIC_OP_NOOP,
-        D3D12_COLOR_WRITE_ENABLE_ALL };
-    for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
-        desc.BlendState.RenderTarget[i] = defaultRenderTargetBlendDesc;
+        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
+            FALSE, FALSE,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_LOGIC_OP_NOOP,
+            D3D12_COLOR_WRITE_ENABLE_ALL };
+        for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+            desc.BlendState.RenderTarget[i] = defaultRenderTargetBlendDesc;
 
-    desc.DepthStencilState.DepthEnable = FALSE;
-    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-    desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
-    desc.DepthStencilState.StencilEnable = FALSE;
-    desc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
-    desc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
-    const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
-        D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
-    desc.DepthStencilState.FrontFace = defaultStencilOp;
-    desc.DepthStencilState.BackFace = defaultStencilOp;
+        desc.DepthStencilState.DepthEnable = FALSE;
+        desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+        desc.DepthStencilState.StencilEnable = FALSE;
+        desc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+        desc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
+            D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+        desc.DepthStencilState.FrontFace = defaultStencilOp;
+        desc.DepthStencilState.BackFace = defaultStencilOp;
 
-	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_LightingPipelineState));
-    SetD3D12ObjectName(m_LightingPipelineState, L"Lighting pipeline state");
+	    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_AmbientPipelineState));
+        SetD3D12ObjectName(m_AmbientPipelineState, L"Ambient pipeline state");
+    }
 
-    ERR_CATCH_MSG(L"Cannot create lighting pipeline state.");
+    // Lighting root signature
+    {
+        Shader vs, ps;
+        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
+        ps.Init(ShaderType::Pixel,  L"Data/LightingPS.hlsl", L"main");
+
+	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+	    //desc.InputLayout.NumElements = ;
+	    //desc.InputLayout.pInputElementDescs = ;
+	    desc.pRootSignature = m_LightingRootSignature.Get();
+	    desc.VS.BytecodeLength = vs.GetCode().size();
+	    desc.VS.pShaderBytecode = vs.GetCode().data();
+	    desc.PS.BytecodeLength = ps.GetCode().size();
+	    desc.PS.pShaderBytecode = ps.GetCode().data();
+	    desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	    desc.NumRenderTargets = 1;
+	    desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
+	    desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	    desc.SampleDesc.Count = 1;
+	    desc.SampleMask = UINT32_MAX;
+
+        desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+        desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+        desc.RasterizerState.DepthClipEnable = TRUE;
+
+        const D3D12_RENDER_TARGET_BLEND_DESC additiveRenderTargetBlendDesc = {
+            TRUE, FALSE,
+            D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD,
+            D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD,
+            D3D12_LOGIC_OP_NOOP,
+            D3D12_COLOR_WRITE_ENABLE_ALL };
+        desc.BlendState.RenderTarget[0] = additiveRenderTargetBlendDesc;
+
+        const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
+            FALSE, FALSE,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+            D3D12_LOGIC_OP_NOOP,
+            D3D12_COLOR_WRITE_ENABLE_ALL };
+        for (UINT i = 1; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+            desc.BlendState.RenderTarget[i] = defaultRenderTargetBlendDesc;
+
+        desc.DepthStencilState.DepthEnable = FALSE;
+        desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+        desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+        desc.DepthStencilState.StencilEnable = FALSE;
+        desc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+        desc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+        const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
+            D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+        desc.DepthStencilState.FrontFace = defaultStencilOp;
+        desc.DepthStencilState.BackFace = defaultStencilOp;
+
+	    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_LightingPipelineState));
+        SetD3D12ObjectName(m_LightingPipelineState, L"Lighting pipeline state");
+    }
+
+    ERR_CATCH_MSG(L"Cannot create lighting pipeline states.");
     } CATCH_PRINT_ERROR(;);
 }
 
@@ -932,10 +1009,10 @@ void Renderer::CreatePostprocessingPipelineState()
         D3D12_ROOT_PARAMETER params[POSTPROCESSING_ROOT_PARAM_COUNT] = {};
 
         const CD3DX12_DESCRIPTOR_RANGE descRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].DescriptorTable.NumDescriptorRanges = 1;
-        params[POSTPROCESSING_ROOT_PARAM_TEXTURE].DescriptorTable.pDescriptorRanges = &descRange;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV].DescriptorTable.pDescriptorRanges = &descRange;
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
 		desc.NumParameters = (uint32_t)_countof(params);

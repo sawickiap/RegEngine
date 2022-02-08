@@ -110,5 +110,11 @@
     <Text Include="..\WorkingDir\Data\LightingPS.hlsl">
       <Filter>Shaders</Filter>
     </Text>
+    <Text Include="..\WorkingDir\Data\AmbientPS.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Data\Include\LightingCommon.hlsl">
+      <Filter>Shaders\Include</Filter>
+    </Text>
   </ItemGroup>
 </Project>
