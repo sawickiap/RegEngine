@@ -36,12 +36,10 @@ enum ASSIMP_LOG_SEVERITY
 
 static const DXGI_FORMAT GBUFFER_FORMATS[] = {
     DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
-    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    DXGI_FORMAT_R16G16B16A16_FLOAT,
 };
 static const wchar_t* GBUFFER_NAMES[] = {
     L"Albedo",
-    L"Position",
     L"Normal",
 };
 static_assert(_countof(GBUFFER_FORMATS) == (size_t)GBuffer::Count);
@@ -129,7 +127,6 @@ enum LIGHTING_ROOT_PARAM
     LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
     LIGHTING_ROOT_PARAM_DEPTH_SRV,
     LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO,
-    LIGHTING_ROOT_PARAM_GBUFFER_POSITION,
     LIGHTING_ROOT_PARAM_GBUFFER_NORMAL,
     LIGHTING_ROOT_PARAM_COUNT
 };
@@ -450,7 +447,7 @@ void Renderer::Render()
             PIX_EVENT_SCOPE(cmdList, L"3D");
 
             cmdList.SetRenderTargets(m_DepthTexture.get(),
-                {m_GBuffers[0].get(), m_GBuffers[1].get(), m_GBuffers[2].get()});
+                {m_GBuffers[0].get(), m_GBuffers[1].get()});
 
             cmdList.SetPipelineState(m_3DPipelineState.Get());
 	        cmdList.SetRootSignature(m_RootSignature.Get());
@@ -481,8 +478,6 @@ void Renderer::Render()
                 LIGHTING_ROOT_PARAM_DEPTH_SRV, m_DepthTexture->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_GBUFFER_POSITION, m_GBuffers[(size_t)GBuffer::Position]->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 LIGHTING_ROOT_PARAM_GBUFFER_NORMAL, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -854,13 +849,7 @@ void Renderer::CreateLightingPipelineState()
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.NumDescriptorRanges = 1;
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.pDescriptorRanges = &descRange0;
 
-        const CD3DX12_DESCRIPTOR_RANGE descRange1{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
-        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.NumDescriptorRanges = 1;
-        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.pDescriptorRanges = &descRange1;
-
-        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3};
+        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.NumDescriptorRanges = 1;

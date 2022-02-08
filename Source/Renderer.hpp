@@ -21,7 +21,6 @@ struct aiMaterial;
 enum class GBuffer
 {
     Albedo,
-    Position,
     Normal,
     Count
 };

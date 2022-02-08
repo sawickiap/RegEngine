@@ -18,7 +18,6 @@ struct VS_INPUT
 struct VS_OUTPUT
 {
 	float4 pos_Clip : SV_POSITION;
-	float3 pos_View : POS_VIEW;
 	float3 normal_View : NORMAL;
 	float2 texCoord : TEXCOORD;
 };
@@ -27,7 +26,6 @@ VS_OUTPUT main(VS_INPUT input)
 {
 	VS_OUTPUT output;
 	output.pos_Clip = mul(perObjectConstants.WorldViewProj, float4(input.pos_Local, 1));
-	output.pos_View = mul(perObjectConstants.WorldView, float4(input.pos_Local, 1)).xyz;
 	output.normal_View = mul((float3x3)perObjectConstants.WorldView, input.normal_Local);
 	output.texCoord = input.texCoord;
 	return output;
