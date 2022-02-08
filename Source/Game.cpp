@@ -37,6 +37,9 @@ void Game::OnKeyDown(WPARAM key)
         cam->SetPitch(glm::radians(30.f));
         break;
     }
+    case '0':
+        g_Renderer->m_AmbientEnabled = !g_Renderer->m_AmbientEnabled;
+        break;
     }
 }
 

@@ -413,7 +413,7 @@ void Renderer::Render()
             myData.m_ProjInv = m_Camera->GetProjectionInverse();
             myData.m_DirToLight_View = dirToLight_View;
             myData.m_LightColor = g_LightColor.GetValue();
-            myData.m_AmbientColor = g_AmbientColor.GetValue();
+            myData.m_AmbientColor = m_AmbientEnabled ? (packed_vec3)g_AmbientColor.GetValue() : packed_vec3(0.f, 0.f, 0.f);
 
             void* mappedPtr = nullptr;
             m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, perFrameConstants);

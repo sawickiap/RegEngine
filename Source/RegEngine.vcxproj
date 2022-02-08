@@ -129,6 +129,7 @@
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
+    <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h" />
     <ClInclude Include="AssimpUtils.hpp" />
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="Cameras.hpp" />

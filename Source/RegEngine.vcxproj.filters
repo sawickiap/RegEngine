@@ -75,6 +75,9 @@
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="Cameras.hpp" />
     <ClInclude Include="Streams.hpp" />
+    <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h">
+      <Filter>Shaders\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

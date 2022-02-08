@@ -72,6 +72,8 @@ It creates and keeps ID3D12Device and other key objects.
 class Renderer
 {
 public:
+    bool m_AmbientEnabled = true;
+
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
 	~Renderer();
