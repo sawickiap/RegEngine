@@ -156,36 +156,36 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\WorkingDir\Data\PS.hlsl">
-      <FileType>Document</FileType>
-    </Text>
-    <Text Include="..\WorkingDir\Data\VS.hlsl">
-      <FileType>Document</FileType>
-    </Text>
-  </ItemGroup>
-  <ItemGroup>
     <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\WorkingDir\Data\FullScreenQuadVS.hlsl">
+    <Text Include="..\WorkingDir\Data\FullScreenQuad.VS.hlsl">
       <FileType>Document</FileType>
     </Text>
-    <Text Include="..\WorkingDir\Data\PostprocessingPS.hlsl">
-      <FileType>Document</FileType>
-    </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\WorkingDir\Data\LightingPS.hlsl">
+    <Text Include="..\WorkingDir\Data\Postprocessing.PS.hlsl">
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\WorkingDir\Data\AmbientPS.hlsl">
+    <Text Include="..\WorkingDir\Data\Lighting.PS.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\WorkingDir\Data\Ambient.PS.hlsl">
       <FileType>Document</FileType>
     </Text>
     <Text Include="..\WorkingDir\Data\Include\LightingCommon.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\WorkingDir\Data\ThreeD.PS.hlsl">
+      <FileType>Document</FileType>
+    </Text>
+    <Text Include="..\WorkingDir\Data\ThreeD.VS.hlsl">
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>

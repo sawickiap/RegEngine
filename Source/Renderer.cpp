@@ -838,8 +838,8 @@ void Renderer::Create3DPipelineState()
     ERR_TRY
 
     Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/VS.hlsl", L"main");
-    ps.Init(ShaderType::Pixel,  L"Data/PS.hlsl", L"main");
+    vs.Init(ShaderType::Vertex, L"Data/ThreeD.VS.hlsl", L"main");
+    ps.Init(ShaderType::Pixel,  L"Data/ThreeD.PS.hlsl", L"main");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 	desc.InputLayout.NumElements = Vertex::GetInputElementCount();
@@ -926,8 +926,8 @@ void Renderer::CreateLightingPipelineStates()
     // Ambient root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
-        ps.Init(ShaderType::Pixel,  L"Data/AmbientPS.hlsl", L"main");
+        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
+        ps.Init(ShaderType::Pixel,  L"Data/Ambient.PS.hlsl", L"main");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 	    //desc.InputLayout.NumElements = ;
@@ -975,8 +975,8 @@ void Renderer::CreateLightingPipelineStates()
     // Lighting root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
-        ps.Init(ShaderType::Pixel,  L"Data/LightingPS.hlsl", L"main");
+        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
+        ps.Init(ShaderType::Pixel,  L"Data/Lighting.PS.hlsl", L"main");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 	    //desc.InputLayout.NumElements = ;
@@ -1066,8 +1066,8 @@ void Renderer::CreatePostprocessingPipelineState()
 	}
 
     Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
-    ps.Init(ShaderType::Pixel,  L"Data/PostprocessingPS.hlsl", L"main");
+    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
+    ps.Init(ShaderType::Pixel,  L"Data/Postprocessing.PS.hlsl", L"main");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
 	//desc.InputLayout.NumElements = ;
@@ -1192,14 +1192,14 @@ void Renderer::LoadModel()
 
         Light pl0 = {
             .m_Type = LIGHT_TYPE_DIRECTIONAL,
-            .m_Color = vec3(1.f, 0.f, 0.f),
+            .m_Color = vec3(0.5f, 0.f, 0.f),
             .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
         };
         m_Lights.push_back(pl0);
 
         Light pl1 = {
             .m_Type = LIGHT_TYPE_DIRECTIONAL,
-            .m_Color = vec3(0.f, 1.f, 0.f),
+            .m_Color = vec3(0.f, 0.5f, 0.f),
             .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
         };
         m_Lights.push_back(pl1);

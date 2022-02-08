@@ -22,6 +22,6 @@
     "BackFaceCullingMode": 2,
 
     "DirectionToLight": [-1, 3, 0.5],
-    "LightColor": [0.95,0.95,0.95], // In linear space.
+    "LightColor": [0.7,0.7,0.7], // In linear space.
     "AmbientColor": [0.05, 0.05, 0.05] // In linear space.
 }
