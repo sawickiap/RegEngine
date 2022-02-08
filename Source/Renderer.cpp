@@ -18,6 +18,7 @@
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/vector2.h>
 #include <assimp/vector3.h>
+#include "../WorkingDir/Data/Include/ShaderConstants.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -114,6 +115,15 @@ struct PerObjectConstants
     packed_mat4 m_WorldView;
 };
 
+struct LightConstants
+{
+    packed_vec3 m_Color;
+    uint32_t m_Type;
+
+    packed_vec3 m_DirectionToLight_Position;
+    uint32_t _padding0;
+};
+
 enum THREED_ROOT_PARAM
 {
     THREED_ROOT_PARAM_PER_FRAME_CBV,
@@ -125,6 +135,7 @@ enum THREED_ROOT_PARAM
 enum LIGHTING_ROOT_PARAM
 {
     LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
+    LIGHTING_ROOT_PARAM_LIGHT_CBV,
     LIGHTING_ROOT_PARAM_DEPTH_SRV,
     LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV,
     LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV,
@@ -487,16 +498,36 @@ void Renderer::Render()
                 LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+            if(m_AmbientEnabled)
             {
                 PIX_EVENT_SCOPE(cmdList, L"Ambient");
                 cmdList.SetPipelineState(m_AmbientPipelineState.Get());
                 cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
             }
 
+            for(size_t lightIndex = 0; lightIndex < m_Lights.size(); ++lightIndex)
             {
-                PIX_EVENT_SCOPE(cmdList, L"Light");
-                cmdList.SetPipelineState(m_LightingPipelineState.Get());
-                cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+                const Light& l = m_Lights[lightIndex];
+                if(l.m_Enabled)
+                {
+                    PIX_EVENT_SCOPE(cmdList, std::format(L"Light {} Type={}", lightIndex, l.m_Type));
+
+                    vec4 dirToLight_Homo = m_Camera->GetView() * vec4(l.m_DirectionToLight_Position, 0.f);
+                    vec3 dirToLight = glm::normalize(vec3(dirToLight_Homo.x, dirToLight_Homo.y, dirToLight_Homo.z));
+
+                    LightConstants lc;
+                    lc.m_Color = l.m_Color;
+                    lc.m_Type = l.m_Type;
+                    lc.m_DirectionToLight_Position = dirToLight;
+                    void* mappedPtr = nullptr;
+                    D3D12_GPU_DESCRIPTOR_HANDLE lcDesc;
+                    m_TemporaryConstantBufferManager->CreateBuffer(sizeof(lc), mappedPtr, lcDesc);
+                    memcpy(mappedPtr, &lc, sizeof(lc));
+
+                    cmdList.SetPipelineState(m_LightingPipelineState.Get());
+                    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(LIGHTING_ROOT_PARAM_LIGHT_CBV, lcDesc);
+                    cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+                }
             }
         }
 
@@ -854,6 +885,12 @@ void Renderer::CreateLightingPipelineStates()
         params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
         params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &descRangePerFrameCBV;
 
+        const CD3DX12_DESCRIPTOR_RANGE descRangeLightCBV{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1};
+        params[LIGHTING_ROOT_PARAM_LIGHT_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_LIGHT_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_LIGHT_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_LIGHT_CBV].DescriptorTable.pDescriptorRanges = &descRangeLightCBV;
+
         const CD3DX12_DESCRIPTOR_RANGE descRangeDepthSRV{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
         params[LIGHTING_ROOT_PARAM_DEPTH_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[LIGHTING_ROOT_PARAM_DEPTH_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -1133,6 +1170,7 @@ void Renderer::CreateStandardTextures()
 
 void Renderer::ClearModel()
 {
+    m_Lights.clear();
     m_Textures.clear();
     m_Materials.clear();
     m_Meshes.clear();
@@ -1142,6 +1180,30 @@ void Renderer::ClearModel()
 void Renderer::LoadModel()
 {
     ClearModel();
+
+    // Lights
+    {
+        Light dl = {
+            .m_Type = LIGHT_TYPE_DIRECTIONAL,
+            .m_Color = g_LightColor.GetValue(),
+            .m_DirectionToLight_Position = g_DirectionToLight.GetValue()
+        };
+        m_Lights.push_back(dl);
+
+        Light pl0 = {
+            .m_Type = LIGHT_TYPE_POINT,
+            .m_Color = vec3(1.f, 0.f, 0.f),
+            .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
+        };
+        m_Lights.push_back(pl0);
+
+        Light pl1 = {
+            .m_Type = LIGHT_TYPE_POINT,
+            .m_Color = vec3(0.f, 1.f, 0.f),
+            .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
+        };
+        m_Lights.push_back(pl1);
+    }
 
     /*
     RegEngine coordinate system is left-handed: X right, Y back, Z up.

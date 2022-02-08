@@ -65,6 +65,17 @@ struct Entity
     std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
 };
 
+struct Light
+{
+    bool m_Enabled = true;
+    // Use LIGHT_TYPE_* from ShaderConstants.h
+    uint32_t m_Type = 0;
+    vec3 m_Color; // Linear space
+    // LIGHT_TYPE_DIRECTIONAL: direction to light (world space)
+    // LIGHT_TYPE_POINT: position (world space)
+    vec3 m_DirectionToLight_Position;
+};
+
 /*
 Represents the main object responsible for rendering graphics.
 It creates and keeps ID3D12Device and other key objects.
@@ -73,6 +84,7 @@ class Renderer
 {
 public:
     bool m_AmbientEnabled = true;
+    std::vector<Light> m_Lights;
 
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
