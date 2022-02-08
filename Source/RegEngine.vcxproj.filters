@@ -107,5 +107,8 @@
     <Text Include="..\WorkingDir\Data\PostprocessingPS.hlsl">
       <Filter>Shaders</Filter>
     </Text>
+    <Text Include="..\WorkingDir\Data\LightingPS.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
   </ItemGroup>
 </Project>

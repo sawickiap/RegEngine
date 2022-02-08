@@ -34,6 +34,19 @@ enum ASSIMP_LOG_SEVERITY
     ASSIMP_LOG_SEVERITY_DEBUG,
 };
 
+static const DXGI_FORMAT GBUFFER_FORMATS[] = {
+    DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+    DXGI_FORMAT_R32G32B32A32_FLOAT,
+};
+static const wchar_t* GBUFFER_NAMES[] = {
+    L"Albedo",
+    L"Position",
+    L"Normal",
+};
+static_assert(_countof(GBUFFER_FORMATS) == (size_t)GBuffer::Count);
+static_assert(_countof(GBUFFER_NAMES) == (size_t)GBuffer::Count);
+
 UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
 static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
 static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
@@ -97,15 +110,22 @@ struct PerObjectConstants
     packed_mat4 m_WorldView;
 };
 
-enum ROOT_PARAM
+enum THREED_ROOT_PARAM
 {
-    ROOT_PARAM_PER_FRAME_CBV,
-    ROOT_PARAM_PER_OBJECT_CBV,
-    ROOT_PARAM_TEXTURE_SRV,
-    ROOT_PARAM_SAMPLER,
-    ROOT_PARAM_COUNT
+    THREED_ROOT_PARAM_PER_FRAME_CBV,
+    THREED_ROOT_PARAM_PER_OBJECT_CBV,
+    THREED_ROOT_PARAM_TEXTURE_SRV,
+    THREED_ROOT_PARAM_SAMPLER,
+    THREED_ROOT_PARAM_COUNT
 };
-
+enum LIGHTING_ROOT_PARAM
+{
+    LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
+    LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO,
+    LIGHTING_ROOT_PARAM_GBUFFER_POSITION,
+    LIGHTING_ROOT_PARAM_GBUFFER_NORMAL,
+    LIGHTING_ROOT_PARAM_COUNT
+};
 enum POSTPROCESSING_ROOT_PARAM
 {
     POSTPROCESSING_ROOT_PARAM_TEXTURE,
@@ -311,11 +331,12 @@ void Renderer::Reload()
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
     
-    m_PipelineState.Reset();
+    m_3DPipelineState.Reset();
     ClearModel();
 
-    CreatePipelineState();
+    Create3DPipelineState();
     CreatePostprocessingPipelineState();
+    CreateLightingPipelineState();
     LoadModel();
 }
 
@@ -373,61 +394,85 @@ void Renderer::Render()
         float time = (float)GetTickCount() * 1e-3f;
 	    //float pos = fmod(time * 100.f, (float)SIZE_X);
 
+        // Set per-frame constants.
+        D3D12_GPU_DESCRIPTOR_HANDLE perFrameConstants;
+        {
+            const vec3 dirToLight_World = g_DirectionToLight.GetValue();
+            const vec3 dirToLight_View = glm::normalize(vec3(m_Camera->GetView() * vec4(dirToLight_World, 0.f)));
+
+            PerFrameConstants myData = {};
+            myData.m_FrameIndex = m_FrameIndex;
+            myData.m_SceneTime = time;
+            myData.m_DirToLight_View = dirToLight_View;
+            myData.m_LightColor = g_LightColor.GetValue();
+            myData.m_AmbientColor = g_AmbientColor.GetValue();
+
+            void* mappedPtr = nullptr;
+            m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, perFrameConstants);
+            memcpy(mappedPtr, &myData, sizeof(myData));
+        }
+
         {
             PIX_EVENT_SCOPE(cmdList, L"Clears");
 
-            m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+            {
+                m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	            const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
+	            cmdList.GetCmdList()->ClearRenderTargetView(
+                    m_GBuffers[i]->GetD3D12RTV(),
+                    clearRGBA,
+                    0, nullptr); // NumRects, pRects
+            }
 
-	        const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
-	        cmdList.GetCmdList()->ClearRenderTargetView(
-                m_ColorRenderTarget->GetD3D12RTV(),
-                clearRGBA,
-                0,
-                nullptr);
+            m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_DEPTH_WRITE);
             cmdList.GetCmdList()->ClearDepthStencilView(
                 m_DepthTexture->GetD3D12DSV(),
                 D3D12_CLEAR_FLAG_DEPTH,
                 0.f, // depth
                 0, // stencil
-                0, nullptr); // NumRects, prects
+                0, nullptr); // NumRects, pRects
         }
 
-        cmdList.SetRenderTargets(m_DepthTexture.get(), m_ColorRenderTarget.get());
-
-        if(m_PipelineState && m_RootSignature)
+        if(m_3DPipelineState && m_RootSignature)
         {
             PIX_EVENT_SCOPE(cmdList, L"3D");
 
-            cmdList.SetPipelineState(m_PipelineState.Get());
+            cmdList.SetRenderTargets(m_DepthTexture.get(),
+                {m_GBuffers[0].get(), m_GBuffers[1].get(), m_GBuffers[2].get()});
+
+            cmdList.SetPipelineState(m_3DPipelineState.Get());
 	        cmdList.SetRootSignature(m_RootSignature.Get());
 
-            // Set per-frame constants.
-            {
-                const vec3 dirToLight_World = g_DirectionToLight.GetValue();
-                const vec3 dirToLight_View = glm::normalize(vec3(m_Camera->GetView() * vec4(dirToLight_World, 0.f)));
-
-                PerFrameConstants myData = {};
-                myData.m_FrameIndex = m_FrameIndex;
-                myData.m_SceneTime = time;
-                myData.m_DirToLight_View = dirToLight_View;
-                myData.m_LightColor = g_LightColor.GetValue();
-                myData.m_AmbientColor = g_AmbientColor.GetValue();
-
-                void* mappedPtr = nullptr;
-                D3D12_GPU_DESCRIPTOR_HANDLE descriptorHandle;
-                m_TemporaryConstantBufferManager->CreateBuffer(sizeof(myData), mappedPtr, descriptorHandle);
-                memcpy(mappedPtr, &myData, sizeof(myData));
-
-                cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_FRAME_CBV, descriptorHandle);
-            }
-
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_SAMPLER,
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_SAMPLER,
                 m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
             mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
             RenderEntity(cmdList, globalXform, m_RootEntity);
+        }
+
+        if(m_LightingRootSignature && m_LightingPipelineState)
+        {
+            PIX_EVENT_SCOPE(cmdList, L"Lighting");
+            for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+                m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
+            cmdList.SetRenderTargets(nullptr, m_ColorRenderTarget.get());
+            cmdList.SetPipelineState(m_LightingPipelineState.Get());
+            cmdList.SetRootSignature(m_LightingRootSignature.Get());
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                LIGHTING_ROOT_PARAM_GBUFFER_POSITION, m_GBuffers[(size_t)GBuffer::Position]->GetD3D12SRV());
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                LIGHTING_ROOT_PARAM_GBUFFER_NORMAL, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
+            cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
         }
 
         if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
@@ -649,31 +694,31 @@ void Renderer::CreateResources()
 
 	// Root signature
 	{
-        D3D12_ROOT_PARAMETER params[ROOT_PARAM_COUNT] = {};
+        D3D12_ROOT_PARAMETER params[THREED_ROOT_PARAM_COUNT] = {};
 
         const CD3DX12_DESCRIPTOR_RANGE perFrameCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
-        params[ROOT_PARAM_PER_FRAME_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[ROOT_PARAM_PER_FRAME_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-        params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
-        params[ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &perFrameCBVDescRange;
+        params[THREED_ROOT_PARAM_PER_FRAME_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[THREED_ROOT_PARAM_PER_FRAME_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params[THREED_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[THREED_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &perFrameCBVDescRange;
 
         const CD3DX12_DESCRIPTOR_RANGE perObjectCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1};
-        params[ROOT_PARAM_PER_OBJECT_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[ROOT_PARAM_PER_OBJECT_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-        params[ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.NumDescriptorRanges = 1;
-        params[ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.pDescriptorRanges = &perObjectCBVDescRange;
+        params[THREED_ROOT_PARAM_PER_OBJECT_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[THREED_ROOT_PARAM_PER_OBJECT_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
+        params[THREED_ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[THREED_ROOT_PARAM_PER_OBJECT_CBV].DescriptorTable.pDescriptorRanges = &perObjectCBVDescRange;
 
         const CD3DX12_DESCRIPTOR_RANGE textureSRVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        params[ROOT_PARAM_TEXTURE_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[ROOT_PARAM_TEXTURE_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.NumDescriptorRanges = 1;
-        params[ROOT_PARAM_TEXTURE_SRV].DescriptorTable.pDescriptorRanges = &textureSRVDescRange;
+        params[THREED_ROOT_PARAM_TEXTURE_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[THREED_ROOT_PARAM_TEXTURE_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[THREED_ROOT_PARAM_TEXTURE_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[THREED_ROOT_PARAM_TEXTURE_SRV].DescriptorTable.pDescriptorRanges = &textureSRVDescRange;
 
         const CD3DX12_DESCRIPTOR_RANGE samplerDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0};
-        params[ROOT_PARAM_SAMPLER].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-        params[ROOT_PARAM_SAMPLER].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-        params[ROOT_PARAM_SAMPLER].DescriptorTable.NumDescriptorRanges = 1;
-        params[ROOT_PARAM_SAMPLER].DescriptorTable.pDescriptorRanges = &samplerDescRange;
+        params[THREED_ROOT_PARAM_SAMPLER].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[THREED_ROOT_PARAM_SAMPLER].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[THREED_ROOT_PARAM_SAMPLER].DescriptorTable.NumDescriptorRanges = 1;
+        params[THREED_ROOT_PARAM_SAMPLER].DescriptorTable.pDescriptorRanges = &samplerDescRange;
 
 		D3D12_ROOT_SIGNATURE_DESC desc = {};
 		desc.NumParameters = (uint32_t)_countof(params);
@@ -707,17 +752,31 @@ void Renderer::CreateResources()
         m_ColorRenderTarget->Init(resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, L"ColorRenderTarget");
     }
 
-	CreatePipelineState();
+    for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+    {
+        D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
+            GBUFFER_FORMATS[i],
+            GetFinalResolutionU().x, GetFinalResolutionU().y,
+            1, // arraySize
+            1, // mipLevels
+            1, 0, // sampleCount, sampleQuality
+            D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+        m_GBuffers[i] = std::make_unique<RenderingResource>();
+        m_GBuffers[i]->Init(resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, std::format(L"GBuffer {}", GBUFFER_NAMES[i]));
+    }
+
+	Create3DPipelineState();
+	CreateLightingPipelineState();
 	CreatePostprocessingPipelineState();
 
     ERR_CATCH_FUNC;
 }
 
-void Renderer::CreatePipelineState()
+void Renderer::Create3DPipelineState()
 {
     assert(m_ColorRenderTarget);
 
-    m_PipelineState.Reset();
+    m_3DPipelineState.Reset();
 
     ERR_TRY
     ERR_TRY
@@ -735,18 +794,119 @@ void Renderer::CreatePipelineState()
 	desc.PS.BytecodeLength = ps.GetCode().size();
 	desc.PS.pShaderBytecode = ps.GetCode().data();
 	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	desc.NumRenderTargets = 1;
-	desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
+	desc.NumRenderTargets = (UINT)GBuffer::Count;
+    for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+	    desc.RTVFormats[i] = GBUFFER_FORMATS[i];
 	desc.DSVFormat = DEPTH_STENCIL_FORMAT;
 	desc.SampleDesc.Count = 1;
 	desc.SampleMask = UINT32_MAX;
 	SetDefaultRasterizerDesc(desc.RasterizerState);
 	SetDefaultBlendDesc(desc.BlendState);
 	SetDefaultDepthStencilDesc(desc.DepthStencilState);
-	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_PipelineState));
-    SetD3D12ObjectName(m_PipelineState, L"Test pipeline state");
+	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState));
+    SetD3D12ObjectName(m_3DPipelineState, L"Test pipeline state");
 
     ERR_CATCH_MSG(L"Cannot create pipeline state.");
+    } CATCH_PRINT_ERROR(;);
+}
+
+void Renderer::CreateLightingPipelineState()
+{
+    m_LightingRootSignature.Reset();
+    m_LightingPipelineState.Reset();
+
+    ERR_TRY
+    ERR_TRY
+
+    // Root signature
+    {
+        D3D12_ROOT_PARAMETER params[LIGHTING_ROOT_PARAM_COUNT] = {};
+
+        const CD3DX12_DESCRIPTOR_RANGE descRangePerFrameCBV{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
+        params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+        params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &descRangePerFrameCBV;
+
+        const CD3DX12_DESCRIPTOR_RANGE descRange0{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.pDescriptorRanges = &descRange0;
+
+        const CD3DX12_DESCRIPTOR_RANGE descRange1{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1};
+        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.pDescriptorRanges = &descRange1;
+
+        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.pDescriptorRanges = &descRange2;
+
+		D3D12_ROOT_SIGNATURE_DESC desc = {};
+		desc.NumParameters = (uint32_t)_countof(params);
+        desc.pParameters = params;
+		desc.Flags = //D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
+		ComPtr<ID3DBlob> blob;
+		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
+		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
+			__uuidof(ID3D12RootSignature), &m_LightingRootSignature));
+        SetD3D12ObjectName(m_LightingRootSignature, L"Lighting root signature");
+	}
+
+    Shader vs, ps;
+    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuadVS.hlsl", L"main");
+    ps.Init(ShaderType::Pixel,  L"Data/LightingPS.hlsl", L"main");
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {};
+	//desc.InputLayout.NumElements = ;
+	//desc.InputLayout.pInputElementDescs = ;
+	desc.pRootSignature = m_LightingRootSignature.Get();
+	desc.VS.BytecodeLength = vs.GetCode().size();
+	desc.VS.pShaderBytecode = vs.GetCode().data();
+	desc.PS.BytecodeLength = ps.GetCode().size();
+	desc.PS.pShaderBytecode = ps.GetCode().data();
+	desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	desc.NumRenderTargets = 1;
+	desc.RTVFormats[0] = m_ColorRenderTarget->GetDesc().Format;
+	desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+	desc.SampleDesc.Count = 1;
+	desc.SampleMask = UINT32_MAX;
+
+    desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+    desc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
+    desc.RasterizerState.DepthClipEnable = TRUE;
+
+    const D3D12_RENDER_TARGET_BLEND_DESC defaultRenderTargetBlendDesc = {
+        FALSE, FALSE,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_BLEND_ONE, D3D12_BLEND_ZERO, D3D12_BLEND_OP_ADD,
+        D3D12_LOGIC_OP_NOOP,
+        D3D12_COLOR_WRITE_ENABLE_ALL };
+    for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        desc.BlendState.RenderTarget[i] = defaultRenderTargetBlendDesc;
+
+    desc.DepthStencilState.DepthEnable = FALSE;
+    desc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+    desc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER;
+    desc.DepthStencilState.StencilEnable = FALSE;
+    desc.DepthStencilState.StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK;
+    desc.DepthStencilState.StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK;
+    const D3D12_DEPTH_STENCILOP_DESC defaultStencilOp = {
+        D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_STENCIL_OP_KEEP, D3D12_COMPARISON_FUNC_ALWAYS };
+    desc.DepthStencilState.FrontFace = defaultStencilOp;
+    desc.DepthStencilState.BackFace = defaultStencilOp;
+
+	CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_LightingPipelineState));
+    SetD3D12ObjectName(m_LightingPipelineState, L"Lighting pipeline state");
+
+    ERR_CATCH_MSG(L"Cannot create lighting pipeline state.");
     } CATCH_PRINT_ERROR(;);
 }
 
@@ -1122,7 +1282,7 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
         m_TemporaryConstantBufferManager->CreateBuffer(sizeof(perObjConstants), perObjectConstantsPtr, perObjectConstantsDescriptorHandle);
         memcpy(perObjectConstantsPtr, &perObjConstants, sizeof(perObjConstants));
 
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_PER_OBJECT_CBV, perObjectConstantsDescriptorHandle);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_PER_OBJECT_CBV, perObjectConstantsDescriptorHandle);
 
         for(size_t meshIndex : entity.m_Meshes)
             RenderEntityMesh(cmdList, entity, meshIndex);
@@ -1150,7 +1310,7 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
         textureDescriptorHandle =
             m_SRVDescriptorManager->GetGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
     }
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
 
     cmdList.SetPrimitiveTopology(mesh->GetTopology());
 

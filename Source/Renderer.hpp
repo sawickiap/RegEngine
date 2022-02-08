@@ -18,6 +18,14 @@ struct aiNode;
 struct aiMesh;
 struct aiMaterial;
 
+enum class GBuffer
+{
+    Albedo,
+    Position,
+    Normal,
+    Count
+};
+
 enum class StandardTexture
 {
     Transparent, Black, Gray, White, Red, Green, Blue, Yellow, Fuchsia, Count
@@ -126,12 +134,15 @@ private:
 	UINT m_FrameIndex = UINT32_MAX;
 	unique_ptr<HANDLE, CloseHandleDeleter> m_FenceEvent;
     unique_ptr<Texture> m_StandardTextures[(size_t)StandardTexture::Count];
+    unique_ptr<RenderingResource> m_GBuffers[(size_t)GBuffer::Count];
     unique_ptr<RenderingResource> m_ColorRenderTarget;
 	ComPtr<ID3D12RootSignature> m_RootSignature;
-	ComPtr<ID3D12PipelineState> m_PipelineState;
+	ComPtr<ID3D12PipelineState> m_3DPipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<OrbitingCamera> m_Camera;
+	ComPtr<ID3D12RootSignature> m_LightingRootSignature;
+	ComPtr<ID3D12PipelineState> m_LightingPipelineState;
 	ComPtr<ID3D12RootSignature> m_PostprocessingRootSignature;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
 
@@ -163,7 +174,8 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
-    void CreatePipelineState();
+    void Create3DPipelineState();
+    void CreateLightingPipelineState();
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
     void ClearModel();
