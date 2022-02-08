@@ -137,12 +137,11 @@ void Texture::SaveCacheFile(const std::filesystem::path& cacheFilePath, const Di
         DDSBlob));
 
     {
-        FileWriteStream stream;
-        stream.Init(pathStr, FILE_STREAM_FLAG_SEQUENTIAL);
+        FileStream stream(pathStr, FileStream::Flag_Write | FileStream::Flag_Sequential);
         const str_view headerStr{CACHE_FILE_HEADER};
         stream.WriteString(headerStr);
         stream.WriteValue((uint32_t)DDSBlob.GetBufferSize());
-        stream.WriteData(DDSBlob.GetBufferPointer(), DDSBlob.GetBufferSize());
+        stream.Write(DDSBlob.GetBufferPointer(), DDSBlob.GetBufferSize());
         stream.WriteString(headerStr);
     }
        
@@ -155,12 +154,11 @@ void Texture::LoadFromCacheFile(uint32_t flags, const std::filesystem::path& pat
     LogInfoF(L"Loading texture cache from file \"{}\"...", pathStr);
     ERR_TRY;
 
-    FileReadStream stream;
-    stream.Init(pathStr, 0);
+    FileStream stream(pathStr, FileStream::Flag_Read);
     
     const size_t headerLen = strlen(CACHE_FILE_HEADER);
     char header[32];
-    stream.ReadData(header, headerLen);
+    stream.Read(header, headerLen);
     if(memcmp(header, CACHE_FILE_HEADER, headerLen) != 0)
         FAIL(L"Invalid begin header.");
 
@@ -170,18 +168,18 @@ void Texture::LoadFromCacheFile(uint32_t flags, const std::filesystem::path& pat
 
     // Validate header at the end.
     {
-        const size_t fileSize = stream.GetFileSize();
-        size_t pos = stream.GetFilePointer();
+        const size_t fileSize = stream.GetSize();
+        size_t pos = stream.GetPosition();
         CHECK_BOOL(pos + contentLen + headerLen == fileSize);
-        stream.SetFilePointer((ptrdiff_t)contentLen, FileStreamBase::MoveMethod::Current);
-        stream.ReadData(header, headerLen);
+        stream.SetPosition((ptrdiff_t)contentLen, BaseStream::MoveMethod::Current);
+        stream.Read(header, headerLen);
         if(memcmp(header, CACHE_FILE_HEADER, headerLen) != 0)
             FAIL(L"Invalid end header.");
-        stream.SetFilePointer((ptrdiff_t)pos, FileStreamBase::MoveMethod::Begin);
+        stream.SetPosition((ptrdiff_t)pos, BaseStream::MoveMethod::Begin);
     }
 
     std::vector<char> content(contentLen);
-    stream.ReadData(content.data(), contentLen);
+    stream.Read(content.data(), contentLen);
 
     DirectX::ScratchImage image;
     CHECK_HR(DirectX::LoadFromDDSMemory(content.data(), contentLen, DirectX::DDS_FLAGS_NONE, NULL, image));
