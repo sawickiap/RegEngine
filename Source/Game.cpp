@@ -29,7 +29,7 @@ void Game::Update()
     for(size_t li = 0; li < g_Renderer->m_Lights.size(); ++li)
     {
         Light& l = g_Renderer->m_Lights[li];
-        if(l.m_Type == LIGHT_TYPE_POINT)
+        if(l.m_Type == LIGHT_TYPE_DIRECTIONAL)
         {
             l.m_DirectionToLight_Position = vec3(
                 sin(time * 0.3545f * (float)li + 13.1535f + (float)li),

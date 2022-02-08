@@ -1191,14 +1191,14 @@ void Renderer::LoadModel()
         m_Lights.push_back(dl);
 
         Light pl0 = {
-            .m_Type = LIGHT_TYPE_POINT,
+            .m_Type = LIGHT_TYPE_DIRECTIONAL,
             .m_Color = vec3(1.f, 0.f, 0.f),
             .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
         };
         m_Lights.push_back(pl0);
 
         Light pl1 = {
-            .m_Type = LIGHT_TYPE_POINT,
+            .m_Type = LIGHT_TYPE_DIRECTIONAL,
             .m_Color = vec3(0.f, 1.f, 0.f),
             .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
         };
