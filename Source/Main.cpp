@@ -201,12 +201,14 @@ void Application::OnKeyDown(WPARAM key)
         LoadLoadSettings();
         if(g_Renderer)
             g_Renderer->Reload();
-        break;
+        return;
 
     case VK_ESCAPE:
         PostMessage(m_Wnd, WM_CLOSE, 0, 0);
-        break;
+        return;
     }
+
+    m_Game.OnKeyDown(key);
 }
 
 int Application::Run()

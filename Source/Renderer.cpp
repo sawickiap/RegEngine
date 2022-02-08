@@ -121,6 +121,7 @@ enum THREED_ROOT_PARAM
 enum LIGHTING_ROOT_PARAM
 {
     LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
+    LIGHTING_ROOT_PARAM_DEPTH_SRV,
     LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO,
     LIGHTING_ROOT_PARAM_GBUFFER_POSITION,
     LIGHTING_ROOT_PARAM_GBUFFER_NORMAL,
@@ -418,7 +419,7 @@ void Renderer::Render()
             for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
             {
                 m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	            const float clearRGBA[] = {0.f, 0.0f, 0.25f, 1.0f};
+	            const float clearRGBA[] = {0.f, 0.f, 0.f, 0.f};
 	            cmdList.GetCmdList()->ClearRenderTargetView(
                     m_GBuffers[i]->GetD3D12RTV(),
                     clearRGBA,
@@ -459,12 +460,15 @@ void Renderer::Render()
             PIX_EVENT_SCOPE(cmdList, L"Lighting");
             for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
                 m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
             cmdList.SetRenderTargets(nullptr, m_ColorRenderTarget.get());
             cmdList.SetPipelineState(m_LightingPipelineState.Get());
             cmdList.SetRootSignature(m_LightingRootSignature.Get());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                LIGHTING_ROOT_PARAM_DEPTH_SRV, m_DepthTexture->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
@@ -654,7 +658,7 @@ void Renderer::CreateResources()
             1, // mipLevels
             1, // sampleCount
             0, // sampleQuality
-            D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL | D3D12_RESOURCE_FLAG_DENY_SHADER_RESOURCE);
+            D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL);
         D3D12_CLEAR_VALUE clearValue = {};
         clearValue.Format = DEPTH_STENCIL_FORMAT;
         clearValue.DepthStencil.Depth = 0.f;
@@ -828,19 +832,25 @@ void Renderer::CreateLightingPipelineState()
         params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.NumDescriptorRanges = 1;
         params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV].DescriptorTable.pDescriptorRanges = &descRangePerFrameCBV;
 
-        const CD3DX12_DESCRIPTOR_RANGE descRange0{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        const CD3DX12_DESCRIPTOR_RANGE descRangeDepthSRV{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
+        params[LIGHTING_ROOT_PARAM_DEPTH_SRV].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+        params[LIGHTING_ROOT_PARAM_DEPTH_SRV].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+        params[LIGHTING_ROOT_PARAM_DEPTH_SRV].DescriptorTable.NumDescriptorRanges = 1;
+        params[LIGHTING_ROOT_PARAM_DEPTH_SRV].DescriptorTable.pDescriptorRanges = &descRangeDepthSRV;
+
+        const CD3DX12_DESCRIPTOR_RANGE descRange0{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1};
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.NumDescriptorRanges = 1;
         params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO].DescriptorTable.pDescriptorRanges = &descRange0;
 
-        const CD3DX12_DESCRIPTOR_RANGE descRange1{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1};
+        const CD3DX12_DESCRIPTOR_RANGE descRange1{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
         params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.NumDescriptorRanges = 1;
         params[LIGHTING_ROOT_PARAM_GBUFFER_POSITION].DescriptorTable.pDescriptorRanges = &descRange1;
 
-        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
+        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3};
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
         params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL].DescriptorTable.NumDescriptorRanges = 1;

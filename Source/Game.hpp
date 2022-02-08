@@ -25,6 +25,7 @@ public:
     // Called every frame before rendering
     void Update();
 
+    void OnKeyDown(WPARAM key);
     void OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos);
 
 private:

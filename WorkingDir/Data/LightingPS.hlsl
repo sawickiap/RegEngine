@@ -1,12 +1,14 @@
 #include "Include/Common.hlsl"
 
-Texture2D<float4> GBufferAlbedo : register(t0);
-Texture2D<float4> GBufferPosition : register(t1);
-Texture2D<float4> GBufferNormal : register(t2);
+Texture2D<float> Depth : register(t0);
+Texture2D<float4> GBufferAlbedo : register(t1);
+Texture2D<float4> GBufferPosition : register(t2);
+Texture2D<float4> GBufferNormal : register(t3);
 
 float4 main(float4 pos : SV_Position) : SV_Target
 {
 	int3 loadPos = int3(pos.xy, 0);
+	float depth = Depth.Load(loadPos).r;
 	float3 albedo = GBufferAlbedo.Load(loadPos).rgb;
 	float3 pos_View = GBufferPosition.Load(loadPos).rgb;
 	float3 normal_View = normalize(GBufferNormal.Load(loadPos).rgb);
@@ -20,5 +22,5 @@ float4 main(float4 pos : SV_Position) : SV_Target
 	color += diffuseTerm * albedo * perFrameConstants.LightColor;
 	color += specularTerm * diffuseTerm * perFrameConstants.LightColor;
 
-	return float4(color, 1);
+	return float4(color, 1.0);
 }

@@ -26,6 +26,20 @@ void Game::Update()
 
 }
 
+void Game::OnKeyDown(WPARAM key)
+{
+    switch(key)
+    {
+    case 'R':
+    {
+        OrbitingCamera* cam = g_Renderer->GetCamera();
+        cam->SetYaw(-glm::radians(10.f));
+        cam->SetPitch(glm::radians(30.f));
+        break;
+    }
+    }
+}
+
 void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
 {
     float yaw = ((float)pos.x / g_Renderer->GetFinalResolutionF().x - 0.5f) * glm::two_pi<float>();
