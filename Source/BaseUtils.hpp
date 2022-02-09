@@ -260,7 +260,6 @@ void LogWarningF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Warning
 template<typename... Args>
 void LogErrorF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Error, format, args...); }
 
-std::vector<char> LoadFile(const wstr_view& path);
 void SetThreadName(DWORD threadId, const str_view& name);
 void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }

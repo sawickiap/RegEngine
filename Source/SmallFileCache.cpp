@@ -1,5 +1,6 @@
 #include "BaseUtils.hpp"
 #include "SmallFileCache.hpp"
+#include "Streams.hpp"
 #include <unordered_map>
 
 constexpr size_t MAX_CACHED_FILE_SIZE = 128llu * 1024;

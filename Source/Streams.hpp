@@ -81,3 +81,5 @@ public:
 private:
     unique_ptr<HANDLE, CloseHandleDeleter> m_Handle;
 };
+
+std::vector<char> LoadFile(const wstr_view& path);

@@ -118,3 +118,17 @@ void FileStream::Write(const void* bytes, size_t bytesToWrite)
     CHECK_BOOL_WINAPI(WriteFile(m_Handle.get(), bytes, numberOfBytesToWrite, &numberOfBytesWritten, NULL));
     CHECK_BOOL(numberOfBytesWritten == numberOfBytesToWrite);
 }
+
+std::vector<char> LoadFile(const wstr_view& path)
+{
+    ERR_TRY;
+
+    FileStream s(path, FileStream::Flag_Read | FileStream::Flag_Sequential);
+    const size_t size = s.GetSize();
+    std::vector<char> data(size);
+    if(size)
+        s.Read(data.data(), size);
+	return data;
+
+    ERR_CATCH_MSG(std::format(L"Cannot load file \"{}\".", path));
+}

@@ -157,40 +157,6 @@ void Log(LogLevel level, const wstr_view& msg)
         SetConsoleColor(LogLevel::Message);
 }
 
-std::vector<char> LoadFile(const wstr_view& path)
-{
-    ERR_TRY;
-
-    LogInfoF(L"Loading file \"{}\"...", path);
-
-	HANDLE handle = CreateFile(
-		path.c_str(), // lpFileName
-		GENERIC_READ, // dwDesiredAccess
-		FILE_SHARE_READ, // dwShareMode
-		NULL, // lpSecurityAttributes
-		OPEN_EXISTING, // dwCreationDisposition
-		FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, // dwFlagsAndAttributes
-		NULL); // hTemplateFile
-	CHECK_BOOL_WINAPI(handle != INVALID_HANDLE_VALUE);
-	unique_ptr<HANDLE, CloseHandleDeleter> handlePtr(handle);
-
-	LARGE_INTEGER sizeInt = {};
-	CHECK_BOOL(GetFileSizeEx(handle, &sizeInt));
-	if(sizeInt.QuadPart == 0)
-		return {};
-	CHECK_BOOL(sizeInt.QuadPart <= (LONGLONG)UINT32_MAX);
-	const DWORD size = sizeInt.LowPart;
-	
-	std::vector<char> bytes(size);
-	DWORD numberOfBytesRead = 0;
-	CHECK_BOOL(ReadFile(handle, bytes.data(), size, &numberOfBytesRead, NULL));
-	CHECK_BOOL(numberOfBytesRead == numberOfBytesRead);
-	
-	return bytes;
-
-    ERR_CATCH_MSG(std::format(L"Cannot load file \"{}\".", path));
-}
-
 // For C++ threads as threadId you can use:
 // GetThreadId((HANDLE)t.native_handle());
 void SetThreadName(DWORD threadId, const str_view& name)
