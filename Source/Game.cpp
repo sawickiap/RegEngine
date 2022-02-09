@@ -26,7 +26,7 @@ void Game::Update()
 {
     float time = (float)GetTickCount() * 1e-3f;
 
-    for(size_t li = 0; li < g_Renderer->m_Lights.size(); ++li)
+    for(size_t li = 1; li < g_Renderer->m_Lights.size(); ++li)
     {
         Light& l = g_Renderer->m_Lights[li];
         if(l.m_Type == LIGHT_TYPE_DIRECTIONAL)

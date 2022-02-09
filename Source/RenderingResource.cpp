@@ -33,9 +33,13 @@ void RenderingResource::Init(
         optimizedClearValue,
         &m_MyRes,
         IID_NULL, NULL)); // riidResource, ppvResource
-    
     if(!name.empty())
         SetD3D12ObjectName(m_MyRes->GetResource(), name);
+
+    assert(g_Renderer && g_Renderer->GetDevice1());
+    ID3D12Pageable* const pageable = m_MyRes->GetResource();
+    const D3D12_RESIDENCY_PRIORITY priority = D3D12_RESIDENCY_PRIORITY_HIGH;
+    g_Renderer->GetDevice1()->SetResidencyPriority(1, &pageable, &priority); // Ignoring result
 
     InitDescriptors();
 }
@@ -113,15 +117,7 @@ void RenderingResource::InitDescriptors()
         // Special formats
         if(m_Desc.Format == DXGI_FORMAT_D32_FLOAT)
         {
-            viewDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            viewDesc.Format = DXGI_FORMAT_R32_FLOAT;
-            viewDesc.Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
-                D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_0,
-                D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_1,
-                D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_2,
-                D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_3);
-            viewDesc.Texture2D = {
-                .MipLevels = 1 };
+            FillShaderResourceViewDesc_Texture2D(viewDesc, DXGI_FORMAT_R32_FLOAT);
             viewDescPtr = &viewDesc;
         }
         m_SRV = SRVManager->AllocatePersistent(1);

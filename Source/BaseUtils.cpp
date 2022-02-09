@@ -239,6 +239,145 @@ uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format)
     return (uint8_t)DirectX::BitsPerPixel(format);
 }
 
+void FillShaderResourceViewDesc_Texture2D(D3D12_SHADER_RESOURCE_VIEW_DESC& dst,
+    DXGI_FORMAT format)
+{
+    dst = {
+        .Format = format,
+        .ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D,
+        .Shader4ComponentMapping = D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_0,
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_1,
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_2,
+        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_3),
+        .Texture2D = {
+            .MipLevels = UINT_MAX }};
+}
+
+void FillRasterizerDesc(D3D12_RASTERIZER_DESC& dst,
+    D3D12_CULL_MODE cullMode, BOOL frontCounterClockwise)
+{
+    dst = {
+        .FillMode = D3D12_FILL_MODE_SOLID,
+        .CullMode = cullMode,
+        .FrontCounterClockwise = frontCounterClockwise,
+        .DepthBias = D3D12_DEFAULT_DEPTH_BIAS,
+        .DepthBiasClamp = D3D12_DEFAULT_DEPTH_BIAS_CLAMP,
+        .SlopeScaledDepthBias = D3D12_DEFAULT_SLOPE_SCALED_DEPTH_BIAS,
+        .MultisampleEnable = FALSE,
+        .AntialiasedLineEnable = FALSE,
+        .ForcedSampleCount = 0,
+        .ConservativeRaster = D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF};
+}
+
+void FillRasterizerDesc_NoCulling(D3D12_RASTERIZER_DESC& dst)
+{
+    FillRasterizerDesc(dst, D3D12_CULL_MODE_NONE, FALSE);
+}
+
+void FillBlendDesc_BlendRT0(D3D12_BLEND_DESC& dst,
+    D3D12_BLEND srcBlend, D3D12_BLEND destBlend, D3D12_BLEND_OP blendOp,
+    D3D12_BLEND srcBlendAlpha, D3D12_BLEND destBlendAlpha, D3D12_BLEND_OP blendOpAlpha)
+{
+    dst = {};
+    dst.RenderTarget[0] = {
+        .BlendEnable = TRUE,
+        .LogicOpEnable = FALSE,
+        .SrcBlend = srcBlend,
+        .DestBlend = destBlend,
+        .BlendOp = blendOp,
+        .SrcBlendAlpha = srcBlendAlpha,
+        .DestBlendAlpha = destBlendAlpha,
+        .BlendOpAlpha = blendOpAlpha,
+        .LogicOp = D3D12_LOGIC_OP_NOOP,
+        .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL};
+    const D3D12_RENDER_TARGET_BLEND_DESC otherRTBlendDesc = {
+        .BlendEnable = FALSE,
+        .LogicOpEnable = FALSE,
+        .SrcBlend = D3D12_BLEND_ONE,
+        .DestBlend = D3D12_BLEND_ONE,
+        .BlendOp = D3D12_BLEND_OP_ADD,
+        .SrcBlendAlpha = D3D12_BLEND_ONE,
+        .DestBlendAlpha = D3D12_BLEND_ONE,
+        .BlendOpAlpha = D3D12_BLEND_OP_ADD,
+        .LogicOp = D3D12_LOGIC_OP_NOOP,
+        .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL};
+    for (UINT i = 1; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        dst.RenderTarget[i] = otherRTBlendDesc;
+}
+
+void FillBlendDesc_NoBlending(D3D12_BLEND_DESC& dst)
+{
+    dst = {};
+    const D3D12_RENDER_TARGET_BLEND_DESC RTBlendDesc = {
+        .BlendEnable = FALSE,
+        .LogicOpEnable = FALSE,
+        .SrcBlend = D3D12_BLEND_ONE,
+        .DestBlend = D3D12_BLEND_ONE,
+        .BlendOp = D3D12_BLEND_OP_ADD,
+        .SrcBlendAlpha = D3D12_BLEND_ONE,
+        .DestBlendAlpha = D3D12_BLEND_ONE,
+        .BlendOpAlpha = D3D12_BLEND_OP_ADD,
+        .LogicOp = D3D12_LOGIC_OP_NOOP,
+        .RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL};
+    for (UINT i = 0; i < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT; ++i)
+        dst.RenderTarget[i] = RTBlendDesc;
+}
+
+void FillDepthStencilDesc_NoTests(D3D12_DEPTH_STENCIL_DESC& dst)
+{
+    dst = {
+        .DepthEnable = FALSE,
+        .DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO,
+        .DepthFunc = D3D12_COMPARISON_FUNC_GREATER,
+        .StencilEnable = FALSE,
+        .StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK,
+        .StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK,
+        .FrontFace = {
+            .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilPassOp = D3D12_STENCIL_OP_KEEP,
+            .StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS},
+        .BackFace = {
+            .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilPassOp = D3D12_STENCIL_OP_KEEP,
+            .StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS}};
+}
+
+void FillDepthStencilDesc_DepthTest(D3D12_DEPTH_STENCIL_DESC& dst,
+    D3D12_DEPTH_WRITE_MASK depthWriteMask, D3D12_COMPARISON_FUNC depthFunc)
+{
+    dst = {
+        .DepthEnable = TRUE,
+        .DepthWriteMask = depthWriteMask,
+        .DepthFunc = depthFunc,
+        .StencilEnable = FALSE,
+        .StencilReadMask = D3D12_DEFAULT_STENCIL_READ_MASK,
+        .StencilWriteMask = D3D12_DEFAULT_STENCIL_WRITE_MASK,
+        .FrontFace = {
+            .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilPassOp = D3D12_STENCIL_OP_KEEP,
+            .StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS},
+        .BackFace = {
+            .StencilFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+            .StencilPassOp = D3D12_STENCIL_OP_KEEP,
+            .StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS}};
+}
+
+void FillRootParameter_DescriptorTable(D3D12_ROOT_PARAMETER& dst,
+    const D3D12_DESCRIPTOR_RANGE* descriptorRange, D3D12_SHADER_VISIBILITY shaderVisibility)
+{
+    dst = {
+        .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+        .DescriptorTable = {
+            .NumDescriptorRanges = 1,
+            .pDescriptorRanges = descriptorRange},
+        .ShaderVisibility = shaderVisibility};
+}
+
 bool FileExists(const std::filesystem::path& path)
 {
     std::error_code errorCode;

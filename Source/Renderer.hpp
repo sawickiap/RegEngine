@@ -92,6 +92,7 @@ public:
     void Reload();
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
+    ID3D12Device1* GetDevice1() { return m_Device1.Get(); };
     const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
     D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
     ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
@@ -126,6 +127,7 @@ private:
 	const HWND m_Wnd;
 
 	ComPtr<ID3D12Device> m_Device;
+	ComPtr<ID3D12Device1> m_Device1;
 	RendererCapabilities m_Capabilities;
     ComPtr<D3D12MA::Allocator> m_MemoryAllocator;
 	ComPtr<ID3D12CommandQueue> m_CmdQueue;

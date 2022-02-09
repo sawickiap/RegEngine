@@ -267,6 +267,21 @@ inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view&
 // On error returns 0.
 uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format);
 
+void FillShaderResourceViewDesc_Texture2D(D3D12_SHADER_RESOURCE_VIEW_DESC& dst,
+    DXGI_FORMAT format);
+void FillRasterizerDesc(D3D12_RASTERIZER_DESC& dst,
+    D3D12_CULL_MODE cullMode, BOOL frontCounterClockwise);
+void FillRasterizerDesc_NoCulling(D3D12_RASTERIZER_DESC& dst);
+void FillBlendDesc_BlendRT0(D3D12_BLEND_DESC& dst,
+    D3D12_BLEND srcBlend, D3D12_BLEND destBlend, D3D12_BLEND_OP blendOp,
+    D3D12_BLEND srcBlendAlpha, D3D12_BLEND destBlendAlpha, D3D12_BLEND_OP blendOpAlpha);
+void FillBlendDesc_NoBlending(D3D12_BLEND_DESC& dst);
+void FillDepthStencilDesc_NoTests(D3D12_DEPTH_STENCIL_DESC& dst);
+void FillDepthStencilDesc_DepthTest(D3D12_DEPTH_STENCIL_DESC& dst,
+    D3D12_DEPTH_WRITE_MASK depthWriteMask, D3D12_COMPARISON_FUNC depthFunc);
+void FillRootParameter_DescriptorTable(D3D12_ROOT_PARAMETER& dst,
+    const D3D12_DESCRIPTOR_RANGE* descriptorRange, D3D12_SHADER_VISIBILITY shaderVisibility);
+
 // Returns true if file exists and is a file not directory or something else. Doesn't throw exceptions.
 bool FileExists(const std::filesystem::path& path);
 bool GetFileLastWriteTime(std::filesystem::file_time_type& outTime, const std::filesystem::path& path);
