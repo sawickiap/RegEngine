@@ -2,6 +2,7 @@
 #include "Game.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
+#include "SmallFileCache.hpp"
 #include <windowsx.h>
 
 enum EXIT_CODE
@@ -23,6 +24,7 @@ class Application
 {
 public:
     Application();
+    ~Application();
     void Init();
     int Run();
 
@@ -51,12 +53,19 @@ Application::Application()
     SetThreadName(GetCurrentThreadId(), "MAIN");
 }
 
+Application::~Application()
+{
+    delete g_SmallFileCache;
+    g_SmallFileCache = nullptr;
+}
+
 void Application::Init()
 {
     ERR_TRY;
     LogMessage(L"Application starting.");
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DXGIFactory)));
+    g_SmallFileCache = new SmallFileCache{};
     LoadStartupSettings();
     LoadLoadSettings();
     SelectAdapter();

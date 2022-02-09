@@ -2,10 +2,13 @@
 #include "Shaders.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
+#include "SmallFileCache.hpp"
 #include "../ThirdParty/dxc_2021_12_08/inc/dxcapi.h"
 #pragma comment(lib, "../ThirdParty/dxc_2021_12_08/lib/x64/dxcompiler.lib")
 
 static StringSequenceSetting g_ShaderExtraParameters(SettingCategory::Load, "Shaders.ExtraParameters");
+
+static constexpr uint32_t CODE_PAGE = DXC_CP_UTF8;
 
 class IncludeHandler : public IDxcIncludeHandler
 {
@@ -40,18 +43,21 @@ public:
     ComPtr<IDxcCompiler3> m_Compiler;
 };
 
-HRESULT STDMETHODCALLTYPE IncludeHandler::LoadSource(_In_z_ LPCWSTR pFilename, _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource)
+HRESULT STDMETHODCALLTYPE IncludeHandler::LoadSource(
+    _In_z_ LPCWSTR pFilename,
+    _COM_Outptr_result_maybenull_ IDxcBlob** ppIncludeSource)
 {
     assert(g_Renderer && g_Renderer->GetShaderCompiler());
     ShaderCompilerPimpl* compiler = g_Renderer->GetShaderCompiler()->m_Pimpl.get();
 
     std::filesystem::path filePath = m_Directory / pFilename;
     const wchar_t* const filePathNative = filePath.native().c_str();
-    LogInfoF(L"Loading included file \"{}\"...", filePathNative);
-    uint32_t codePage = CP_UTF8;
-    IDxcBlobEncoding* blobEncoding = nullptr;
-    HRESULT hr = compiler->m_Utils->LoadFile(filePathNative, &codePage, &blobEncoding);
-    *ppIncludeSource = blobEncoding;
+
+    const auto contents = g_SmallFileCache->LoadFile(filePathNative);
+    ComPtr<IDxcBlobEncoding> blobEncoding;
+    HRESULT hr = compiler->m_Utils->CreateBlob(contents.data(), (uint32_t)contents.size(), CODE_PAGE, &blobEncoding);
+    if(SUCCEEDED(hr))
+        blobEncoding->QueryInterface(IID_PPV_ARGS(ppIncludeSource));
     return hr;
 }
 
@@ -78,12 +84,12 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
     dir = dir.parent_path();
     IncludeHandler includeHandler(std::move(dir));
 
-    const std::vector<char> source = LoadFile(filePath);
+    const std::vector<char> source = g_SmallFileCache->LoadFile(filePath);
     CHECK_BOOL(!source.empty());
     const DxcBuffer sourceDxcBuffer = {
         .Ptr = source.data(),
         .Size = source.size(),
-        .Encoding = DXC_CP_UTF8};
+        .Encoding = CODE_PAGE};
 
     const wchar_t* profileParam = nullptr;
     switch(type)

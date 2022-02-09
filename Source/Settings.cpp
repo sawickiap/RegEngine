@@ -1,5 +1,6 @@
 #include "BaseUtils.hpp"
 #include "Settings.hpp"
+#include "SmallFileCache.hpp"
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "../ThirdParty/rapidjson/include/rapidjson/document.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
@@ -163,7 +164,7 @@ void SettingCollection::LoadFromFile(const wstr_view& filePath)
 {
     ERR_TRY;
     using namespace rapidjson;
-    auto fileContents = LoadFile(filePath);
+    auto fileContents = g_SmallFileCache->LoadFile(filePath);
     Document doc;
     doc.Parse<kParseCommentsFlag | kParseTrailingCommasFlag | kParseNanAndInfFlag | kParseValidateEncodingFlag>(
         fileContents.data(), fileContents.size());

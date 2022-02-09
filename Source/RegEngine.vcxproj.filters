@@ -20,6 +20,7 @@
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="Cameras.cpp" />
     <ClCompile Include="Streams.cpp" />
+    <ClCompile Include="SmallFileCache.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -78,6 +79,7 @@
     <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h">
       <Filter>Shaders\Include</Filter>
     </ClInclude>
+    <ClInclude Include="SmallFileCache.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
