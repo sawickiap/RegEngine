@@ -89,7 +89,7 @@ public:
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
 	~Renderer();
-    void Reload();
+    void Reload(bool refreshAll);
 
     ID3D12Device* GetDevice() { return m_Device.Get(); };
     ID3D12Device1* GetDevice1() { return m_Device1.Get(); };
@@ -195,11 +195,12 @@ private:
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
     void ClearModel();
-    void LoadModel();
+    void LoadModel(bool refreshAll);
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
-    void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex, const aiMaterial* material);
+    void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
+        const aiMaterial* material, bool refreshAll);
 
     void WaitForFenceOnCPU(UINT64 value);
 

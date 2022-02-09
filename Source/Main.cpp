@@ -204,20 +204,34 @@ void Application::OnDestroy()
 
 void Application::OnKeyDown(WPARAM key)
 {
-    switch (key)
-    {
-    case VK_F5:
-        LoadLoadSettings();
-        if(g_Renderer)
-            g_Renderer->Reload();
-        return;
+    uint32_t modifiers = 0;
+    if((GetKeyState(VK_CONTROL) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_CONTROL;
+    if((GetKeyState(VK_MENU) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_ALT;
+    if((GetKeyState(VK_SHIFT) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_SHIFT;
 
-    case VK_ESCAPE:
+    // ESC: Exit.
+    if(key == VK_ESCAPE && modifiers == 0)
+    {
         PostMessage(m_Wnd, WM_CLOSE, 0, 0);
         return;
     }
+    
+    // F5: Refresh. Ctrl+F5: Force-refresh.
+    if(key == VK_F5 && (modifiers & ~KEY_MODIFIER_CONTROL) == 0)
+    {
+        const bool refreshAll = (modifiers & KEY_MODIFIER_CONTROL) != 0;
+        if(refreshAll)
+            g_SmallFileCache->Clear();
+        LoadLoadSettings();
+        if(g_Renderer)
+            g_Renderer->Reload(refreshAll);
+        return;
+    }
 
-    m_Game.OnKeyDown(key);
+    m_Game.OnKeyDown(key, modifiers);
 }
 
 int Application::Run()

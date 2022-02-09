@@ -315,7 +315,7 @@ void Renderer::Init()
 	CreateResources();
     CreateStandardTextures();
     m_AssimpInit = std::make_unique<AssimpInit>();
-    LoadModel();
+    LoadModel(false);
     
     m_Camera = std::make_unique<OrbitingCamera>();
     m_Camera->SetAspectRatio(GetFinalResolutionF().x / GetFinalResolutionF().y);
@@ -341,7 +341,7 @@ Renderer::~Renderer()
         m_FrameResources[i].m_BackBuffer.reset();
 }
 
-void Renderer::Reload()
+void Renderer::Reload(bool refreshAll)
 {
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
@@ -352,7 +352,7 @@ void Renderer::Reload()
     Create3DPipelineState();
     CreatePostprocessingPipelineState();
     CreateLightingPipelineStates();
-    LoadModel();
+    LoadModel(refreshAll);
 }
 
 uvec2 Renderer::GetFinalResolutionU()
@@ -1045,7 +1045,7 @@ void Renderer::ClearModel()
     m_RootEntity = Entity{};
 }
 
-void Renderer::LoadModel()
+void Renderer::LoadModel(bool refreshAll)
 {
     ClearModel();
 
@@ -1113,7 +1113,7 @@ void Renderer::LoadModel()
 
         const std::filesystem::path modelDir = std::filesystem::path(filePath.begin(), filePath.end()).parent_path();
         for(uint32_t i = 0; i < scene->mNumMaterials; ++i)
-            LoadMaterial(modelDir, scene, i, scene->mMaterials[i]);
+            LoadMaterial(modelDir, scene, i, scene->mMaterials[i], refreshAll);
     }
 
     ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
@@ -1205,7 +1205,8 @@ bool GetStringMaterialProperty(string& out, const aiMaterial* material, const st
     return true;
 }
 
-void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex, const aiMaterial* material)
+void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
+    const aiMaterial* material, bool refreshAll)
 {
     ERR_TRY;
 
@@ -1261,9 +1262,10 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         SceneTexture tex;
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
-        tex.m_Texture->LoadFromFile(
-            Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_LOAD | Texture::FLAG_CACHE_SAVE,
-            texturePathP.native());
+        uint32_t flags = Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;
+        if(!refreshAll)
+            flags |= Texture::FLAG_CACHE_LOAD;
+        tex.m_Texture->LoadFromFile(flags, texturePathP.native());
         m_Textures.push_back(std::move(tex));
         m_Materials.push_back(SceneMaterial{m_Textures.size() - 1});
     }

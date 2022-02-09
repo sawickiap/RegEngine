@@ -39,32 +39,35 @@ void Game::Update()
     }
 }
 
-void Game::OnKeyDown(WPARAM key)
+void Game::OnKeyDown(WPARAM key, uint32_t modifiers)
 {
-    switch(key)
+    if(modifiers == 0)
     {
-    case 'R':
-    {
-        OrbitingCamera* cam = g_Renderer->GetCamera();
-        cam->SetYaw(-glm::radians(10.f));
-        cam->SetPitch(glm::radians(30.f));
-        break;
-    }
-    case '0':
-        g_Renderer->m_AmbientEnabled = !g_Renderer->m_AmbientEnabled;
-        break;
-    case '1':
-        if(g_Renderer->m_Lights.size() > 0)
-            g_Renderer->m_Lights[0].m_Enabled = !g_Renderer->m_Lights[0].m_Enabled;
-        break;
-    case '2':
-        if(g_Renderer->m_Lights.size() > 1)
-            g_Renderer->m_Lights[1].m_Enabled = !g_Renderer->m_Lights[1].m_Enabled;
-        break;
-    case '3':
-        if(g_Renderer->m_Lights.size() > 1)
-            g_Renderer->m_Lights[2].m_Enabled = !g_Renderer->m_Lights[2].m_Enabled;
-        break;
+        switch(key)
+        {
+        case 'R':
+        {
+            OrbitingCamera* cam = g_Renderer->GetCamera();
+            cam->SetYaw(-glm::radians(10.f));
+            cam->SetPitch(glm::radians(30.f));
+            break;
+        }
+        case '0':
+            g_Renderer->m_AmbientEnabled = !g_Renderer->m_AmbientEnabled;
+            break;
+        case '1':
+            if(g_Renderer->m_Lights.size() > 0)
+                g_Renderer->m_Lights[0].m_Enabled = !g_Renderer->m_Lights[0].m_Enabled;
+            break;
+        case '2':
+            if(g_Renderer->m_Lights.size() > 1)
+                g_Renderer->m_Lights[1].m_Enabled = !g_Renderer->m_Lights[1].m_Enabled;
+            break;
+        case '3':
+            if(g_Renderer->m_Lights.size() > 1)
+                g_Renderer->m_Lights[2].m_Enabled = !g_Renderer->m_Lights[2].m_Enabled;
+            break;
+        }
     }
 }
 

@@ -12,6 +12,13 @@ enum MOUSE_BUTTON_DOWN_FLAG
     MOUSE_BUTTON_DOWN_XBUTTON2 = 0x40,
 };
 
+enum KEY_MODIFIERS
+{
+    KEY_MODIFIER_CONTROL = 0x1,
+    KEY_MODIFIER_ALT = 0x2,
+    KEY_MODIFIER_SHIFT = 0x4,
+};
+
 /*
 Represents main object responsible for game/program logic.
 */
@@ -25,7 +32,7 @@ public:
     // Called every frame before rendering
     void Update();
 
-    void OnKeyDown(WPARAM key);
+    void OnKeyDown(WPARAM key, uint32_t modifiers);
     void OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos);
 
 private:
