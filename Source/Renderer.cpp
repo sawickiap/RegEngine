@@ -124,14 +124,6 @@ struct LightConstants
     uint32_t _padding0;
 };
 
-enum THREED_ROOT_PARAM
-{
-    THREED_ROOT_PARAM_PER_FRAME_CBV,
-    THREED_ROOT_PARAM_PER_OBJECT_CBV,
-    THREED_ROOT_PARAM_TEXTURE_SRV,
-    THREED_ROOT_PARAM_SAMPLER,
-    THREED_ROOT_PARAM_COUNT
-};
 enum LIGHTING_ROOT_PARAM
 {
     LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
@@ -254,6 +246,66 @@ void Font::Init()
 
 Font::~Font()
 {
+}
+
+StandardRootSignature::StandardRootSignature()
+{
+    constexpr uint32_t PARAM_COUNT = CBV_COUNT + SRV_COUNT + SAMPLER_COUNT;
+    D3D12_DESCRIPTOR_RANGE descRanges[PARAM_COUNT];
+    D3D12_ROOT_PARAMETER params[PARAM_COUNT];
+    uint32_t paramIndex = 0;
+    for(uint32_t CBVIndex = 0; CBVIndex < CBV_COUNT; ++CBVIndex, ++paramIndex)
+    {
+        descRanges[paramIndex] = {
+            .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_CBV,
+            .NumDescriptors = 1,
+            .BaseShaderRegister = CBVIndex};
+        params[paramIndex] = {
+            .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            .DescriptorTable = {
+                .NumDescriptorRanges = 1,
+                .pDescriptorRanges = descRanges + paramIndex},
+            .ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL};
+    }
+    for(uint32_t SRVIndex = 0; SRVIndex < SRV_COUNT; ++SRVIndex, ++paramIndex)
+    {
+        descRanges[paramIndex] = {
+            .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+            .NumDescriptors = 1,
+            .BaseShaderRegister = SRVIndex};
+        params[paramIndex] = {
+            .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            .DescriptorTable = {
+                .NumDescriptorRanges = 1,
+                .pDescriptorRanges = descRanges + paramIndex},
+            .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL};
+    }
+    for(uint32_t samplerIndex = 0; samplerIndex < SAMPLER_COUNT; ++samplerIndex, ++paramIndex)
+    {
+        descRanges[paramIndex] = {
+            .RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER,
+            .NumDescriptors = 1,
+            .BaseShaderRegister = samplerIndex};
+        params[paramIndex] = {
+            .ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+            .DescriptorTable = {
+                .NumDescriptorRanges = 1,
+                .pDescriptorRanges = descRanges + paramIndex},
+            .ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL};
+    }
+
+	D3D12_ROOT_SIGNATURE_DESC desc = {
+		.NumParameters = PARAM_COUNT,
+        .pParameters = params,
+		.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
+			D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
+            D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS};
+	ComPtr<ID3DBlob> blob;
+	CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
+	CHECK_HR(g_Renderer->GetDevice()->CreateRootSignature(
+        0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_RootSignature)));
+    SetD3D12ObjectName(m_RootSignature, L"Standard root signature");
 }
 
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
@@ -453,7 +505,7 @@ void Renderer::Render()
                 0, nullptr); // NumRects, pRects
         }
 
-        if(m_3DPipelineState && m_RootSignature)
+        if(m_3DPipelineState)
         {
             PIX_EVENT_SCOPE(cmdList, L"3D");
 
@@ -461,11 +513,14 @@ void Renderer::Render()
             cmdList.SetRenderTargets(m_DepthTexture.get(),
                 {m_GBuffers[0].get(), m_GBuffers[1].get()});
 
+	        cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
             cmdList.SetPipelineState(m_3DPipelineState.Get());
-	        cmdList.SetRootSignature(m_RootSignature.Get());
 
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_SAMPLER,
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                m_StandardRootSignature->GetCBVParamIndex(0),
+                perFrameConstants);
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                m_StandardRootSignature->GetSamplerParamIndex(0),
                 m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
@@ -490,7 +545,7 @@ void Renderer::Render()
             cmdList.SetRootSignature(m_LightingRootSignature.Get());
             
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                THREED_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
+                LIGHTING_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 LIGHTING_ROOT_PARAM_DEPTH_SRV, m_DepthTexture->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
@@ -697,39 +752,7 @@ void Renderer::CreateResources()
     }
     */
 
-	// Root signature
-	{
-        D3D12_ROOT_PARAMETER params[THREED_ROOT_PARAM_COUNT] = {};
-
-        const CD3DX12_DESCRIPTOR_RANGE perFrameCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
-        FillRootParameter_DescriptorTable(params[THREED_ROOT_PARAM_PER_FRAME_CBV],
-            &perFrameCBVDescRange, D3D12_SHADER_VISIBILITY_ALL);
-
-        const CD3DX12_DESCRIPTOR_RANGE perObjectCBVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1};
-        FillRootParameter_DescriptorTable(params[THREED_ROOT_PARAM_PER_OBJECT_CBV],
-            &perObjectCBVDescRange, D3D12_SHADER_VISIBILITY_VERTEX);
-
-        const CD3DX12_DESCRIPTOR_RANGE textureSRVDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        FillRootParameter_DescriptorTable(params[THREED_ROOT_PARAM_TEXTURE_SRV],
-            &textureSRVDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        const CD3DX12_DESCRIPTOR_RANGE samplerDescRange{D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 1, 0};
-        FillRootParameter_DescriptorTable(params[THREED_ROOT_PARAM_SAMPLER],
-            &samplerDescRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-		D3D12_ROOT_SIGNATURE_DESC desc = {
-		    .NumParameters = (uint32_t)_countof(params),
-            .pParameters = params,
-		    .Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS};
-		ComPtr<ID3DBlob> blob;
-		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
-		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
-			__uuidof(ID3D12RootSignature), &m_RootSignature));
-        SetD3D12ObjectName(m_RootSignature, L"Test root signature");
-	}
+	m_StandardRootSignature = std::make_unique<StandardRootSignature>();
 
     // Font
     {
@@ -783,7 +806,7 @@ void Renderer::Create3DPipelineState()
     ps.Init(ShaderType::Pixel,  L"Data/ThreeD.PS.hlsl", L"main");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-	    .pRootSignature = m_RootSignature.Get(),
+	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
 	    .VS = {
             .pShaderBytecode = vs.GetCode().data(),
             .BytecodeLength = vs.GetCode().size()},
@@ -1300,7 +1323,9 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
         m_TemporaryConstantBufferManager->CreateBuffer(sizeof(perObjConstants), perObjectConstantsPtr, perObjectConstantsDescriptorHandle);
         memcpy(perObjectConstantsPtr, &perObjConstants, sizeof(perObjConstants));
 
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_PER_OBJECT_CBV, perObjectConstantsDescriptorHandle);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetCBVParamIndex(1),
+            perObjectConstantsDescriptorHandle);
 
         for(size_t meshIndex : entity.m_Meshes)
             RenderEntityMesh(cmdList, entity, meshIndex);
@@ -1328,7 +1353,9 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
         textureDescriptorHandle =
             m_SRVDescriptorManager->GetGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
     }
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(THREED_ROOT_PARAM_TEXTURE_SRV, textureDescriptorHandle);
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+        m_StandardRootSignature->GetSRVParamIndex(0),
+        textureDescriptorHandle);
 
     cmdList.SetPrimitiveTopology(mesh->GetTopology());
 

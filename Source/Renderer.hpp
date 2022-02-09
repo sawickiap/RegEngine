@@ -77,6 +77,35 @@ struct Light
 };
 
 /*
+It offers:
+- CBV b0 ... b7, each separate DESCRIPTOR_TABLE, visible to ALL shader stages.
+- SRV t0 ... t7, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stage.
+- Sampler s0 ... s3, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stages.
+
+Flags:
+ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+DENY_HULL_SHADER_ROOT_ACCESS
+DENY_DOMAIN_SHADER_ROOT_ACCESS
+DENY_GEOMETRY_SHADER_ROOT_ACCESS
+*/
+class StandardRootSignature
+{
+public:
+    StandardRootSignature();
+    ID3D12RootSignature* GetRootSignature() const { return m_RootSignature.Get(); }
+    static uint32_t GetCBVParamIndex(uint32_t CBVIndex) { return CBVIndex; }
+    static uint32_t GetSRVParamIndex(uint32_t SRVIndex) { return SRVIndex + CBV_COUNT; }
+    static uint32_t GetSamplerParamIndex(uint32_t samplerIndex) { return samplerIndex + CBV_COUNT + SRV_COUNT; }
+
+private:
+    static constexpr uint32_t CBV_COUNT = 8;
+    static constexpr uint32_t SRV_COUNT = 8;
+    static constexpr uint32_t SAMPLER_COUNT = 4;
+
+    ComPtr<ID3D12RootSignature> m_RootSignature;
+};
+
+/*
 Represents the main object responsible for rendering graphics.
 It creates and keeps ID3D12Device and other key objects.
 */
@@ -151,7 +180,7 @@ private:
     unique_ptr<Texture> m_StandardTextures[(size_t)StandardTexture::Count];
     unique_ptr<RenderingResource> m_GBuffers[(size_t)GBuffer::Count];
     unique_ptr<RenderingResource> m_ColorRenderTarget;
-	ComPtr<ID3D12RootSignature> m_RootSignature;
+    unique_ptr<StandardRootSignature> m_StandardRootSignature;
 	ComPtr<ID3D12PipelineState> m_3DPipelineState;
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
