@@ -6,7 +6,8 @@
 #include "../ThirdParty/dxc_2021_12_08/inc/dxcapi.h"
 #pragma comment(lib, "../ThirdParty/dxc_2021_12_08/lib/x64/dxcompiler.lib")
 
-static StringSequenceSetting g_ShaderExtraParameters(SettingCategory::Load, "Shaders.ExtraParameters");
+static StringSequenceSetting g_ShadersExtraParameters(SettingCategory::Load, "Shaders.ExtraParameters");
+static BoolSetting g_ShadersEmbedDebugInformation(SettingCategory::Load, "Shaders.EmbedDebugInformation", false);
 
 static constexpr uint32_t CODE_PAGE = DXC_CP_UTF8;
 
@@ -105,12 +106,17 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
         profileParam,
         entryPointParam.c_str()};
     
-    const size_t extraParamCount = g_ShaderExtraParameters.m_Strings.size();
+    const size_t extraParamCount = g_ShadersExtraParameters.m_Strings.size();
     std::vector<wstring> extraParamsUnicode(extraParamCount);
     for(size_t i = 0; i < extraParamCount; ++i)
     {
-        extraParamsUnicode[i] = ConvertCharsToUnicode(g_ShaderExtraParameters.m_Strings[i], CP_UTF8);
+        extraParamsUnicode[i] = ConvertCharsToUnicode(g_ShadersExtraParameters.m_Strings[i], CP_UTF8);
         arguments.push_back(extraParamsUnicode[i].c_str());
+    }
+    if(g_ShadersEmbedDebugInformation.GetValue())
+    {
+        arguments.push_back(L"-Zi");
+        arguments.push_back(L"-Qembed_debug");
     }
 
     ComPtr<IDxcResult> result;
