@@ -124,21 +124,6 @@ struct LightConstants
     uint32_t _padding0;
 };
 
-enum LIGHTING_ROOT_PARAM
-{
-    LIGHTING_ROOT_PARAM_PER_FRAME_CBV,
-    LIGHTING_ROOT_PARAM_LIGHT_CBV,
-    LIGHTING_ROOT_PARAM_DEPTH_SRV,
-    LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV,
-    LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV,
-    LIGHTING_ROOT_PARAM_COUNT
-};
-enum POSTPROCESSING_ROOT_PARAM
-{
-    POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV,
-    POSTPROCESSING_ROOT_PARAM_COUNT
-};
-
 class AssimpInit
 {
 public:
@@ -529,7 +514,7 @@ void Renderer::Render()
             RenderEntity(cmdList, globalXform, m_RootEntity);
         }
 
-        if(m_LightingRootSignature && m_AmbientPipelineState && m_LightingPipelineState)
+        if(m_AmbientPipelineState && m_LightingPipelineState)
         {
             PIX_EVENT_SCOPE(cmdList, L"Lighting");
             m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
@@ -542,16 +527,16 @@ void Renderer::Render()
                 m_ColorRenderTarget->GetD3D12RTV(), clearColor, 0, nullptr);
 
             cmdList.SetRenderTargets(nullptr, m_ColorRenderTarget.get());
-            cmdList.SetRootSignature(m_LightingRootSignature.Get());
+            cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
             
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_PER_FRAME_CBV, perFrameConstants);
+                m_StandardRootSignature->GetCBVParamIndex(0), perFrameConstants);
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_DEPTH_SRV, m_DepthTexture->GetD3D12SRV());
+                m_StandardRootSignature->GetSRVParamIndex(0), m_DepthTexture->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV, m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
+                m_StandardRootSignature->GetSRVParamIndex(1), m_GBuffers[(size_t)GBuffer::Albedo]->GetD3D12SRV());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV, m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
+                m_StandardRootSignature->GetSRVParamIndex(2), m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             if(m_AmbientEnabled)
@@ -581,21 +566,22 @@ void Renderer::Render()
                     memcpy(mappedPtr, &lc, sizeof(lc));
 
                     cmdList.SetPipelineState(m_LightingPipelineState.Get());
-                    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(LIGHTING_ROOT_PARAM_LIGHT_CBV, lcDesc);
+                    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                        m_StandardRootSignature->GetCBVParamIndex(1), lcDesc);
                     cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
                 }
             }
         }
 
-        if(m_PostprocessingRootSignature && m_PostprocessingPipelineState)
+        if(m_PostprocessingPipelineState)
         {
             PIX_EVENT_SCOPE(cmdList, L"Postprocessing");
             m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             cmdList.SetRenderTargets(nullptr, frameRes.m_BackBuffer.get());
             cmdList.SetPipelineState(m_PostprocessingPipelineState.Get());
-            cmdList.SetRootSignature(m_PostprocessingRootSignature.Get());
+            cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV, m_ColorRenderTarget->GetD3D12SRV());
+                m_StandardRootSignature->GetSRVParamIndex(0), m_ColorRenderTarget->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
 
@@ -838,51 +824,11 @@ void Renderer::Create3DPipelineState()
 
 void Renderer::CreateLightingPipelineStates()
 {
-    m_LightingRootSignature.Reset();
     m_LightingPipelineState.Reset();
     m_AmbientPipelineState.Reset();
 
     ERR_TRY
     ERR_TRY
-
-    // Root signature
-    {
-        D3D12_ROOT_PARAMETER params[LIGHTING_ROOT_PARAM_COUNT] = {};
-
-        const CD3DX12_DESCRIPTOR_RANGE descRangePerFrameCBV{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0};
-        FillRootParameter_DescriptorTable(params[LIGHTING_ROOT_PARAM_PER_FRAME_CBV],
-            &descRangePerFrameCBV, D3D12_SHADER_VISIBILITY_ALL);
-
-        const CD3DX12_DESCRIPTOR_RANGE descRangeLightCBV{D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 1};
-        FillRootParameter_DescriptorTable(params[LIGHTING_ROOT_PARAM_LIGHT_CBV],
-            &descRangeLightCBV, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        const CD3DX12_DESCRIPTOR_RANGE descRangeDepthSRV{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        FillRootParameter_DescriptorTable(params[LIGHTING_ROOT_PARAM_DEPTH_SRV],
-            &descRangeDepthSRV, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        const CD3DX12_DESCRIPTOR_RANGE descRange0{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1};
-        FillRootParameter_DescriptorTable(params[LIGHTING_ROOT_PARAM_GBUFFER_ALBEDO_SRV],
-            &descRange0, D3D12_SHADER_VISIBILITY_PIXEL);
-
-        const CD3DX12_DESCRIPTOR_RANGE descRange2{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2};
-        FillRootParameter_DescriptorTable(params[LIGHTING_ROOT_PARAM_GBUFFER_NORMAL_SRV],
-            &descRange2, D3D12_SHADER_VISIBILITY_PIXEL);
-
-		D3D12_ROOT_SIGNATURE_DESC desc = {
-		    .NumParameters = (uint32_t)_countof(params),
-            .pParameters = params,
-		    .Flags = //D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS};
-		
-        ComPtr<ID3DBlob> blob;
-		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
-		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
-			__uuidof(ID3D12RootSignature), &m_LightingRootSignature));
-        SetD3D12ObjectName(m_LightingRootSignature, L"Lighting root signature");
-	}
 
     // Ambient root signature
     {
@@ -891,7 +837,7 @@ void Renderer::CreateLightingPipelineStates()
         ps.Init(ShaderType::Pixel,  L"Data/Ambient.PS.hlsl", L"main");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-            .pRootSignature = m_LightingRootSignature.Get(),
+            .pRootSignature = m_StandardRootSignature->GetRootSignature(),
 	        .VS = {
                 .pShaderBytecode = vs.GetCode().data(),
                 .BytecodeLength = vs.GetCode().size()},
@@ -919,7 +865,7 @@ void Renderer::CreateLightingPipelineStates()
         ps.Init(ShaderType::Pixel,  L"Data/Lighting.PS.hlsl", L"main");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-	        .pRootSignature = m_LightingRootSignature.Get(),
+	        .pRootSignature = m_StandardRootSignature->GetRootSignature(),
 	        .VS = {
                 .pShaderBytecode = vs.GetCode().data(),
                 .BytecodeLength = vs.GetCode().size()},
@@ -948,41 +894,17 @@ void Renderer::CreateLightingPipelineStates()
 
 void Renderer::CreatePostprocessingPipelineState()
 {
-    m_PostprocessingRootSignature.Reset();
     m_PostprocessingPipelineState.Reset();
 
     ERR_TRY
     ERR_TRY
-
-    // Root signature
-    {
-        D3D12_ROOT_PARAMETER params[POSTPROCESSING_ROOT_PARAM_COUNT] = {};
-
-        const CD3DX12_DESCRIPTOR_RANGE descRange{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0};
-        FillRootParameter_DescriptorTable(params[POSTPROCESSING_ROOT_PARAM_TEXTURE_SRV],
-            &descRange, D3D12_SHADER_VISIBILITY_PIXEL);
-
-		D3D12_ROOT_SIGNATURE_DESC desc = {
-		    .NumParameters = (uint32_t)_countof(params),
-            .pParameters = params,
-		    .Flags = //D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_HULL_SHADER_ROOT_ACCESS |
-			    D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
-                D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS};
-		
-        ComPtr<ID3DBlob> blob;
-		CHECK_HR(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, nullptr));
-		CHECK_HR(m_Device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(),
-			__uuidof(ID3D12RootSignature), &m_PostprocessingRootSignature));
-        SetD3D12ObjectName(m_PostprocessingRootSignature, L"Postprocessing root signature");
-	}
 
     Shader vs, ps;
     vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
     ps.Init(ShaderType::Pixel,  L"Data/Postprocessing.PS.hlsl", L"main");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-	    .pRootSignature = m_PostprocessingRootSignature.Get(),
+	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
 	    .VS = {
             .pShaderBytecode = vs.GetCode().data(),
             .BytecodeLength = vs.GetCode().size()},

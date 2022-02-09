@@ -185,10 +185,8 @@ private:
     unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<OrbitingCamera> m_Camera;
-	ComPtr<ID3D12RootSignature> m_LightingRootSignature;
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;
 	ComPtr<ID3D12PipelineState> m_LightingPipelineState;
-	ComPtr<ID3D12RootSignature> m_PostprocessingRootSignature;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
 
     struct SceneMesh
