@@ -1,6 +1,8 @@
 #include "Include/Common.hlsl"
 #include "Include/LightingCommon.hlsl"
 
+#if PIXEL_SHADER
+
 struct Light
 {
 	float3 m_Color;
@@ -13,7 +15,7 @@ struct Light
 };
 ConstantBuffer<Light> g_Light : register(b1);
 
-float4 main(float4 pos : SV_Position) : SV_Target
+float4 MainPS(float4 pos : SV_Position) : SV_Target
 {
 	int3 loadPos = int3(pos.xy, 0);
 	float depth = Depth.Load(loadPos).r;
@@ -37,3 +39,5 @@ float4 main(float4 pos : SV_Position) : SV_Target
 
 	return float4(color, 1.0);
 }
+
+#endif

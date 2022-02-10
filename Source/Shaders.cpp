@@ -93,10 +93,12 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
         .Encoding = CODE_PAGE};
 
     const wchar_t* profileParam = nullptr;
+    const wchar_t* shaderTypeMacroParam = nullptr;
     switch(type)
     {
-    case ShaderType::Vertex: profileParam = L"-T vs_6_0"; break;
-    case ShaderType::Pixel:  profileParam = L"-T ps_6_0"; break;
+    case ShaderType::Vertex:  profileParam = L"-T vs_6_0"; shaderTypeMacroParam = L"-D VERTEX_SHADER=1"; break;
+    case ShaderType::Pixel:   profileParam = L"-T ps_6_0"; shaderTypeMacroParam = L"-D PIXEL_SHADER=1"; break;
+    case ShaderType::Compute: profileParam = L"-T cs_6_0"; shaderTypeMacroParam = L"-D COMPUTE_SHADER=1"; break;
     default: assert(0);
     }
 
@@ -104,6 +106,7 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
 
     std::vector<const wchar_t*> arguments = {
         profileParam,
+        shaderTypeMacroParam,
         entryPointParam.c_str()};
     
     const size_t extraParamCount = g_ShadersExtraParameters.m_Strings.size();
@@ -195,3 +198,12 @@ ShaderCompiler::~ShaderCompiler()
 {
 
 }
+
+/*
+Macros predefined in shader code:
+
+Depending on shader type
+    VERTEX_SHADER=1
+    PIXEL_SHADER=1
+    COMPUTE_SHADER=1
+*/

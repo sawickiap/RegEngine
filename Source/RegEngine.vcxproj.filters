@@ -100,25 +100,19 @@
     <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
       <Filter>Shaders\Include</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\FullScreenQuad.VS.hlsl">
+    <Text Include="..\WorkingDir\Data\Postprocessing.hlsl">
       <Filter>Shaders</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\Postprocessing.PS.hlsl">
+    <Text Include="..\WorkingDir\Data\Lighting.hlsl">
       <Filter>Shaders</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\Lighting.PS.hlsl">
-      <Filter>Shaders</Filter>
-    </Text>
-    <Text Include="..\WorkingDir\Data\Ambient.PS.hlsl">
+    <Text Include="..\WorkingDir\Data\Ambient.hlsl">
       <Filter>Shaders</Filter>
     </Text>
     <Text Include="..\WorkingDir\Data\Include\LightingCommon.hlsl">
       <Filter>Shaders\Include</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\ThreeD.PS.hlsl">
-      <Filter>Shaders</Filter>
-    </Text>
-    <Text Include="..\WorkingDir\Data\ThreeD.VS.hlsl">
+    <Text Include="..\WorkingDir\Data\ThreeD.hlsl">
       <Filter>Shaders</Filter>
     </Text>
   </ItemGroup>

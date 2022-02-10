@@ -2,7 +2,7 @@
 
 enum class ShaderType
 {
-    Vertex, Pixel, Count
+    Vertex, Pixel, Compute, Count
 };
 
 class ShaderPimpl;

@@ -788,8 +788,8 @@ void Renderer::Create3DPipelineState()
     ERR_TRY
 
     Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/ThreeD.VS.hlsl", L"main");
-    ps.Init(ShaderType::Pixel,  L"Data/ThreeD.PS.hlsl", L"main");
+    vs.Init(ShaderType::Vertex, L"Data/ThreeD.hlsl", L"MainVS");
+    ps.Init(ShaderType::Pixel,  L"Data/ThreeD.hlsl", L"MainPS");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
 	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -833,8 +833,8 @@ void Renderer::CreateLightingPipelineStates()
     // Ambient root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
-        ps.Init(ShaderType::Pixel,  L"Data/Ambient.PS.hlsl", L"main");
+        vs.Init(ShaderType::Vertex, L"Data/Ambient.hlsl", L"FullScreenQuadVS");
+        ps.Init(ShaderType::Pixel,  L"Data/Ambient.hlsl", L"MainPS");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
             .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -861,8 +861,8 @@ void Renderer::CreateLightingPipelineStates()
     // Lighting root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
-        ps.Init(ShaderType::Pixel,  L"Data/Lighting.PS.hlsl", L"main");
+        vs.Init(ShaderType::Vertex, L"Data/Lighting.hlsl", L"FullScreenQuadVS");
+        ps.Init(ShaderType::Pixel,  L"Data/Lighting.hlsl", L"MainPS");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
 	        .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -900,8 +900,8 @@ void Renderer::CreatePostprocessingPipelineState()
     ERR_TRY
 
     Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/FullScreenQuad.VS.hlsl", L"main");
-    ps.Init(ShaderType::Pixel,  L"Data/Postprocessing.PS.hlsl", L"main");
+    vs.Init(ShaderType::Vertex, L"Data/Postprocessing.hlsl", L"FullScreenQuadVS");
+    ps.Init(ShaderType::Pixel,  L"Data/Postprocessing.hlsl", L"MainPS");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
 	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
