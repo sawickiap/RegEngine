@@ -27,7 +27,7 @@ enum class GBuffer
 
 enum class StandardTexture
 {
-    Transparent, Black, Gray, White, Red, Green, Blue, Yellow, Fuchsia, Count
+    Transparent, Black, Gray, White, Red, Green, Blue, Yellow, Fuchsia, EmptyNormal, Count
 };
 
 struct RendererCapabilities
@@ -196,7 +196,8 @@ private:
     };
     struct SceneMaterial
     {
-        size_t m_TextureIndex = SIZE_MAX;
+        size_t m_AlbedoTextureIndex = SIZE_MAX;
+        size_t m_NormalTextureIndex = SIZE_MAX;
     };
     struct SceneTexture
     {
@@ -222,12 +223,16 @@ private:
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
     void ClearModel();
+    void CreateLights();
     void LoadModel(bool refreshAll);
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
     void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
         const aiMaterial* material, bool refreshAll);
+    // Returns index of the existing or newly loaded texture in m_Textures, SIZE_MAX if failed.
+    size_t TryLoadTexture(const std::filesystem::path& path, bool sRGB, bool allowCache);
+    void CreateProceduralModel();
 
     void WaitForFenceOnCPU(UINT64 value);
 

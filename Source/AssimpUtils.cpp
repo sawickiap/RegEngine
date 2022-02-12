@@ -352,14 +352,12 @@ void PrintAssimpSceneInfo(const aiScene* scene)
         scene->mNumMaterials,
         scene->mNumMeshes,
         scene->mNumTextures);
+    if(scene->mRootNode)
+        AppendNodeInfo(out, 1, scene->mRootNode);
     for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
         AppendMeshInfo(out, i, scene->mMeshes[i]);
     for(uint32_t i = 0; i < scene->mNumMaterials; ++i)
         AppendMaterialInfo(out, i, scene->mMaterials[i]);
-    if(scene->mRootNode)
-        AppendNodeInfo(out, 1, scene->mRootNode);
-    // materials
-    // textures
 
     LogMessage(out);
 }

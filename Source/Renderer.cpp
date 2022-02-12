@@ -69,10 +69,11 @@ static UintSetting g_DSVPersistentDescriptorMaxCount(SettingCategory::Startup,
 // 0 = anisotropic filtering disabled, 1..16 = D3D12_SAMPLER_DESC::MaxAnisotropy.
 static UintSetting g_MaxAnisotropy(SettingCategory::Startup, "MaxAnisotropy", 16);
 
-
+static BoolSetting g_AssimpPrintSceneInfo(SettingCategory::Load, "Assimp.PrintSceneInfo", false);
 static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
 static StringSetting g_TexturePath(SettingCategory::Load, "TexturePath");
+static StringSetting g_NormalTexturePath(SettingCategory::Load, "NormalTexturePath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
@@ -352,11 +353,14 @@ void Renderer::Init()
 	CreateFrameResources();
 	CreateResources();
     CreateStandardTextures();
-    m_AssimpInit = std::make_unique<AssimpInit>();
-    LoadModel(false);
+    
+    //m_AssimpInit = std::make_unique<AssimpInit>();
+    //LoadModel(false);
+    CreateProceduralModel();
     
     m_Camera = std::make_unique<OrbitingCamera>();
     m_Camera->SetAspectRatio(GetFinalResolutionF().x / GetFinalResolutionF().y);
+    m_Camera->SetDistance(3.f);
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -390,7 +394,8 @@ void Renderer::Reload(bool refreshAll)
     Create3DPipelineState();
     CreatePostprocessingPipelineState();
     CreateLightingPipelineStates();
-    LoadModel(refreshAll);
+    //LoadModel(refreshAll);
+    CreateProceduralModel();
 }
 
 uvec2 Renderer::GetFinalResolutionU()
@@ -945,11 +950,13 @@ void Renderer::CreateStandardTextures()
         L"Standard texture - Blue",
         L"Standard texture - Yellow",
         L"Standard texture - Fuchsia",
+        L"Standard texture - Empty normal",
     };
     // We are little endian, so it is 0xAABBGGRR
     using PixelType = uint32_t;
     const PixelType COLORS[] = {
         0x00000000, 0xFF000000, 0xFF808080, 0xFFFFFFFF, 0xFF0000FF, 0xFF00FF00, 0xFFFF0000, 0xFF00FFFF, 0xFFFF00FF,
+        0xFFFF7F80,
     };
     static_assert(_countof(NAMES) == (size_t)StandardTexture::Count);
     static_assert(_countof(COLORS) == (size_t)StandardTexture::Count);
@@ -960,7 +967,7 @@ void Renderer::CreateStandardTextures()
     std::vector<char> buf(SIZE * ROW_PITCH * sizeof(PixelType));
 
     D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-        DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+        DXGI_FORMAT_UNKNOWN,
         SIZE, SIZE, // width, height
         1, // arraySize
         1); // mipLevels
@@ -980,6 +987,9 @@ void Renderer::CreateStandardTextures()
                 *pixelPtr = color;
         }
 
+        resDesc.Format = textureIndex == (size_t)StandardTexture::EmptyNormal ?
+            DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+
         unique_ptr<Texture>& texPtr = m_StandardTextures[textureIndex];
         texPtr = std::make_unique<Texture>();
         texPtr->LoadFromMemory(resDesc, data, NAMES[textureIndex]);
@@ -995,33 +1005,34 @@ void Renderer::ClearModel()
     m_RootEntity = Entity{};
 }
 
+void Renderer::CreateLights()
+{
+    Light dl = {
+        .m_Type = LIGHT_TYPE_DIRECTIONAL,
+        .m_Color = g_LightColor.GetValue(),
+        .m_DirectionToLight_Position = g_DirectionToLight.GetValue()
+    };
+    m_Lights.push_back(dl);
+
+    /*Light pl0 = {
+        .m_Type = LIGHT_TYPE_DIRECTIONAL,
+        .m_Color = vec3(0.5f, 0.f, 0.f),
+        .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
+    };
+    m_Lights.push_back(pl0);
+
+    Light pl1 = {
+        .m_Type = LIGHT_TYPE_DIRECTIONAL,
+        .m_Color = vec3(0.f, 0.5f, 0.f),
+        .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
+    };
+    m_Lights.push_back(pl1);*/
+}
+
 void Renderer::LoadModel(bool refreshAll)
 {
     ClearModel();
-
-    // Lights
-    {
-        Light dl = {
-            .m_Type = LIGHT_TYPE_DIRECTIONAL,
-            .m_Color = g_LightColor.GetValue(),
-            .m_DirectionToLight_Position = g_DirectionToLight.GetValue()
-        };
-        m_Lights.push_back(dl);
-
-        Light pl0 = {
-            .m_Type = LIGHT_TYPE_DIRECTIONAL,
-            .m_Color = vec3(0.5f, 0.f, 0.f),
-            .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
-        };
-        m_Lights.push_back(pl0);
-
-        Light pl1 = {
-            .m_Type = LIGHT_TYPE_DIRECTIONAL,
-            .m_Color = vec3(0.f, 0.5f, 0.f),
-            .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
-        };
-        m_Lights.push_back(pl1);
-    }
+    CreateLights();
 
     /*
     RegEngine coordinate system is left-handed: X right, Y back, Z up.
@@ -1046,13 +1057,14 @@ void Renderer::LoadModel(bool refreshAll)
             aiProcess_SortByPType |
             aiProcess_FlipWindingOrder |
             aiProcess_GenSmoothNormals |
+            aiProcess_CalcTangentSpace |
             aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
-        // aiProcess_CalcTangentSpace
         // aiProcess_MakeLeftHanded
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         
-        //PrintAssimpSceneInfo(scene);
+        if(g_AssimpPrintSceneInfo.GetValue())
+            PrintAssimpSceneInfo(scene);
 
         for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
             LoadModelMesh(scene, scene->mMeshes[i]);
@@ -1095,7 +1107,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
     CHECK_BOOL(assimpMesh->mPrimitiveTypes == aiPrimitiveType_TRIANGLE);
     CHECK_BOOL(assimpMesh->HasTextureCoords(0) || !assimpMesh->HasTextureCoords(1));
     CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
-    CHECK_BOOL(assimpMesh->HasNormals());
+    CHECK_BOOL(assimpMesh->HasNormals() && assimpMesh->HasTangentsAndBitangents());
 
     std::vector<Vertex> vertices(vertexCount);
     for(uint32_t i = 0; i < vertexCount; ++i)
@@ -1103,8 +1115,12 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         const aiVector3D pos = assimpMesh->mVertices[i];
         const aiVector3D texCoord = assimpMesh->mTextureCoords[0][i];
         const aiVector3D normal = assimpMesh->mNormals[i];
+        const aiVector3D tangent = assimpMesh->mTangents[i];
+        const aiVector3D bitangent = assimpMesh->mBitangents[i];
         vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
         vertices[i].m_Normal = packed_vec3(normal.x, normal.z, normal.y); // Same here.
+        vertices[i].m_Tangent = packed_vec3(tangent.x, tangent.z, tangent.y); // Same here.
+        vertices[i].m_Bitangent = packed_vec3(bitangent.x, bitangent.z, bitangent.y); // Same here.
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
@@ -1160,7 +1176,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 {
     ERR_TRY;
 
-    string texturePath;
+    string albedoPath;
     // Canonical way - GetTexture.
     if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
     {
@@ -1173,54 +1189,109 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         const aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0,
             &s, &mapping, &uvindex, &blend, &op, mapmodes);
         if(ret == aiReturn_SUCCESS)
-            texturePath = s.C_Str();
+            albedoPath = s.C_Str();
     }
     // Method found in a model from Turbosquid made in Maya.
-    if(texturePath.empty())
+    if(albedoPath.empty())
     {
-        GetStringMaterialProperty(texturePath, material, "$raw.Maya|baseColor|file");
+        GetStringMaterialProperty(albedoPath, material, "$raw.Maya|baseColor|file");
     }
 
-    std::filesystem::path texturePathP;
-    if(!texturePath.empty())
-        texturePathP = StrToPath(ConvertCharsToUnicode(texturePath, CP_ACP));
+    std::filesystem::path albedoPathP;
+    if(!albedoPath.empty())
+        albedoPathP = StrToPath(ConvertCharsToUnicode(albedoPath, CP_ACP));
     else if(!g_TexturePath.GetValue().empty())
         // "TexturePath" setting - relative to working directory not model path!
-        texturePathP = std::filesystem::absolute(StrToPath(g_TexturePath.GetValue()));
+        albedoPathP = std::filesystem::absolute(StrToPath(g_TexturePath.GetValue()));
+    if(!albedoPathP.empty() && !albedoPathP.is_absolute())
+        albedoPathP = modelDir / albedoPathP;
 
-    if(texturePathP.empty())
-        m_Materials.push_back(SceneMaterial{});
-    else
+    std::filesystem::path normalPathP;
+    if(!g_NormalTexturePath.GetValue().empty())
+        // "NormalTexturePath" setting - relative to working directory not model path!
+        normalPathP = std::filesystem::absolute(StrToPath(g_NormalTexturePath.GetValue()));
+
+    SceneMaterial sceneMat;
+    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathP, true, !refreshAll);
+    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathP, false, !refreshAll);
+    m_Materials.push_back(std::move(sceneMat));
+
+    ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
+}
+
+size_t Renderer::TryLoadTexture(const std::filesystem::path& path, bool sRGB, bool allowCache)
+{
+    if(path.empty())
+        return SIZE_MAX;
+
+    wstring processedPath = std::filesystem::weakly_canonical(path);
+    ToUpperCase(processedPath);
+
+    // Find existing texture.
+    for(size_t i = 0, count = m_Textures.size(); i < count; ++i)
     {
-        if(!texturePathP.is_absolute())
-            texturePathP = modelDir / texturePathP;
-
-        wstring processedPath = std::filesystem::weakly_canonical(texturePathP);
-        ToUpperCase(processedPath);
-
-        // Find existing texture.
-        for(size_t i = 0, count = m_Textures.size(); i < count; ++i)
+        if(m_Textures[i].m_ProcessedPath == processedPath)
         {
-            if(m_Textures[i].m_ProcessedPath == processedPath)
-            {
-               m_Materials.push_back(SceneMaterial{i});
-               return;
-            }
+            return i;
         }
+    }
 
-        // Not found - load new texture.
+    // Not found - load new texture.
+    try
+    {
         SceneTexture tex;
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
-        uint32_t flags = Texture::FLAG_SRGB | Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;
-        if(!refreshAll)
+        uint32_t flags = Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;
+        if(sRGB)
+            flags |= Texture::FLAG_SRGB;
+        if(allowCache)
             flags |= Texture::FLAG_CACHE_LOAD;
-        tex.m_Texture->LoadFromFile(flags, texturePathP.native());
+        tex.m_Texture->LoadFromFile(flags, path.native());
         m_Textures.push_back(std::move(tex));
-        m_Materials.push_back(SceneMaterial{m_Textures.size() - 1});
+        return m_Textures.size() - 1;
     }
+    CATCH_PRINT_ERROR(return SIZE_MAX;)
+}
 
-    ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
+void Renderer::CreateProceduralModel()
+{
+    ClearModel();
+    CreateLights();
+
+    SceneMaterial mat;
+    mat.m_NormalTextureIndex = TryLoadTexture(StrToPath(g_NormalTexturePath.GetValue()), false, true);
+    m_Materials.push_back(mat);
+
+    Vertex vertices[] = {
+        {
+            .m_Position={-1.f, -1.f, 0.f}, .m_Normal={0.f, 0.f, 1.f}, .m_Tangent={1.f, 0.f, 0.f}, .m_Bitangent={0.f, -1.f, 0.f},
+            .m_TexCoord={0.f, 0.f}, .m_Color={1.f, 1.f, 1.f, 1.f}
+        },
+        {
+            .m_Position={ 1.f, -1.f, 0.f}, .m_Normal={0.f, 0.f, 1.f}, .m_Tangent={1.f, 0.f, 0.f}, .m_Bitangent={0.f, -1.f, 0.f},
+            .m_TexCoord={1.f, 0.f}, .m_Color={1.f, 1.f, 1.f, 1.f}
+        },
+        {
+            .m_Position={-1.f,  1.f, 0.f}, .m_Normal={0.f, 0.f, 1.f}, .m_Tangent={1.f, 0.f, 0.f}, .m_Bitangent={0.f, -1.f, 0.f},
+            .m_TexCoord={0.f, 1.f}, .m_Color={1.f, 1.f, 1.f, 1.f}
+        },
+        {
+            .m_Position={ 1.f,  1.f, 0.f}, .m_Normal={0.f, 0.f, 1.f}, .m_Tangent={1.f, 0.f, 0.f}, .m_Bitangent={0.f, -1.f, 0.f},
+            .m_TexCoord={1.f, 1.f}, .m_Color={1.f, 1.f, 1.f, 1.f}
+        },
+    };
+    Mesh::IndexType indices[] = {0, 1, 2, 2, 1, 3};
+
+    SceneMesh mesh;
+    mesh.m_MaterialIndex = 0;
+    mesh.m_Mesh = std::make_unique<Mesh>();
+    mesh.m_Mesh->Init(L"Procedural mesh", D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
+        vertices, indices);
+    m_Meshes.push_back(std::move(mesh));
+
+    m_RootEntity.m_Transform = glm::identity<mat4>();
+    m_RootEntity.m_Meshes.push_back(0);
 }
 
 void Renderer::WaitForFenceOnCPU(UINT64 value)
@@ -1268,21 +1339,38 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     const size_t materialIndex = m_Meshes[meshIndex].m_MaterialIndex;
     assert(materialIndex < m_Materials.size());
     const SceneMaterial& mat = m_Materials[materialIndex];
-    Texture* texture = mat.m_TextureIndex != SIZE_MAX ? m_Textures[mat.m_TextureIndex].m_Texture.get() : nullptr;
-    D3D12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle;
-    if(texture)
+
+    Texture* albedoTexture = mat.m_AlbedoTextureIndex != SIZE_MAX ?
+        m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
+    D3D12_GPU_DESCRIPTOR_HANDLE albedoTextureDescriptorHandle;
+    if(albedoTexture)
     {
-        textureDescriptorHandle =
-            m_SRVDescriptorManager->GetGPUHandle(m_Textures[mat.m_TextureIndex].m_Texture->GetDescriptor());
+        albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+            m_Textures[mat.m_AlbedoTextureIndex].m_Texture->GetDescriptor());
     }
     else
     {
-        textureDescriptorHandle =
-            m_SRVDescriptorManager->GetGPUHandle(m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
+        albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+            m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
     }
     cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-        m_StandardRootSignature->GetSRVParamIndex(0),
-        textureDescriptorHandle);
+        m_StandardRootSignature->GetSRVParamIndex(0), albedoTextureDescriptorHandle);
+
+    Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
+        m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
+    D3D12_GPU_DESCRIPTOR_HANDLE normalTextureDescriptorHandle;
+    if(normalTexture)
+    {
+        normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+            m_Textures[mat.m_NormalTextureIndex].m_Texture->GetDescriptor());
+    }
+    else
+    {
+        normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+            m_StandardTextures[(size_t)StandardTexture::EmptyNormal]->GetDescriptor());
+    }
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+        m_StandardRootSignature->GetSRVParamIndex(1), normalTextureDescriptorHandle);
 
     cmdList.SetPrimitiveTopology(mesh->GetTopology());
 

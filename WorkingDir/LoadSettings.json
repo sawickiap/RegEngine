@@ -5,28 +5,41 @@
     "Shaders.ExtraParameters": [ "-O3" ],
     // When set to true, equivalent of adding extra parameters: -Zi -Qembed_debug
     "Shaders.EmbedDebugInformation" : true,
+    
     //"Assimp.ModelPath": "f:\\Libraries\\Assimp\\assimp-5.0.1\\test\\models\\MS3D\\jeep1.ms3d",
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\FairyTower\\FairyTower.fbx",
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",
     
+    "Assimp.PrintSceneInfo": true,
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Apple\\apple.obj",
     "TexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\Diffuse.tif",
+    //"NormalTexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\apple-NM_u0_v0.tif",
+    "NormalTexturePath": "e:\\Tmp\\MODELS\\Normal_map_example_-_Map_512.png",
     //"TexturePath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.png",
     //"TexturePath":  "",
-    "Assimp.Scale": 2.2,
+    /*"Assimp.Scale": 2.2,
     "Assimp.Transform": [
         1, 0, 0, 0,
         0, 1, 0, -3,
         0, 0, -1, -12,
         0, 0, 0, 1
+    ],*/
+    "Assimp.Scale": 1.0,
+    "Assimp.Transform": [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1
     ],
     // 0 = backface culling disabled, 1 = clockwise is front, 2 = counterclockwise is front
-    "BackFaceCullingMode": 2,
+    "BackFaceCullingMode": 1,
 
     "Background.Color": [0.0,0.0,0.1],
     //"Background.Color": "808080",
 
-    "DirectionToLight": [-1, 3, 0.5],
+    //"DirectionToLight": [-1, 3, 0.5],
+    "DirectionToLight": [-0.7,-0.5,1],
     "LightColor": [0.7,0.7,0.7],
-    "AmbientColor": [0.05, 0.05, 0.05]
+    //"AmbientColor": [0.05, 0.05, 0.05]
+    "AmbientColor": [0,0,0]
 }

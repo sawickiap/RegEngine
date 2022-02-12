@@ -4,6 +4,8 @@ struct Vertex
 {
     packed_vec3 m_Position;
     packed_vec3 m_Normal;
+    packed_vec3 m_Tangent;
+    packed_vec3 m_Bitangent;
     packed_vec2 m_TexCoord;
     packed_vec4 m_Color;
 
