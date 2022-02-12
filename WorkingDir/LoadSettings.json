@@ -11,28 +11,30 @@
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",
     
     "Assimp.PrintSceneInfo": true,
-    "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Apple\\apple.obj",
-    "TexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\Diffuse.tif",
-    "NormalTexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\apple-NM_u0_v0.tif",
-    //"NormalTexturePath": "e:\\Tmp\\MODELS\\Normal_map_example_-_Map_512.png",
-    //"TexturePath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.png",
-    //"TexturePath":  "",
-    "Assimp.Scale": 2.2,
-    "Assimp.Transform": [
-        1, 0, 0, 0,
-        0, 1, 0, -3,
-        0, 0, -1, -12,
-        0, 0, 0, 1
-    ],
-    /*"Assimp.Scale": 1.0,
+    //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\Apple\\apple.obj",
+    "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Cauldron-Media-master\\DamagedHelmet\\glTF\\DamagedHelmet.gltf",
+    "Assimp.Scale": 5.0,
     "Assimp.Transform": [
         1, 0, 0, 0,
         0, 1, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1
-    ],*/
+    ],
     // 0 = backface culling disabled, 1 = clockwise is front, 2 = counterclockwise is front
-    "BackFaceCullingMode": 2,
+    "BackFaceCullingMode": 1,
+
+    "TexturePath": "",
+    "NormalTexturePath": "",
+    //"NormalTexturePath": "e:\\Tmp\\MODELS\\Normal_map_example_-_Map_512.png",
+    //"TexturePath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.png",
+    //"TexturePath":  "",
+    /*"Assimp.Scale": 2.2,
+    "Assimp.Transform": [
+        1, 0, 0, 0,
+        0, 1, 0, -3,
+        0, 0, -1, -12,
+        0, 0, 0, 1
+    ],*/
 
     "Background.Color": [0.0,0.0,0.1],
     //"Background.Color": "808080",

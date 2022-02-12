@@ -19,8 +19,8 @@ Represents a triangle mesh - vertex and (optional) index buffer.
 class Mesh
 {
 public:
-    typedef uint16_t IndexType;
-    static constexpr DXGI_FORMAT s_IndexFormat = DXGI_FORMAT_R16_UINT;
+    typedef uint32_t IndexType;
+    static constexpr DXGI_FORMAT s_IndexFormat = DXGI_FORMAT_R32_UINT;
     void Init(
         const wstr_view& name,
         D3D12_PRIMITIVE_TOPOLOGY_TYPE topologyType,

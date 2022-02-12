@@ -37,6 +37,8 @@ void Game::Update()
                 sin(time * 0.7453f + 54.3253f + (float)li));
         }
     }
+
+    g_Renderer->m_NormalMappingEnabled = !(GetAsyncKeyState('N') & 0x8000);
 }
 
 void Game::OnKeyDown(WPARAM key, uint32_t modifiers)

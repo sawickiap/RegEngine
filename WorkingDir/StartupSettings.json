@@ -19,7 +19,7 @@
     "SamplerDescriptors.Temporary.MaxCountPerFrame": 128,
     "RTVDescriptors.Persistent.MaxCount": 128,
     "DSVDescriptors.Persistent.MaxCount": 128,
-    "ConstantBuffers.Temporary.MaxSizePerFrame": 65536,
+    "ConstantBuffers.Temporary.MaxSizePerFrame": 200000,
 
     // Between 0 (for anisotropic filtering disabled) and 16 (max quality).
     "MaxAnisotropy": 16,

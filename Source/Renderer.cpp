@@ -1179,8 +1179,10 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     ERR_TRY;
 
     string albedoPath;
+    string normalPath;
+
     // Canonical way - GetTexture.
-    if(material->GetTextureCount(aiTextureType_DIFFUSE) == 1)
+    if(material->GetTextureCount(aiTextureType_DIFFUSE) >= 1)
     {
         aiString s;
         aiTextureMapping mapping;
@@ -1192,6 +1194,19 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
             &s, &mapping, &uvindex, &blend, &op, mapmodes);
         if(ret == aiReturn_SUCCESS)
             albedoPath = s.C_Str();
+    }
+    if(material->GetTextureCount(aiTextureType_NORMALS) >= 1)
+    {
+        aiString s;
+        aiTextureMapping mapping;
+        uint32_t uvindex;
+        float blend;
+        aiTextureOp op;
+        aiTextureMapMode mapmodes[3];
+        const aiReturn ret = material->GetTexture(aiTextureType_NORMALS, 0,
+            &s, &mapping, &uvindex, &blend, &op, mapmodes);
+        if(ret == aiReturn_SUCCESS)
+            normalPath = s.C_Str();
     }
     // Method found in a model from Turbosquid made in Maya.
     if(albedoPath.empty())
@@ -1209,9 +1224,13 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         albedoPathP = modelDir / albedoPathP;
 
     std::filesystem::path normalPathP;
-    if(!g_NormalTexturePath.GetValue().empty())
+    if(!normalPath.empty())
+        normalPathP = StrToPath(ConvertCharsToUnicode(normalPath, CP_ACP));
+    else if(!g_NormalTexturePath.GetValue().empty())
         // "NormalTexturePath" setting - relative to working directory not model path!
         normalPathP = std::filesystem::absolute(StrToPath(g_NormalTexturePath.GetValue()));
+    if(!normalPathP.empty() && !normalPathP.is_absolute())
+        normalPathP = modelDir / normalPathP;
 
     SceneMaterial sceneMat;
     sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathP, true, !refreshAll);
@@ -1361,7 +1380,7 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
         m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
     D3D12_GPU_DESCRIPTOR_HANDLE normalTextureDescriptorHandle;
-    if(normalTexture)
+    if(normalTexture && m_NormalMappingEnabled)
     {
         normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
             m_Textures[mat.m_NormalTextureIndex].m_Texture->GetDescriptor());
