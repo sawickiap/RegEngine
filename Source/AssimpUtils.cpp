@@ -65,7 +65,7 @@ static void AppendMaterialPropertyDataItem(wstring& out, const int32_t *v)
 
 // Appends string inline, no indentation or new line.
 template<typename T>
-static void AppendMaterialPropertyData(wstring& out, std::span<const char> data)
+static void AppendMaterialPropertyValue(wstring& out, std::span<const char> data)
 {
     if(data.empty())
         return;
@@ -78,6 +78,18 @@ static void AppendMaterialPropertyData(wstring& out, std::span<const char> data)
         AppendMaterialPropertyDataItem(out, (const T*)data.data() + i);
     }
     if(itemCount > itemCountToPrint)
+        out += L" ...";
+}
+
+static void AppendMaterialPropertyData(wstring& out, std::span<const char> data)
+{
+    if(data.empty())
+        return;
+    const size_t byteCountToPrint = std::min<size_t>(data.size(), 8);
+    out += std::format(L"{:02X}", (uint8_t)data[0]);
+    for(size_t i = 1; i < byteCountToPrint; ++i)
+    out += std::format(L" {:02X}", (uint8_t)data[0]);
+    if(data.size() > byteCountToPrint)
         out += L" ...";
 }
 
@@ -229,11 +241,11 @@ static void AppendMaterialProperties(wstring& out, const aiMaterial* material)
         {
         case aiPTI_Float:
             out += L", Data: ";
-            AppendMaterialPropertyData<float>(out, std::span<const char>(prop->mData, prop->mDataLength));
+            AppendMaterialPropertyValue<float>(out, std::span<const char>(prop->mData, prop->mDataLength));
             break;
         case aiPTI_Double:
             out += L", Data: ";
-            AppendMaterialPropertyData<double>(out, std::span<const char>(prop->mData, prop->mDataLength));
+            AppendMaterialPropertyValue<double>(out, std::span<const char>(prop->mData, prop->mDataLength));
             break;
         case aiPTI_String:
         {
@@ -243,10 +255,11 @@ static void AppendMaterialProperties(wstring& out, const aiMaterial* material)
         }
         case aiPTI_Integer:
             out += L", Data: ";
-            AppendMaterialPropertyData<int32_t>(out, std::span<const char>(prop->mData, prop->mDataLength));
+            AppendMaterialPropertyValue<int32_t>(out, std::span<const char>(prop->mData, prop->mDataLength));
             break;
         case aiPTI_Buffer:
-            // Will implement when it's needed.
+            out += L", Buffer: ";
+            AppendMaterialPropertyData(out, std::span<const char>(prop->mData, prop->mDataLength));
             break;
         default:
             assert(0);

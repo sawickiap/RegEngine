@@ -100,12 +100,17 @@ void Texture::LoadFromSourceFile(uint32_t flags, const wstr_view& filePath,
 
     if(filePath.ends_with(L".tga", false))
     {
-        constexpr DirectX::TGA_FLAGS TGAFlags = DirectX::TGA_FLAGS_NONE;//DirectX::TGA_FLAGS_IGNORE_SRGB | DirectX::TGA_FLAGS_FORCE_SRGB;
+        constexpr DirectX::TGA_FLAGS TGAFlags = DirectX::TGA_FLAGS_NONE;
         CHECK_HR(DirectX::LoadFromTGAFile(filePath.c_str(), TGAFlags, nullptr, image));
+    }
+    else if(filePath.ends_with(L".dds", false))
+    {
+        constexpr DirectX::DDS_FLAGS DDSFlags = DirectX::DDS_FLAGS_NONE;
+        CHECK_HR(DirectX::LoadFromDDSFile(filePath.c_str(), DDSFlags, nullptr, image));
     }
     else
     {
-        constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_NONE;//DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_SRGB;
+        constexpr DirectX::WIC_FLAGS WICFlags = DirectX::WIC_FLAGS_NONE;
         CHECK_HR(DirectX::LoadFromWICFile(filePath.c_str(), WICFlags, nullptr, image));
     }
 
