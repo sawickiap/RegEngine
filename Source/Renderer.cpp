@@ -354,13 +354,13 @@ void Renderer::Init()
 	CreateResources();
     CreateStandardTextures();
     
-    //m_AssimpInit = std::make_unique<AssimpInit>();
-    //LoadModel(false);
-    CreateProceduralModel();
+    m_AssimpInit = std::make_unique<AssimpInit>();
+    LoadModel(false);
+    //CreateProceduralModel();
     
     m_Camera = std::make_unique<OrbitingCamera>();
     m_Camera->SetAspectRatio(GetFinalResolutionF().x / GetFinalResolutionF().y);
-    m_Camera->SetDistance(3.f);
+    //m_Camera->SetDistance(3.f);
 
     ERR_CATCH_MSG(L"Failed to initialize renderer.");
 }
@@ -394,8 +394,8 @@ void Renderer::Reload(bool refreshAll)
     Create3DPipelineState();
     CreatePostprocessingPipelineState();
     CreateLightingPipelineStates();
-    //LoadModel(refreshAll);
-    CreateProceduralModel();
+    LoadModel(refreshAll);
+    //CreateProceduralModel();
 }
 
 uvec2 Renderer::GetFinalResolutionU()
@@ -1016,7 +1016,7 @@ void Renderer::CreateLights()
     };
     m_Lights.push_back(dl);
 
-    /*Light pl0 = {
+    Light pl0 = {
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = vec3(0.5f, 0.f, 0.f),
         .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
@@ -1028,7 +1028,7 @@ void Renderer::CreateLights()
         .m_Color = vec3(0.f, 0.5f, 0.f),
         .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
     };
-    m_Lights.push_back(pl1);*/
+    m_Lights.push_back(pl1);
 }
 
 void Renderer::LoadModel(bool refreshAll)
@@ -1121,7 +1121,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         const aiVector3D bitangent = assimpMesh->mBitangents[i];
         vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
         vertices[i].m_Normal = packed_vec3(normal.x, normal.z, normal.y); // Same here.
-        vertices[i].m_Tangent = packed_vec3(tangent.x, tangent.z, tangent.y); // Same here.
+        vertices[i].m_Tangent = - packed_vec3(tangent.x, tangent.z, tangent.y); // Same here. Additionally negating because of DirectX texture addressing convention.
         vertices[i].m_Bitangent = packed_vec3(bitangent.x, bitangent.z, bitangent.y); // Same here.
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
