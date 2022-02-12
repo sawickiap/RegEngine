@@ -152,6 +152,21 @@ glm::vec<3, T, Q> TransformCoord(const glm::mat<4, 4, T, Q>& m, const glm::vec<3
     return {result.x * wInv, result.y * wInv, result.z * wInv};
 }
 
+// These two are based on article: "A close look at the sRGB formula"
+// https://entropymine.com/imageworsener/srgbformula/
+inline float LinearToSRGB(float v)
+{
+    return v <= 0.00313066844250063f ?
+        v * 12.92f :
+        pow(v, 0.41666666666666666666666666666667f) * 1.055f - 0.055f;
+}
+inline float SRGBToLinear(float v)
+{
+    return v <= 0.0404482362771082f ?
+        v * 0.07739938080495356037151702786378f :
+        pow((v + 0.055f) * 0.94786729857819905213270142180095f, 2.4f);
+}
+
 // Custom deleter for STL smart pointers that uses HANDLE and CloseFile().
 struct CloseHandleDeleter
 {

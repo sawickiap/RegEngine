@@ -1,7 +1,6 @@
 #include "BaseUtils.hpp"
 #include "Settings.hpp"
 #include "SmallFileCache.hpp"
-#include "../ThirdParty/glm/glm/gtc/color_space.hpp"
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "../ThirdParty/rapidjson/include/rapidjson/document.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
@@ -138,7 +137,7 @@ static float ParseStringColorComponent(char upperChar, char lowerChar, bool conv
         return FLT_MAX;
     float result = ((float)upperCharVal * 16.f + (float)lowerCharVal) / 255.f;
     if(convertSRGBToLinear)
-        result = glm::convertSRGBToLinear(glm::vec<1, float>(result)).x;
+        result = SRGBToLinear(result);
     return result;
 }
 
