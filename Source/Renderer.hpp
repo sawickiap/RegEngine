@@ -124,7 +124,6 @@ public:
     ID3D12Device1* GetDevice1() { return m_Device1.Get(); };
     const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
     D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
-    ID3D12CommandAllocator* GetCmdAllocator() { return m_CmdAllocator.Get(); }
     DescriptorManager* GetSRVDescriptorManager() { return m_SRVDescriptorManager.get(); }
     DescriptorManager* GetSamplerDescriptorManager() { return m_SamplerDescriptorManager.get(); }
     DescriptorManager* GetRTVDescriptorManager() { return m_RTVDescriptorManager.get(); }
@@ -146,6 +145,7 @@ public:
 private:
 	struct FrameResources
 	{
+        ComPtr<ID3D12CommandAllocator> m_CmdAllocator;
 		ComPtr<ID3D12GraphicsCommandList> m_CmdList;
 		unique_ptr<RenderingResource> m_BackBuffer;
 		UINT64 m_SubmittedFenceValue = 0;
@@ -160,7 +160,7 @@ private:
 	RendererCapabilities m_Capabilities;
     ComPtr<D3D12MA::Allocator> m_MemoryAllocator;
 	ComPtr<ID3D12CommandQueue> m_CmdQueue;
-    ComPtr<ID3D12CommandAllocator> m_CmdAllocator;
+    ComPtr<ID3D12CommandAllocator> m_UploadCmdAllocator;
     ComPtr<ID3D12GraphicsCommandList> m_UploadCmdList;
     UINT64 m_UploadCmdListSubmittedFenceValue = 0;
 	ComPtr<ID3D12Fence> m_Fence;

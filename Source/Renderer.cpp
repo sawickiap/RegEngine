@@ -411,7 +411,8 @@ vec2 Renderer::GetFinalResolutionF()
 void Renderer::BeginUploadCommandList(CommandList& dstCmdList)
 {
     WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
-    dstCmdList.Init(m_CmdAllocator.Get(), m_UploadCmdList.Get());
+    CHECK_HR(m_UploadCmdAllocator->Reset());
+    dstCmdList.Init(m_UploadCmdAllocator.Get(), m_UploadCmdList.Get());
 }
 
 void Renderer::CompleteUploadCommandList(CommandList& cmdList)
@@ -437,7 +438,8 @@ void Renderer::Render()
     m_TemporaryConstantBufferManager->NewFrame();
 
     CommandList cmdList;
-    cmdList.Init(m_CmdAllocator.Get(), frameRes.m_CmdList.Get());
+    CHECK_HR(frameRes.m_CmdAllocator->Reset());
+    cmdList.Init(frameRes.m_CmdAllocator.Get(), frameRes.m_CmdList.Get());
     {
         PIX_EVENT_SCOPE(cmdList, L"FRAME");
 
@@ -592,12 +594,10 @@ void Renderer::Render()
                 m_StandardRootSignature->GetSRVParamIndex(0), m_ColorRenderTarget->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
-
         }
 
         frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
-
     cmdList.Execute(m_CmdQueue.Get());
 
 	frameRes.m_SubmittedFenceValue = m_NextFenceValue++;
@@ -641,13 +641,11 @@ void Renderer::CreateCommandQueues()
 	CHECK_HR(m_Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, __uuidof(ID3D12Fence), &m_Fence));
     SetD3D12ObjectName(m_Fence, L"Main fence");
 
-	CHECK_HR(m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, __uuidof(ID3D12CommandAllocator),
-		&m_CmdAllocator));
-    SetD3D12ObjectName(m_CmdAllocator, L"Command allocator");
+    CHECK_HR(m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_UploadCmdAllocator)));
+    SetD3D12ObjectName(m_UploadCmdAllocator, L"Upload command allocator");
 
-	CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-		m_CmdAllocator.Get(), NULL,
-		IID_PPV_ARGS(&m_UploadCmdList)));
+    CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+		m_UploadCmdAllocator.Get(), NULL, IID_PPV_ARGS(&m_UploadCmdList)));
 	CHECK_HR(m_UploadCmdList->Close());
     SetD3D12ObjectName(m_UploadCmdList, L"Upload command list");
 }
@@ -682,16 +680,20 @@ void Renderer::CreateFrameResources()
 
 	for(uint32_t i = 0; i < g_FrameCount.GetValue(); ++i)
 	{
-		CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
-			m_CmdAllocator.Get(), NULL,
-			IID_PPV_ARGS(&m_FrameResources[i].m_CmdList)));
-		CHECK_HR(m_FrameResources[i].m_CmdList->Close());
-        SetD3D12ObjectName(m_FrameResources[i].m_CmdList, std::format(L"Command list {}", i));
+        FrameResources& frameRes = m_FrameResources[i];
+
+        CHECK_HR(m_Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&frameRes.m_CmdAllocator)));
+        SetD3D12ObjectName(frameRes.m_CmdAllocator, std::format(L"Command allocator {}", i));
+
+        CHECK_HR(m_Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
+			frameRes.m_CmdAllocator.Get(), NULL, IID_PPV_ARGS(&frameRes.m_CmdList)));
+		CHECK_HR(frameRes.m_CmdList->Close());
+        SetD3D12ObjectName(frameRes.m_CmdList, std::format(L"Command list {}", i));
 
         ID3D12Resource* backBuffer = nullptr;
 		CHECK_HR(m_SwapChain->GetBuffer(i, IID_PPV_ARGS(&backBuffer)));
-        m_FrameResources[i].m_BackBuffer = std::make_unique<RenderingResource>();
-        m_FrameResources[i].m_BackBuffer->InitExternallyOwned(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
+        frameRes.m_BackBuffer = std::make_unique<RenderingResource>();
+        frameRes.m_BackBuffer->InitExternallyOwned(backBuffer, D3D12_RESOURCE_STATE_PRESENT);
 	}
 }
 
