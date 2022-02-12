@@ -136,7 +136,7 @@ static float ParseStringColorComponent(char upperChar, char lowerChar, bool conv
     const uint8_t lowerCharVal = ParseHexadecimalDigit(lowerChar);
     if(lowerCharVal == UINT8_MAX)
         return FLT_MAX;
-    float result = (float)upperCharVal * 16.f + (float)lowerCharVal;
+    float result = ((float)upperCharVal * 16.f + (float)lowerCharVal) / 255.f;
     if(convertSRGBToLinear)
         result = glm::convertSRGBToLinear(glm::vec<1, float>(result)).x;
     return result;
