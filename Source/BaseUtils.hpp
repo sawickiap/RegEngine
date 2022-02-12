@@ -103,6 +103,55 @@ static inline T DivideRoudingUp(T x, T y)
     return (x + y - 1) / y;
 }
 
+/*
+Multiply m * v, using only 3x3 submatrix of m.
+In other words, extend v to homogeneous coordinates as (x, y, z, 0).
+This disregards 4th column of m, which contains translation.
+
+Good for:
+- transforming vectors that represent direction not position, so they should not have translation applied,
+- transforming vectors by matrices that contain only rotation and scaling, not translation.
+
+The name of this function is a tradition from D3DX and DirectX Math libraries.
+*/
+template<typename T, enum glm::qualifier Q>
+glm::vec<3, T, Q> TransformNormal(const glm::mat<4, 4, T, Q>& m, const glm::vec<3, T, Q>& v)
+{
+    auto result = m * glm::vec<4, T, Q>(v.x, v.y, v.z, (T)0.f);
+    return {result.x, result.y, result.z};
+}
+/*
+Multiply m * v, extending v to homogeneous coordinates as (x, y, z, 1).
+Resulting vector w component is discarded.
+
+Good for: transforming vectors that represent position by a matrix that may represent
+any affine transformation (rotation, scaling, translation), but not perspective projection.
+
+The name of this function is a tradition from D3DX and DirectX Math libraries.
+*/
+template<typename T, enum glm::qualifier Q>
+glm::vec<3, T, Q> Transform(const glm::mat<4, 4, T, Q>& m, const glm::vec<3, T, Q>& v)
+{
+    auto result = m * glm::vec<4, T, Q>(v.x, v.y, v.z, (T)1.f);
+    return {result.x, result.y, result.z};
+}
+/*
+Multiply m * v, extending v to homogeneous coordinates as (x, y, z, 1).
+Resulting vector will be (x/w, y/w, z/w).
+
+Good for: transforming vectors that represent position by a matrix that may represent
+any transformation, including perspective projection.
+
+The name of this function is a tradition from D3DX and DirectX Math libraries.
+*/
+template<typename T, enum glm::qualifier Q>
+glm::vec<3, T, Q> TransformCoord(const glm::mat<4, 4, T, Q>& m, const glm::vec<3, T, Q>& v)
+{
+    auto result = m * glm::vec<4, T, Q>(v.x, v.y, v.z, (T)1.f);
+    T wInv = (T)1.f / result.w;
+    return {result.x * wInv, result.y * wInv, result.z * wInv};
+}
+
 // Custom deleter for STL smart pointers that uses HANDLE and CloseFile().
 struct CloseHandleDeleter
 {
