@@ -1,6 +1,7 @@
 #include "BaseUtils.hpp"
 #include "Settings.hpp"
 #include "SmallFileCache.hpp"
+#include "../ThirdParty/glm/glm/gtc/color_space.hpp"
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "../ThirdParty/rapidjson/include/rapidjson/document.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
@@ -112,6 +113,90 @@ template bool LoadVecFromJSON<glm::bvec3>(glm::bvec3& outVec, const void* jsonVa
 template bool LoadVecFromJSON<glm::bvec4>(glm::bvec4& outVec, const void* jsonVal);
 
 template bool LoadMatFromJSON<glm::mat4>(glm::mat4& outMat, const void* jsonVal);
+
+// If error, returns UINT8_MAX.
+static uint8_t ParseHexadecimalDigit(char ch)
+{
+    if(ch >= '0' && ch <= '9')
+        return (uint8_t)(ch - '0');
+    else if(ch >= 'A' && ch <= 'Z')
+        return (uint8_t)(ch - 'A' + 10);
+    else if(ch >= 'a' && ch <= 'z')
+        return (uint8_t)(ch - 'a' + 10);
+    else
+        return UINT8_MAX;
+}
+
+// If error, returns FLT_MAX.
+static float ParseStringColorComponent(char upperChar, char lowerChar, bool convertSRGBToLinear)
+{
+    const uint8_t upperCharVal = ParseHexadecimalDigit(upperChar);
+    if(upperCharVal == UINT8_MAX)
+        return FLT_MAX;
+    const uint8_t lowerCharVal = ParseHexadecimalDigit(lowerChar);
+    if(lowerCharVal == UINT8_MAX)
+        return FLT_MAX;
+    float result = (float)upperCharVal * 16.f + (float)lowerCharVal;
+    if(convertSRGBToLinear)
+        result = glm::convertSRGBToLinear(glm::vec<1, float>(result)).x;
+    return result;
+}
+
+static bool ParseStringColor(vec4& outColor_Linear, const str_view& str)
+{
+    if(str.empty())
+        return false;
+    str_view str2 = str;
+    if(str2[0] == '#')
+        str2 = str_view(str2, 1);
+    const size_t len = str2.length();
+    bool hasAlpha = false;
+    if(len == 8)
+        hasAlpha = true;
+    else if(len != 6)
+        return false;
+    outColor_Linear.r = ParseStringColorComponent(str2[0], str2[1], true);
+    if(outColor_Linear.r == FLT_MAX)
+        return false;
+    outColor_Linear.g = ParseStringColorComponent(str2[2], str2[3], true);
+    if(outColor_Linear.g == FLT_MAX)
+        return false;
+    outColor_Linear.b = ParseStringColorComponent(str2[4], str2[5], true);
+    if(outColor_Linear.b == FLT_MAX)
+        return false;
+    if(hasAlpha)
+    {
+        outColor_Linear.a = ParseStringColorComponent(str2[6], str2[7], false);
+        if(outColor_Linear.a == FLT_MAX)
+            return false;
+    }
+    else
+        outColor_Linear.a = 1.f;
+    return true;
+}
+
+void ColorSetting::LoadFromJSON(const void* jsonVal)
+{
+    const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
+    if(realVal->IsString() &&
+        ParseStringColor(m_Value, str_view(realVal->GetString(), realVal->GetStringLength())))
+    {
+        return;
+    }
+    vec4 vec;
+    if(LoadVecFromJSON(vec, jsonVal))
+    {
+        m_Value = vec;
+        return;
+    }
+    vec3 vec3;
+    if(LoadVecFromJSON(vec3, jsonVal))
+    {
+        m_Value = vec4(vec3.r, vec3.g, vec3.b, 1.f);
+        return;
+    }
+    LogWarningF(L"Invalid color setting \"{}\".", str_view(GetName()));
+}
 
 class SettingCollection
 {

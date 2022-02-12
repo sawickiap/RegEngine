@@ -21,6 +21,8 @@ struct PerFrameConstants
 };
 ConstantBuffer<PerFrameConstants> perFrameConstants : register(b0);
 
+#ifdef VERTEX_SHADER
+
 float4 FullScreenQuadVS(uint vertexID : SV_VertexID) : SV_Position
 {
 	return float4(
@@ -29,3 +31,5 @@ float4 FullScreenQuadVS(uint vertexID : SV_VertexID) : SV_Position
 		0.0,
 		1.0);
 }
+
+#endif // #ifdef VERTEX_SHADER

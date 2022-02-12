@@ -76,6 +76,7 @@ static StringSetting g_TexturePath(SettingCategory::Load, "TexturePath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
+static ColorSetting g_BackgroundColor(SettingCategory::Load, "Background.Color", vec4(0.f, 0.f, 0.f, 1.f));
 static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLight", vec3(0.f, 1.f, 0.f));
 static VecSetting<vec3> g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
 static VecSetting<vec3> g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
@@ -517,16 +518,16 @@ void Renderer::Render()
         if(m_AmbientPipelineState && m_LightingPipelineState)
         {
             PIX_EVENT_SCOPE(cmdList, L"Lighting");
-            m_DepthTexture->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+            m_DepthTexture->TransitionToStates(cmdList,
+                D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_DEPTH_READ);
             for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
                 m_GBuffers[i]->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
             m_ColorRenderTarget->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-            const float clearColor[4] = {};
             cmdList.GetCmdList()->ClearRenderTargetView(
-                m_ColorRenderTarget->GetD3D12RTV(), clearColor, 0, nullptr);
+                m_ColorRenderTarget->GetD3D12RTV(), glm::value_ptr(g_BackgroundColor.GetValue()), 0, nullptr);
 
-            cmdList.SetRenderTargets(nullptr, m_ColorRenderTarget.get());
+            cmdList.SetRenderTargets(m_DepthTexture.get(), m_ColorRenderTarget.get());
             cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
             
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
@@ -546,29 +547,33 @@ void Renderer::Render()
                 cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
             }
 
-            for(size_t lightIndex = 0; lightIndex < m_Lights.size(); ++lightIndex)
+            if(!m_Lights.empty())
             {
-                const Light& l = m_Lights[lightIndex];
-                if(l.m_Enabled)
+                cmdList.SetPipelineState(m_LightingPipelineState.Get());
+
+                for(size_t lightIndex = 0; lightIndex < m_Lights.size(); ++lightIndex)
                 {
-                    PIX_EVENT_SCOPE(cmdList, std::format(L"Light {} Type={}", lightIndex, l.m_Type));
+                    const Light& l = m_Lights[lightIndex];
+                    if(l.m_Enabled)
+                    {
+                        PIX_EVENT_SCOPE(cmdList, std::format(L"Light {} Type={}", lightIndex, l.m_Type));
 
-                    vec4 dirToLight_Homo = m_Camera->GetView() * vec4(l.m_DirectionToLight_Position, 0.f);
-                    vec3 dirToLight = glm::normalize(vec3(dirToLight_Homo.x, dirToLight_Homo.y, dirToLight_Homo.z));
+                        vec4 dirToLight_Homo = m_Camera->GetView() * vec4(l.m_DirectionToLight_Position, 0.f);
+                        vec3 dirToLight = glm::normalize(vec3(dirToLight_Homo.x, dirToLight_Homo.y, dirToLight_Homo.z));
 
-                    LightConstants lc;
-                    lc.m_Color = l.m_Color;
-                    lc.m_Type = l.m_Type;
-                    lc.m_DirectionToLight_Position = dirToLight;
-                    void* mappedPtr = nullptr;
-                    D3D12_GPU_DESCRIPTOR_HANDLE lcDesc;
-                    m_TemporaryConstantBufferManager->CreateBuffer(sizeof(lc), mappedPtr, lcDesc);
-                    memcpy(mappedPtr, &lc, sizeof(lc));
+                        LightConstants lc;
+                        lc.m_Color = l.m_Color;
+                        lc.m_Type = l.m_Type;
+                        lc.m_DirectionToLight_Position = dirToLight;
+                        void* mappedPtr = nullptr;
+                        D3D12_GPU_DESCRIPTOR_HANDLE lcDesc;
+                        m_TemporaryConstantBufferManager->CreateBuffer(sizeof(lc), mappedPtr, lcDesc);
+                        memcpy(mappedPtr, &lc, sizeof(lc));
 
-                    cmdList.SetPipelineState(m_LightingPipelineState.Get());
-                    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                        m_StandardRootSignature->GetCBVParamIndex(1), lcDesc);
-                    cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+                        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                            m_StandardRootSignature->GetCBVParamIndex(1), lcDesc);
+                        cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
+                    }
                 }
             }
         }
@@ -848,11 +853,12 @@ void Renderer::CreateLightingPipelineStates()
 	        .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 	        .NumRenderTargets = 1,
             .RTVFormats = {m_ColorRenderTarget->GetDesc().Format},
-	        .DSVFormat = DXGI_FORMAT_UNKNOWN,
+	        .DSVFormat = DXGI_FORMAT_D32_FLOAT,
             .SampleDesc = {.Count = 1}};
         FillRasterizerDesc_NoCulling(desc.RasterizerState);
         FillBlendDesc_NoBlending(desc.BlendState);
-        FillDepthStencilDesc_NoTests(desc.DepthStencilState);
+        FillDepthStencilDesc_DepthTest(desc.DepthStencilState,
+            D3D12_DEPTH_WRITE_MASK_ZERO, D3D12_COMPARISON_FUNC_LESS);
 
 	    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_AmbientPipelineState));
         SetD3D12ObjectName(m_AmbientPipelineState, L"Ambient pipeline state");
@@ -876,13 +882,14 @@ void Renderer::CreateLightingPipelineStates()
 	        .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 	        .NumRenderTargets = 1,
             .RTVFormats = {m_ColorRenderTarget->GetDesc().Format},
-	        .DSVFormat = DXGI_FORMAT_UNKNOWN,
+	        .DSVFormat = DXGI_FORMAT_D32_FLOAT,
             .SampleDesc = {.Count = 1}};
         FillRasterizerDesc_NoCulling(desc.RasterizerState);
         FillBlendDesc_BlendRT0(desc.BlendState,
             D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD,
             D3D12_BLEND_ONE, D3D12_BLEND_ONE, D3D12_BLEND_OP_ADD);
-        FillDepthStencilDesc_NoTests(desc.DepthStencilState);
+        FillDepthStencilDesc_DepthTest(desc.DepthStencilState,
+            D3D12_DEPTH_WRITE_MASK_ZERO, D3D12_COMPARISON_FUNC_LESS);
 
 	    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_LightingPipelineState));
         SetD3D12ObjectName(m_LightingPipelineState, L"Lighting pipeline state");

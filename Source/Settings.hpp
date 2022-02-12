@@ -53,7 +53,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override;
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 template<typename T>
@@ -75,7 +75,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override;
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 class UintSetting : public NumericSetting<uint32_t>
@@ -87,7 +87,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override;
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 class IntSetting : public NumericSetting<int32_t>
@@ -99,7 +99,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override;
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 template<typename VecT>
@@ -117,7 +117,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override
+    void LoadFromJSON(const void* jsonVal) override
     {
         // `this` is needed due to a compiler bug!
         VecT vec;
@@ -126,6 +126,26 @@ protected:
         else
             LogWarningF(L"Invalid vector setting \"{}\".", str_view(this->GetName()));
     }
+};
+
+/*
+JSON can be either like for vector of floats e.g. [1.0, 0.0, 0.5, 1.0] or string
+in format "RRGGBBAA" or "#RRGGBBAA", e.g. "FF0088FF".
+Floats are assumed to be 0..1 but can have any values really.
+Floats are in linear space and loaded as-is.
+String format is assumed in sRGB space and converted to linear.
+In both cases, alpha can be omitted, which is then assumed to be 1.0.
+*/
+class ColorSetting : public VecSetting<vec4>
+{
+public:
+    ColorSetting(SettingCategory category, const str_view& name, const vec4& defaultValue) :
+        VecSetting<vec4>(category, name, defaultValue)
+    {
+    }
+
+protected:
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 template<typename MatT>
@@ -138,7 +158,7 @@ public:
     }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override
+    void LoadFromJSON(const void* jsonVal) override
     {
         // `this` is needed due to a compiler bug!
         MatT mat;
@@ -161,7 +181,7 @@ public:
     void SetValue(const wstr_view& v) { v.to_string(m_Value); }
 
 protected:
-    virtual void LoadFromJSON(const void* jsonVal) override;
+    void LoadFromJSON(const void* jsonVal) override;
 
 private:
     wstring m_Value;

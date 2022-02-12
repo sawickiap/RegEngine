@@ -108,7 +108,8 @@ void CommandList::SetRenderTargets(RenderingResource* depthStencil, std::initial
 
     if(depthStencil)
     {
-        assert(depthStencil->HasCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE));
+        assert(depthStencil->HasCurrentState(D3D12_RESOURCE_STATE_DEPTH_WRITE) ||
+            depthStencil->HasCurrentState(D3D12_RESOURCE_STATE_DEPTH_READ));
         assert(!depthStencil->GetDSV().IsNull());
         DSVDescriptor = DSVDescriptorManager->GetCPUHandle(depthStencil->GetDSV());
     }
