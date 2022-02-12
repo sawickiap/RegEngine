@@ -557,13 +557,12 @@ void Renderer::Render()
                     {
                         PIX_EVENT_SCOPE(cmdList, std::format(L"Light {} Type={}", lightIndex, l.m_Type));
 
-                        vec4 dirToLight_Homo = m_Camera->GetView() * vec4(l.m_DirectionToLight_Position, 0.f);
-                        vec3 dirToLight = glm::normalize(vec3(dirToLight_Homo.x, dirToLight_Homo.y, dirToLight_Homo.z));
+                        vec3 dirToLight_View = glm::normalize(TransformNormal(m_Camera->GetView(), l.m_DirectionToLight_Position));
 
                         LightConstants lc;
                         lc.m_Color = l.m_Color;
                         lc.m_Type = l.m_Type;
-                        lc.m_DirectionToLight_Position = dirToLight;
+                        lc.m_DirectionToLight_Position = dirToLight_View;
                         void* mappedPtr = nullptr;
                         D3D12_GPU_DESCRIPTOR_HANDLE lcDesc;
                         m_TemporaryConstantBufferManager->CreateBuffer(sizeof(lc), mappedPtr, lcDesc);
