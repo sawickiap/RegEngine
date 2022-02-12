@@ -540,7 +540,6 @@ void Renderer::Render()
                 m_StandardRootSignature->GetSRVParamIndex(2), m_GBuffers[(size_t)GBuffer::Normal]->GetD3D12SRV());
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-            if(m_AmbientEnabled)
             {
                 PIX_EVENT_SCOPE(cmdList, L"Ambient");
                 cmdList.SetPipelineState(m_AmbientPipelineState.Get());

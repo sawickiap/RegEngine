@@ -23,7 +23,7 @@
     // 0 = backface culling disabled, 1 = clockwise is front, 2 = counterclockwise is front
     "BackFaceCullingMode": 2,
 
-    "Background.Color": [0.5,0.5,0.5],
+    "Background.Color": [0.0,0.0,0.1],
     //"Background.Color": "808080",
 
     "DirectionToLight": [-1, 3, 0.5],
