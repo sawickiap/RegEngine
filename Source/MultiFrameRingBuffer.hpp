@@ -31,7 +31,7 @@ public:
         if(size > m_Capacity)
             return false;
         /*
-        Allocated is Back...Front:
+        Allocated space is Back...Front:
 
         |.....|###############|............|
              Back           Front
@@ -69,7 +69,7 @@ public:
                     const T unusedReminderAtEnd = m_Capacity - m_Front;
                     m_Size += unusedReminderAtEnd;
                     m_PerFrameSize[m_FrameIndex] += unusedReminderAtEnd;
-                    outOffset = size;
+                    outOffset = 0;
                     m_Front = size % m_Capacity;
                     m_Size += size;
                     m_PerFrameSize[m_FrameIndex] += size;
