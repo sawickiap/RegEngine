@@ -17,7 +17,7 @@
 #include <Windows.h>
 #include <objbase.h>
 #include <wrl/client.h>
-#include <dxgi1_4.h>
+#include <dxgi1_6.h>
 #include <d3d12.h>
 #include "../ThirdParty/d3dx12/d3dx12.h"
 

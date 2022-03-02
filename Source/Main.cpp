@@ -31,7 +31,8 @@ public:
 private:
     HINSTANCE m_Instance = NULL;
     HWND m_Wnd = NULL;
-    ComPtr<IDXGIFactory4> m_DXGIFactory;
+    ComPtr<IDXGIFactory4> m_DXGIFactory4;
+    ComPtr<IDXGIFactory6> m_DXGIFactory6;
     ComPtr<IDXGIAdapter1> m_Adapter;
     unique_ptr<Renderer> m_Renderer;
     Game m_Game;
@@ -64,7 +65,8 @@ void Application::Init()
     ERR_TRY;
     LogMessage(L"Application starting.");
     CHECK_HR(CoInitialize(NULL));
-    CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DXGIFactory)));
+    CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DXGIFactory4)));
+    CHECK_HR(m_DXGIFactory4->QueryInterface(IID_PPV_ARGS(&m_DXGIFactory6)));
     g_SmallFileCache = new SmallFileCache{};
     LoadStartupSettings();
     LoadLoadSettings();
@@ -72,7 +74,7 @@ void Application::Init()
     assert(m_Adapter);
     RegisterWindowClass();
     CreateWindow_();
-    m_Renderer = make_unique<Renderer>(m_DXGIFactory.Get(), m_Adapter.Get(), m_Wnd);
+    m_Renderer = make_unique<Renderer>(m_DXGIFactory4.Get(), m_Adapter.Get(), m_Wnd);
     m_Renderer->Init();
     m_Game.Init();
     ERR_CATCH_MSG(L"Failed to initialize application.");
@@ -81,7 +83,8 @@ void Application::Init()
 void Application::SelectAdapter()
 {
     ComPtr<IDXGIAdapter1> tmpAdapter;
-    for(UINT i = 0; m_DXGIFactory->EnumAdapters1(i, &tmpAdapter) != DXGI_ERROR_NOT_FOUND; ++i)
+    for(UINT i = 0; m_DXGIFactory6->EnumAdapterByGpuPreference(
+        i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&tmpAdapter)) != DXGI_ERROR_NOT_FOUND; ++i)
     {
         DXGI_ADAPTER_DESC1 desc;
         tmpAdapter->GetDesc1(&desc);
