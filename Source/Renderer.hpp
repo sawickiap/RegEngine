@@ -112,7 +112,7 @@ It creates and keeps ID3D12Device and other key objects.
 class Renderer
 {
 public:
-    bool m_AmbientEnabled = true;
+    bool m_AmbientEnabled = false;
     bool m_NormalMappingEnabled = true;
     std::vector<Light> m_Lights;
 

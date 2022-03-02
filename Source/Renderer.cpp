@@ -76,6 +76,7 @@ static StringSetting g_TexturePath(SettingCategory::Load, "TexturePath");
 static StringSetting g_NormalTexturePath(SettingCategory::Load, "NormalTexturePath");
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
+static BoolSetting g_AssimpNegateBitangent(SettingCategory::Load, "Assimp.NegateBitangent", true);
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
 static ColorSetting g_BackgroundColor(SettingCategory::Load, "Background.Color", vec4(0.f, 0.f, 0.f, 1.f));
 static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLight", vec3(0.f, 1.f, 0.f));
@@ -517,7 +518,8 @@ void Renderer::Render()
                 m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
-            mat4 globalXform = glm::scale(g_AssimpTransform.GetValue(), scaleVec);
+            mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
+            globalXform *= g_AssimpTransform.GetValue();
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
             RenderEntity(cmdList, globalXform, m_RootEntity);
         }
@@ -1017,6 +1019,7 @@ void Renderer::CreateLights()
     m_Lights.push_back(dl);
 
     Light pl0 = {
+        .m_Enabled = false,
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = vec3(0.5f, 0.f, 0.f),
         .m_DirectionToLight_Position = vec3(-1.f, 0.f, 0.f)
@@ -1024,6 +1027,7 @@ void Renderer::CreateLights()
     m_Lights.push_back(pl0);
 
     Light pl1 = {
+        .m_Enabled = false,
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = vec3(0.f, 0.5f, 0.f),
         .m_DirectionToLight_Position = vec3(0.f, 1.f, 0.f)
@@ -1110,6 +1114,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
     CHECK_BOOL(assimpMesh->HasTextureCoords(0) || !assimpMesh->HasTextureCoords(1));
     CHECK_BOOL(assimpMesh->mNumUVComponents[0] == 2 && assimpMesh->mNumUVComponents[1] == 0);
     CHECK_BOOL(assimpMesh->HasNormals() && assimpMesh->HasTangentsAndBitangents());
+    const bool negateBitangent = g_AssimpNegateBitangent.GetValue();
 
     std::vector<Vertex> vertices(vertexCount);
     for(uint32_t i = 0; i < vertexCount; ++i)
@@ -1121,8 +1126,10 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         const aiVector3D bitangent = assimpMesh->mBitangents[i];
         vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
         vertices[i].m_Normal = packed_vec3(normal.x, normal.z, normal.y); // Same here.
-        vertices[i].m_Tangent = - packed_vec3(tangent.x, tangent.z, tangent.y); // Same here. Additionally negating because of DirectX texture addressing convention.
-        vertices[i].m_Bitangent = packed_vec3(bitangent.x, bitangent.z, bitangent.y); // Same here.
+        vertices[i].m_Tangent = packed_vec3(tangent.x, tangent.z, tangent.y); // Same here.
+        vertices[i].m_Bitangent = negateBitangent ? // Same here.
+            -packed_vec3(bitangent.x, bitangent.z, bitangent.y) :
+            packed_vec3(bitangent.x, bitangent.z, bitangent.y);
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
