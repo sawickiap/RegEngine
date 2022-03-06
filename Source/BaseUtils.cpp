@@ -29,6 +29,412 @@ void Exception::Print() const
     }
 }
 
+#ifndef _CMD_LINE_PARSER
+
+bool CommandLineParser::ReadNextArg(std::wstring *OutArg)
+{
+	if (m_argv != NULL)
+	{
+		if (m_ArgIndex >= (size_t)m_argc) return false;
+
+		*OutArg = m_argv[m_ArgIndex];
+		m_ArgIndex++;
+		return true;
+	}
+	else
+	{
+		if (m_ArgIndex >= m_CmdLineLength) return false;
+		
+		OutArg->clear();
+		bool InsideQuotes = false;
+		while (m_ArgIndex < m_CmdLineLength)
+		{
+			wchar_t Ch = m_CmdLine[m_ArgIndex];
+			if (Ch == L'\\')
+			{
+				bool FollowedByQuote = false;
+				size_t BackslashCount = 1;
+				size_t TmpIndex = m_ArgIndex + 1;
+				while (TmpIndex < m_CmdLineLength)
+				{
+					wchar_t TmpCh = m_CmdLine[TmpIndex];
+					if (TmpCh == L'\\')
+					{
+						BackslashCount++;
+						TmpIndex++;
+					}
+					else if (TmpCh == L'"')
+					{
+						FollowedByQuote = true;
+						break;
+					}
+					else
+						break;
+				}
+
+				if (FollowedByQuote)
+				{
+					if (BackslashCount % 2 == 0)
+					{
+						for (size_t i = 0; i < BackslashCount / 2; i++)
+							*OutArg += L'\\';
+						m_ArgIndex += BackslashCount + 1;
+						InsideQuotes = !InsideQuotes;
+					}
+					else
+					{
+						for (size_t i = 0; i < BackslashCount / 2; i++)
+							*OutArg += L'\\';
+						*OutArg += L'"';
+						m_ArgIndex += BackslashCount + 1;
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < BackslashCount; i++)
+						*OutArg += L'\\';
+					m_ArgIndex += BackslashCount;
+				}
+			}
+			else if (Ch == L'"')
+			{
+				InsideQuotes = !InsideQuotes;
+				m_ArgIndex++;
+			}
+			else if (isspace(Ch))
+			{
+				if (InsideQuotes)
+				{
+					*OutArg += Ch;
+					m_ArgIndex++;
+				}
+				else
+				{
+					m_ArgIndex++;
+					break;
+				}
+			}
+			else
+			{
+				*OutArg += Ch;
+				m_ArgIndex++;
+			}
+		}
+
+		while (m_ArgIndex < m_CmdLineLength && isspace(m_CmdLine[m_ArgIndex]))
+			m_ArgIndex++;
+
+		return true;
+	}
+}
+
+CommandLineParser::ShortOption * CommandLineParser::FindShortOpt(wchar_t Opt)
+{
+	for (size_t i = 0; i < m_ShortOpts.size(); i++)
+		if (m_ShortOpts[i].Opt == Opt)
+			return &m_ShortOpts[i];
+	return NULL;
+}
+
+CommandLineParser::LongOption * CommandLineParser::FindLongOpt(const wstr_view &Opt)
+{
+	for (size_t i = 0; i < m_LongOpts.size(); i++)
+		if (m_LongOpts[i].Opt == Opt)
+			return &m_LongOpts[i];
+	return NULL;
+}
+
+CommandLineParser::CommandLineParser(int argc, wchar_t **argv) :
+	m_argv(argv),
+	m_argc(argc),
+	m_ArgIndex(1)
+{
+	assert(argc > 0);
+	assert(argv != NULL);
+}
+
+CommandLineParser::CommandLineParser(const wchar_t *cmdLine) :
+	m_CmdLine(cmdLine)
+{
+	assert(cmdLine != NULL);
+	m_CmdLineLength = wcslen(m_CmdLine);
+	while (m_ArgIndex < m_CmdLineLength && isspace(m_CmdLine[m_ArgIndex]))
+		++m_ArgIndex;
+}
+
+void CommandLineParser::RegisterOption(uint32_t Id, wchar_t Opt, bool Parameter)
+{
+	assert(Opt != L'\0');
+    m_ShortOpts.push_back(ShortOption{Id, Opt, Parameter});
+}
+
+void CommandLineParser::RegisterOption(uint32_t Id, const wstr_view &Opt, bool Parameter)
+{
+	assert(!Opt.empty());
+    m_LongOpts.push_back(LongOption{Id, wstring{Opt}, Parameter});
+}
+
+CommandLineParser::Result CommandLineParser::ReadNext()
+{
+	if (m_InsideMultioption)
+	{
+		assert(m_LastArgIndex < m_LastArg.length());
+		ShortOption *so = FindShortOpt(m_LastArg[m_LastArgIndex]);
+		if (so == NULL)
+		{
+			m_LastOptId = 0;
+			m_LastParameter.clear();
+			return Result::Error;
+		}
+		if (so->Parameter)
+		{
+			if (m_LastArg.length() == m_LastArgIndex+1)
+			{
+				if (!ReadNextArg(&m_LastParameter))
+				{
+					m_LastOptId = 0;
+					m_LastParameter.clear();
+					return Result::Error;
+				}
+				m_InsideMultioption = false;
+				m_LastOptId = so->Id;
+				return Result::Option;
+			}
+			else if (m_LastArg[m_LastArgIndex+1] == L'=')
+			{
+				m_InsideMultioption = false;
+				m_LastParameter = m_LastArg.substr(m_LastArgIndex+2);
+				m_LastOptId = so->Id;
+				return Result::Option;
+			}
+			else
+			{
+				m_InsideMultioption = false;
+				m_LastParameter = m_LastArg.substr(m_LastArgIndex+1);
+				m_LastOptId = so->Id;
+				return Result::Option;
+			}
+		}
+		else
+		{
+			if (m_LastArg.length() == m_LastArgIndex+1)
+			{
+				m_InsideMultioption = false;
+				m_LastParameter.clear();
+				m_LastOptId = so->Id;
+				return Result::Option;
+			}
+			else
+			{
+				m_LastArgIndex++;
+
+				m_LastParameter.clear();
+				m_LastOptId = so->Id;
+				return Result::Option;
+			}
+		}
+	}
+	else
+	{
+		if (!ReadNextArg(&m_LastArg))
+		{
+			m_LastParameter.clear();
+			m_LastOptId = 0;
+			return Result::End;
+		}
+		
+		if (!m_LastArg.empty() && m_LastArg[0] == L'-')
+		{
+			if (m_LastArg.length() > 1 && m_LastArg[1] == L'-')
+			{
+				size_t EqualIndex = m_LastArg.find(L'=', 2);
+				if (EqualIndex != std::wstring::npos)
+				{
+					LongOption *lo = FindLongOpt(m_LastArg.substr(2, EqualIndex-2));
+					if (lo == NULL || lo->Parameter == false)
+					{
+						m_LastOptId = 0;
+						m_LastParameter.clear();
+						return Result::Error;
+					}
+					m_LastParameter = m_LastArg.substr(EqualIndex+1);
+					m_LastOptId = lo->Id;
+					return Result::Option;
+				}
+				else
+				{
+					LongOption *lo = FindLongOpt(m_LastArg.substr(2));
+					if (lo == NULL)
+					{
+						m_LastOptId = 0;
+						m_LastParameter.clear();
+						return Result::Error;
+					}
+					if (lo->Parameter)
+					{
+						if (!ReadNextArg(&m_LastParameter))
+						{
+							m_LastOptId = 0;
+							m_LastParameter.clear();
+							return Result::Error;
+						}
+					}
+					else
+						m_LastParameter.clear();
+					m_LastOptId = lo->Id;
+					return Result::Option;
+				}
+			}
+			else
+			{
+				if (m_LastArg.length() < 2)
+				{
+					m_LastOptId = 0;
+					m_LastParameter.clear();
+					return Result::Error;
+				}
+				ShortOption *so = FindShortOpt(m_LastArg[1]);
+				if (so == NULL)
+				{
+					m_LastOptId = 0;
+					m_LastParameter.clear();
+					return Result::Error;
+				}
+				if (so->Parameter)
+				{
+					if (m_LastArg.length() == 2)
+					{
+						if (!ReadNextArg(&m_LastParameter))
+						{
+							m_LastOptId = 0;
+							m_LastParameter.clear();
+							return Result::Error;
+						}
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+					else if (m_LastArg[2] == L'=')
+					{
+						m_LastParameter = m_LastArg.substr(3);
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+					else
+					{
+						m_LastParameter = m_LastArg.substr(2);
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+				}
+				else
+				{
+					if (m_LastArg.length() == 2)
+					{
+						m_LastParameter.clear();
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+					else
+					{
+						m_InsideMultioption = true;
+						m_LastArgIndex = 2;
+
+						m_LastParameter.clear();
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+				}
+			}
+		}
+		else if (!m_LastArg.empty() && m_LastArg[0] == L'/')
+		{
+			size_t EqualIndex = m_LastArg.find('=', 1);
+			if (EqualIndex != std::wstring::npos)
+			{
+				if (EqualIndex == 2)
+				{
+					ShortOption *so = FindShortOpt(m_LastArg[1]);
+					if (so != NULL)
+					{
+						if (so->Parameter == false)	
+						{
+							m_LastOptId = 0;
+							m_LastParameter.clear();
+							return Result::Error;
+						}
+						m_LastParameter = m_LastArg.substr(EqualIndex+1);
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+				}
+				LongOption *lo = FindLongOpt(m_LastArg.substr(1, EqualIndex-1));
+				if (lo == NULL || lo->Parameter == false)
+				{
+					m_LastOptId = 0;
+					m_LastParameter.clear();
+					return Result::Error;
+				}
+				m_LastParameter = m_LastArg.substr(EqualIndex+1);
+				m_LastOptId = lo->Id;
+				return Result::Option;
+			}
+			else
+			{
+				if (m_LastArg.length() == 2)
+				{
+					ShortOption *so = FindShortOpt(m_LastArg[1]);
+					if (so != NULL)
+					{
+						if (so->Parameter)
+						{
+							if (!ReadNextArg(&m_LastParameter))
+							{
+								m_LastOptId = 0;
+								m_LastParameter.clear();
+								return Result::Error;
+							}
+						}
+						else
+							m_LastParameter.clear();
+						m_LastOptId = so->Id;
+						return Result::Option;
+					}
+				}
+				LongOption *lo = FindLongOpt(m_LastArg.substr(1));
+				if (lo == NULL)
+				{
+					m_LastOptId = 0;
+					m_LastParameter.clear();
+					return Result::Error;
+				}
+				if (lo->Parameter)
+				{
+					if (!ReadNextArg(&m_LastParameter))
+					{
+						m_LastOptId = 0;
+						m_LastParameter.clear();
+						return Result::Error;
+					}
+				}
+				else
+					m_LastParameter.clear();
+				m_LastOptId = lo->Id;
+				return Result::Option;
+			}
+		}
+		else
+		{
+			m_LastOptId = 0;
+			m_LastParameter = m_LastArg;
+			return Result::Parameter;
+		}
+	}
+}
+
+#endif // _CMD_LINE_PARSER
+
+#ifndef _PUBLIC_FUNCTIONS
+
 wstring GetWinAPIErrorMessage()
 {
     const uint32_t err = GetLastError();
@@ -356,3 +762,5 @@ bool GetFileLastWriteTime(std::filesystem::file_time_type& outTime, const std::f
     outTime = std::filesystem::last_write_time(path, errorCode);
     return !errorCode;
 }
+
+#endif // _PUBLIC_FUNCTIONS

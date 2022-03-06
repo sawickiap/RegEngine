@@ -242,3 +242,5 @@ private:
 };
 
 extern Renderer* g_Renderer;
+
+void AssimpPrint(const wstr_view& filePath);

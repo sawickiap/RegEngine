@@ -16,6 +16,15 @@ static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 
 VecSetting<glm::uvec2> g_Size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
 
+struct ApplicationParameters
+{
+    enum class Mode { Normal, AssimpPrint };
+    Mode m_Mode = Mode::Normal;
+    wstring m_Path; // When m_Mode == Mode::AssimpPrint
+
+    int ParseCommandLine(int argc, wchar_t** argv);
+};
+
 /*
 Represents the main object responsible for application initialization and management
 of a Windows window.
@@ -26,6 +35,7 @@ public:
     Application();
     ~Application();
     void Init();
+    void InitWindowAndRenderer();
     int Run();
 
 private:
@@ -46,6 +56,48 @@ private:
     void OnKeyDown(WPARAM key);
 };
 
+int ApplicationParameters::ParseCommandLine(int argc, wchar_t** argv)
+{
+    enum OPTION
+    {
+        OPTION_ASSIMP_PRINT,
+        OPTION_COUNT
+    };
+    static const wchar_t* ERR_MSG = L"Command line syntax error.";
+
+    CommandLineParser parser(argc, argv);
+    parser.RegisterOption(OPTION_ASSIMP_PRINT, L"AssimpPrint", true);
+    for(;;)
+    {
+        CommandLineParser::Result res = parser.ReadNext();
+        switch(res)
+        {
+        case CommandLineParser::Result::End:
+            return 0;
+        case CommandLineParser::Result::Option:
+            switch(parser.GetOptionID())
+            {
+            case OPTION_ASSIMP_PRINT:
+                if(m_Mode == Mode::Normal)
+                {
+                    m_Mode = Mode::AssimpPrint;
+                    m_Path = parser.GetParameter();
+                }
+                else
+                    FAIL(ERR_MSG);
+                break;
+            default:
+                assert(0);
+            }
+            break;
+        default:
+            FAIL(ERR_MSG);
+        }
+    }
+}
+
+#ifndef _APPLICATION_IMPL
+
 static Application* g_App;
 
 Application::Application()
@@ -63,6 +115,7 @@ Application::~Application()
 void Application::Init()
 {
     ERR_TRY;
+
     LogMessage(L"Application starting.");
     CHECK_HR(CoInitialize(NULL));
     CHECK_HR(CreateDXGIFactory1(IID_PPV_ARGS(&m_DXGIFactory4)));
@@ -72,12 +125,21 @@ void Application::Init()
     LoadLoadSettings();
     SelectAdapter();
     assert(m_Adapter);
+
+    ERR_CATCH_MSG(L"Failed to initialize application.");
+}
+
+void Application::InitWindowAndRenderer()
+{
+    ERR_TRY;
+
     RegisterWindowClass();
     CreateWindow_();
     m_Renderer = make_unique<Renderer>(m_DXGIFactory4.Get(), m_Adapter.Get(), m_Wnd);
     m_Renderer->Init();
     m_Game.Init();
-    ERR_CATCH_MSG(L"Failed to initialize application.");
+    
+    ERR_CATCH_MSG(L"Failed to initialize window and renderer.");
 }
 
 void Application::SelectAdapter()
@@ -269,14 +331,34 @@ int Application::Run()
     return (int)msg.wParam;
 }
 
+#endif // _APPLICATION_IMPL
+
 int wmain(int argc, wchar_t** argv)
 {
 	try
 	{
+        ApplicationParameters params;
+        int result = params.ParseCommandLine(argc, argv);
+        if(result != 0)
+            return result;
+
         Application app;
         g_App = &app;
         app.Init();
-        const int result = app.Run();
+
+        switch(params.m_Mode)
+        {
+        case ApplicationParameters::Mode::Normal:
+            app.InitWindowAndRenderer();
+            result = app.Run();
+            break;
+        case ApplicationParameters::Mode::AssimpPrint:
+            AssimpPrint(params.m_Path);
+            break;
+        default:
+            assert(0);
+        }
+        
         return result;
 	}
 	CATCH_PRINT_ERROR(return EXIT_CODE_RUNTIME_ERROR;);

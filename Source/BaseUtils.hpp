@@ -212,6 +212,57 @@ struct Exception
     void Print() const;
 };
 
+class CommandLineParser
+{
+public:
+	enum class Result { Option, Parameter, End, Error };
+
+	CommandLineParser(int argc, wchar_t **argv);
+	CommandLineParser(const wchar_t *cmdLine);
+	
+    void RegisterOption(uint32_t Id, wchar_t Opt, bool Parameter);
+	void RegisterOption(uint32_t Id, const wstr_view &Opt, bool Parameter);
+	
+    Result ReadNext();
+    uint32_t GetOptionID() { return m_LastOptId; }
+    const std::wstring& GetParameter() { return m_LastParameter; }
+
+private:
+	struct ShortOption
+	{
+		uint32_t Id;
+		wchar_t Opt;
+		bool Parameter;
+	};
+
+	struct LongOption
+	{
+		uint32_t Id;
+		wstring Opt;
+		bool Parameter;
+	};
+
+	wchar_t **m_argv = nullptr;
+	const wchar_t *m_CmdLine = nullptr;
+	int m_argc = 0;
+	size_t m_CmdLineLength = 0;
+	size_t m_ArgIndex = 0;
+
+	bool ReadNextArg(std::wstring *OutArg);
+
+	std::vector<ShortOption> m_ShortOpts;
+	std::vector<LongOption> m_LongOpts;
+
+	ShortOption* FindShortOpt(wchar_t Opt);
+	LongOption* FindLongOpt(const wstr_view &Opt);
+
+	bool m_InsideMultioption = false;
+	wstring m_LastArg;
+	size_t m_LastArgIndex = 0;
+	uint32_t m_LastOptId = 0;
+	wstring m_LastParameter;
+};
+
 wstring GetWinAPIErrorMessage();
 wstring GetHRESULTErrorMessage(HRESULT hr);
 

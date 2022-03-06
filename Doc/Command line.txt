@@ -1,0 +1,2 @@
+/AssimpPrint <PATH>
+Loads specified file using Assimp, prints information about it and exits.

@@ -90,6 +90,16 @@ Renderer* g_Renderer;
 #define VAR_NAME_WITH_LINE(name) HELPER_CAT_2(name, __LINE__)
 #define PIX_EVENT_SCOPE(cmdList, msg) PIXEventScope VAR_NAME_WITH_LINE(pixEventScope)((cmdList), (msg));
 
+static const uint32_t ASSIMP_READ_FLAGS =
+    aiProcess_Triangulate |
+    aiProcess_JoinIdenticalVertices |
+    aiProcess_SortByPType |
+    aiProcess_FlipWindingOrder |
+    aiProcess_GenSmoothNormals |
+    aiProcess_CalcTangentSpace |
+    aiProcess_FlipUVs; // To make UV space origin in the upper-left corner.
+    // aiProcess_MakeLeftHanded
+
 struct PerFrameConstants
 {
     uint32_t m_FrameIndex;
@@ -295,6 +305,8 @@ StandardRootSignature::StandardRootSignature()
         0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_RootSignature)));
     SetD3D12ObjectName(m_RootSignature, L"Standard root signature");
 }
+
+#ifndef _RENDERER_IMPL
 
 Renderer::Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd) :
 	m_DXGIFactory{dxgiFactory},
@@ -1057,15 +1069,7 @@ void Renderer::LoadModel(bool refreshAll)
     {
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(
-            ConvertUnicodeToChars(filePath, CP_ACP).c_str(),
-            aiProcess_Triangulate |
-            aiProcess_JoinIdenticalVertices |
-            aiProcess_SortByPType |
-            aiProcess_FlipWindingOrder |
-            aiProcess_GenSmoothNormals |
-            aiProcess_CalcTangentSpace |
-            aiProcess_FlipUVs); // To make UV space origin in the upper-left corner.
-        // aiProcess_MakeLeftHanded
+            ConvertUnicodeToChars(filePath, CP_ACP).c_str(), ASSIMP_READ_FLAGS);
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         
@@ -1418,6 +1422,8 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     }
 }
 
+#endif // _RENDERER_IMPL
+
 void StandardSamplers::Init()
 {
     ERR_TRY;
@@ -1500,4 +1506,23 @@ D3D12_GPU_DESCRIPTOR_HANDLE StandardSamplers::GetD3D12(D3D12_FILTER filter, D3D1
     Descriptor desc = Get(filter, address);
     assert(g_Renderer && g_Renderer->GetSamplerDescriptorManager());
     return g_Renderer->GetSamplerDescriptorManager()->GetGPUHandle(desc);
+}
+
+void AssimpPrint(const wstr_view& filePath)
+{
+    LogMessageF(L"Loading model from \"{}\"...", filePath);
+
+    ERR_TRY;
+
+    AssimpInit assimp;
+
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(
+        ConvertUnicodeToChars(filePath, CP_ACP).c_str(), ASSIMP_READ_FLAGS);
+    if(!scene)
+        FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
+        
+    PrintAssimpSceneInfo(scene);
+
+    ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
 }
