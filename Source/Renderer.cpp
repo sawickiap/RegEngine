@@ -94,11 +94,13 @@ static const uint32_t ASSIMP_READ_FLAGS =
     aiProcess_Triangulate |
     aiProcess_JoinIdenticalVertices |
     aiProcess_SortByPType |
-    aiProcess_FlipWindingOrder |
     aiProcess_GenSmoothNormals |
     aiProcess_CalcTangentSpace |
-    aiProcess_FlipUVs; // To make UV space origin in the upper-left corner.
-    // aiProcess_MakeLeftHanded
+    // This step flips all UV coordinates along the y-axis and adjusts
+    // material settings and bitangents accordingly.
+    aiProcess_FlipUVs;
+// aiProcess_MakeLeftHanded
+// aiProcess_ConvertToLeftHanded
 
 struct PerFrameConstants
 {
@@ -1076,8 +1078,10 @@ void Renderer::LoadModel(bool refreshAll)
         if(g_AssimpPrintSceneInfo.GetValue())
             PrintAssimpSceneInfo(scene);
 
+        const bool globalXformIsInverted = glm::determinant(glm::mat3(g_AssimpTransform.GetValue())) < 0;
+
         for(uint32_t i = 0; i < scene->mNumMeshes; ++i)
-            LoadModelMesh(scene, scene->mMeshes[i]);
+            LoadModelMesh(scene, scene->mMeshes[i], globalXformIsInverted);
         
         const aiNode* node = scene->mRootNode;
         if(node)
@@ -1109,7 +1113,7 @@ void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNo
     }
 }
 
-void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
+void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, bool globalXformIsInverted)
 {
     const uint32_t vertexCount = assimpMesh->mNumVertices;
     const uint32_t faceCount = assimpMesh->mNumFaces;
@@ -1128,26 +1132,34 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh)
         const aiVector3D normal = assimpMesh->mNormals[i];
         const aiVector3D tangent = assimpMesh->mTangents[i];
         const aiVector3D bitangent = assimpMesh->mBitangents[i];
-        vertices[i].m_Position = packed_vec3(pos.x, pos.z, pos.y); // Intentionally swapping Y with Z.
-        vertices[i].m_Normal = packed_vec3(normal.x, normal.z, normal.y); // Same here.
-        vertices[i].m_Tangent = packed_vec3(tangent.x, tangent.z, tangent.y); // Same here.
-        vertices[i].m_Bitangent = negateBitangent ? // Same here.
-            -packed_vec3(bitangent.x, bitangent.z, bitangent.y) :
-            packed_vec3(bitangent.x, bitangent.z, bitangent.y);
+        vertices[i].m_Position = packed_vec3(pos.x, pos.y, pos.z);
+        // I thought I need to invert this when globalXformIsInverted, but apparently I don't.
+        vertices[i].m_Normal = packed_vec3(normal.x, normal.y, normal.z);
+        vertices[i].m_Tangent = packed_vec3(tangent.x, tangent.y, tangent.z);
+        vertices[i].m_Bitangent = negateBitangent ?
+            -packed_vec3(bitangent.x, bitangent.y, bitangent.z) :
+            packed_vec3(bitangent.x, bitangent.y, bitangent.z);
         vertices[i].m_TexCoord = packed_vec2(texCoord.x, texCoord.y);
         vertices[i].m_Color = packed_vec4(1.f, 1.f, 1.f, 1.f);
     }
     
     std::vector<Mesh::IndexType> indices(faceCount * 3);
     uint32_t indexIndex = 0;
-    for(uint32_t i = 0; i < faceCount; ++i)
+    for(uint32_t faceIndex = 0; faceIndex < faceCount; ++faceIndex)
     {
-        assert(assimpMesh->mFaces[i].mNumIndices == 3);
+        assert(assimpMesh->mFaces[faceIndex].mNumIndices == 3);
         for(uint32_t j = 0; j < 3; ++j)
         {
-            assert(assimpMesh->mFaces[i].mIndices[j] <= std::numeric_limits<Mesh::IndexType>::max());
-            indices[indexIndex++] = (Mesh::IndexType)assimpMesh->mFaces[i].mIndices[j];
+            assert(assimpMesh->mFaces[faceIndex].mIndices[j] <= std::numeric_limits<Mesh::IndexType>::max());
+            indices[indexIndex++] = (Mesh::IndexType)assimpMesh->mFaces[faceIndex].mIndices[j];
         }
+    }
+
+    if(globalXformIsInverted)
+    {
+        // Invert winding.
+        for(size_t i = 0, count = indices.size(); i < count; i += 3)
+            std::swap(indices[i], indices[i + 2]);
     }
 
     SceneMesh mesh;

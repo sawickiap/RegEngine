@@ -228,7 +228,7 @@ private:
     void LoadModel(bool refreshAll);
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
-    void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh);
+    void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, bool globalXformIsInverted);
     void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
         const aiMaterial* material, bool refreshAll);
     // Returns index of the existing or newly loaded texture in m_Textures, SIZE_MAX if failed.
