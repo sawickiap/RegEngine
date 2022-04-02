@@ -1,4 +1,5 @@
 #include "BaseUtils.hpp"
+#include "Main.hpp"
 #include "Game.hpp"
 #include "Renderer.hpp"
 #include "Settings.hpp"
@@ -23,39 +24,6 @@ struct ApplicationParameters
     wstring m_Path; // When m_Mode == Mode::AssimpPrint
 
     int ParseCommandLine(int argc, wchar_t** argv);
-};
-
-/*
-Represents the main object responsible for application initialization and management
-of a Windows window.
-*/
-class Application
-{
-public:
-    Application();
-    ~Application();
-    void Init();
-    void InitWindowAndRenderer();
-    int Run();
-
-private:
-    HINSTANCE m_Instance = NULL;
-    HWND m_Wnd = NULL;
-    ComPtr<IDXGIFactory4> m_DXGIFactory4;
-    ComPtr<IDXGIFactory6> m_DXGIFactory6;
-    ComPtr<IDXGIAdapter1> m_Adapter;
-    unique_ptr<Renderer> m_Renderer;
-    Game m_Game;
-
-    static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
-    static uint32_t GetKeyModifiers(); // Returns bit flags KEY_MODIFIERS.
-    void SelectAdapter();
-    void RegisterWindowClass();
-    void CreateWindow_();
-    LRESULT WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
-    void OnDestroy();
-    void OnKeyDown(WPARAM key);
-    void OnKeyUp(WPARAM key);
 };
 
 int ApplicationParameters::ParseCommandLine(int argc, wchar_t** argv)
@@ -100,7 +68,7 @@ int ApplicationParameters::ParseCommandLine(int argc, wchar_t** argv)
 
 #ifndef _APPLICATION_IMPL
 
-static Application* g_App;
+Application* g_App;
 
 Application::Application()
 {
@@ -139,7 +107,8 @@ void Application::InitWindowAndRenderer()
     CreateWindow_();
     m_Renderer = make_unique<Renderer>(m_DXGIFactory4.Get(), m_Adapter.Get(), m_Wnd);
     m_Renderer->Init();
-    m_Game.Init();
+    m_Game = std::make_unique<Game>();
+    m_Game->Init();
     
     ERR_CATCH_MSG(L"Failed to initialize window and renderer.");
 }
@@ -245,7 +214,6 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         return 0;
-
     case WM_DESTROY:
         try
         {
@@ -254,7 +222,6 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         CATCH_PRINT_ERROR(;)
         PostQuitMessage(0);
         return 0;
-
     case WM_KEYDOWN:
         try
         {
@@ -262,7 +229,6 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-
     case WM_KEYUP:
         try
         {
@@ -270,16 +236,21 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-
+    case WM_CHAR:
+        try
+        {
+            OnChar((wchar_t)wParam);
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        return 0;
     case WM_MOUSEMOVE:
     {
         uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
         ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        m_Game.OnMouseMove(mouseButtonDownFlag, pos);
+        m_Game->OnMouseMove(mouseButtonDownFlag, pos);
         return 0;
     }
     }
-
     return DefWindowProc(wnd, msg, wParam, lParam);
 }
 
@@ -312,14 +283,19 @@ void Application::OnKeyDown(WPARAM key)
         return;
     }
 
-    m_Game.OnKeyDown(key, modifiers);
+    m_Game->OnKeyDown(key, modifiers);
 }
 
 void Application::OnKeyUp(WPARAM key)
 {
     const uint32_t modifiers = GetKeyModifiers();
 
-    m_Game.OnKeyUp(key, modifiers);
+    m_Game->OnKeyUp(key, modifiers);
+}
+
+void Application::OnChar(wchar_t ch)
+{
+    m_Game->OnChar(ch);
 }
 
 int Application::Run()
@@ -345,7 +321,7 @@ int Application::Run()
 
             if(m_Renderer)
             {
-                m_Game.Update();
+                m_Game->Update();
                 m_Renderer->Render();
             }
         }

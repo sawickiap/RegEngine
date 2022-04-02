@@ -80,6 +80,7 @@
       <Filter>Shaders\Include</Filter>
     </ClInclude>
     <ClInclude Include="SmallFileCache.hpp" />
+    <ClInclude Include="Main.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">

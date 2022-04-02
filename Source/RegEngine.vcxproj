@@ -138,6 +138,7 @@
     <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="Descriptors.hpp" />
     <ClInclude Include="Game.hpp" />
+    <ClInclude Include="Main.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="MultiFrameRingBuffer.hpp" />
     <ClInclude Include="Renderer.hpp" />

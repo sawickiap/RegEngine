@@ -34,6 +34,7 @@ public:
 
     void OnKeyDown(WPARAM key, uint32_t modifiers);
     void OnKeyUp(WPARAM key, uint32_t modifiers);
+    void OnChar(wchar_t ch);
     void OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos);
 
 private:

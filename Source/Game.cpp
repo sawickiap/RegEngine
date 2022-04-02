@@ -1,4 +1,5 @@
 #include "BaseUtils.hpp"
+#include "Main.hpp"
 #include "Game.hpp"
 #include "Renderer.hpp"
 #include "Cameras.hpp"
@@ -76,6 +77,10 @@ void Game::OnKeyDown(WPARAM key, uint32_t modifiers)
 void Game::OnKeyUp(WPARAM key, uint32_t modifiers)
 {
 
+}
+
+void Game::OnChar(wchar_t ch)
+{
 }
 
 void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
