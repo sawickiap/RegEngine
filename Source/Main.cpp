@@ -48,12 +48,14 @@ private:
     Game m_Game;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    static uint32_t GetKeyModifiers(); // Returns bit flags KEY_MODIFIERS.
     void SelectAdapter();
     void RegisterWindowClass();
     void CreateWindow_();
     LRESULT WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     void OnDestroy();
     void OnKeyDown(WPARAM key);
+    void OnKeyUp(WPARAM key);
 };
 
 int ApplicationParameters::ParseCommandLine(int argc, wchar_t** argv)
@@ -165,6 +167,18 @@ LRESULT WINAPI Application::GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPA
     return g_App->WndProc(wnd, msg, wParam, lParam);
 }
 
+uint32_t Application::GetKeyModifiers()
+{
+    uint32_t modifiers = 0;
+    if((GetKeyState(VK_CONTROL) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_CONTROL;
+    if((GetKeyState(VK_MENU) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_ALT;
+    if((GetKeyState(VK_SHIFT) & 0x8000) != 0)
+        modifiers |= KEY_MODIFIER_SHIFT;
+    return modifiers;
+}
+
 void Application::RegisterWindowClass()
 {
     WNDCLASSEX wndClass = {};
@@ -249,6 +263,14 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
 
+    case WM_KEYUP:
+        try
+        {
+            OnKeyUp(wParam);
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        return 0;
+
     case WM_MOUSEMOVE:
     {
         uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
@@ -269,13 +291,7 @@ void Application::OnDestroy()
 
 void Application::OnKeyDown(WPARAM key)
 {
-    uint32_t modifiers = 0;
-    if((GetKeyState(VK_CONTROL) & 0x8000) != 0)
-        modifiers |= KEY_MODIFIER_CONTROL;
-    if((GetKeyState(VK_MENU) & 0x8000) != 0)
-        modifiers |= KEY_MODIFIER_ALT;
-    if((GetKeyState(VK_SHIFT) & 0x8000) != 0)
-        modifiers |= KEY_MODIFIER_SHIFT;
+    const uint32_t modifiers = GetKeyModifiers();
 
     // ESC: Exit.
     if(key == VK_ESCAPE && modifiers == 0)
@@ -297,6 +313,13 @@ void Application::OnKeyDown(WPARAM key)
     }
 
     m_Game.OnKeyDown(key, modifiers);
+}
+
+void Application::OnKeyUp(WPARAM key)
+{
+    const uint32_t modifiers = GetKeyModifiers();
+
+    m_Game.OnKeyUp(key, modifiers);
 }
 
 int Application::Run()

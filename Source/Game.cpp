@@ -73,6 +73,11 @@ void Game::OnKeyDown(WPARAM key, uint32_t modifiers)
     }
 }
 
+void Game::OnKeyUp(WPARAM key, uint32_t modifiers)
+{
+
+}
+
 void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
 {
     float yaw = ((float)pos.x / g_Renderer->GetFinalResolutionF().x - 0.5f) * glm::two_pi<float>();
