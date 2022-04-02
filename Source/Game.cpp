@@ -83,6 +83,14 @@ void Game::OnChar(wchar_t ch)
 {
 }
 
+void Game::OnMouseDown(MouseButton button, uint32_t buttonDownFlags, const ivec2& pos)
+{
+}
+
+void Game::OnMouseUp(MouseButton button, uint32_t buttonDownFlags, const ivec2& pos)
+{
+}
+
 void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
 {
     float yaw = ((float)pos.x / g_Renderer->GetFinalResolutionF().x - 0.5f) * glm::two_pi<float>();
@@ -90,4 +98,8 @@ void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
     OrbitingCamera* cam = g_Renderer->GetCamera();
     cam->SetYaw(yaw);
     cam->SetPitch(pitch);
+}
+
+void Game::OnMouseWheel(int16_t distance, uint32_t buttonDownFlags, const ivec2& pos)
+{
 }

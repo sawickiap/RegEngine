@@ -1,5 +1,7 @@
 #pragma once
 
+enum class MouseButton { Left, Middle, Right, Count };
+
 // Bit flags used to indicate which buttons are down during mouse even.
 enum MOUSE_BUTTON_DOWN_FLAG
 {
@@ -35,7 +37,10 @@ public:
     void OnKeyDown(WPARAM key, uint32_t modifiers);
     void OnKeyUp(WPARAM key, uint32_t modifiers);
     void OnChar(wchar_t ch);
+    void OnMouseDown(MouseButton button, uint32_t buttonDownFlags, const ivec2& pos);
+    void OnMouseUp(MouseButton button, uint32_t buttonDownFlags, const ivec2& pos);
     void OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos);
+    void OnMouseWheel(int16_t distance, uint32_t buttonDownFlags, const ivec2& pos);
 
 private:
 };
