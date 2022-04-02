@@ -9,6 +9,7 @@ A lightweight object to be passed by value.
 */
 struct Descriptor
 {
+    D3D12MA::VirtualAllocation m_VirtualAlloc = { 0 };
     uint64_t m_Index = UINT64_MAX;
 
     bool IsNull() const { return m_Index == UINT64_MAX; }

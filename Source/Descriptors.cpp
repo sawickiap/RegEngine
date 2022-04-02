@@ -59,8 +59,8 @@ DescriptorManager::~DescriptorManager()
 {
     if(m_VirtualBlock)
     {
-        D3D12MA::StatInfo stats = {};
-        m_VirtualBlock->CalculateStats(&stats);
+        D3D12MA::Statistics stats = {};
+        m_VirtualBlock->GetStatistics(&stats);
         assert(stats.AllocationCount == 0 && "Unfreed persistent descriptors. Inspect m_Type to check their type.");
     }
 }
@@ -77,7 +77,7 @@ Descriptor DescriptorManager::AllocatePersistent(uint32_t descriptorCount)
     D3D12MA::VIRTUAL_ALLOCATION_DESC virtualAllocDesc = {};
     virtualAllocDesc.Size = descriptorCount;
     Descriptor descriptor;
-    CHECK_HR(m_VirtualBlock->Allocate(&virtualAllocDesc, &descriptor.m_Index));
+    CHECK_HR(m_VirtualBlock->Allocate(&virtualAllocDesc, &descriptor.m_VirtualAlloc, &descriptor.m_Index));
     return descriptor;
 }
 
@@ -95,7 +95,7 @@ void DescriptorManager::FreePersistent(Descriptor desc)
     if(!desc.IsNull())
     {
         assert(m_PersistentDescriptorMaxCount);
-        m_VirtualBlock->FreeAllocation(desc.m_Index);
+        m_VirtualBlock->FreeAllocation(desc.m_VirtualAlloc);
     }
 }
 
