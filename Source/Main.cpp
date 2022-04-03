@@ -231,61 +231,87 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_KEYUP:
         try
         {
-            if(msg == WM_KEYDOWN)
-                OnKeyDown(wParam);
-            else // WM_KEYUP
-                OnKeyUp(wParam);
+            if(!ImGui::GetIO().WantCaptureKeyboard)
+            {
+                if(msg == WM_KEYDOWN)
+                    OnKeyDown(wParam);
+                else // WM_KEYUP
+                    OnKeyUp(wParam);
+            }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
     case WM_CHAR:
         try
         {
-            OnChar((wchar_t)wParam);
+            if(!ImGui::GetIO().WantCaptureKeyboard)
+            {
+                OnChar((wchar_t)wParam);
+            }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
     case WM_MOUSEMOVE:
-    {
-        const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
-        const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        m_Game->OnMouseMove(mouseButtonDownFlag, pos);
+        try
+        {
+            if(!ImGui::GetIO().WantCaptureMouse)
+            {
+                const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
+                const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                m_Game->OnMouseMove(mouseButtonDownFlag, pos);
+            }
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-    }
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
-    {
-        SetCapture(m_Wnd);
-        const MouseButton button = msg == WM_LBUTTONDOWN ? MouseButton::Left :
-            msg == WM_MBUTTONDOWN ? MouseButton::Middle :
-            MouseButton::Right;
-        const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
-        const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        m_Game->OnMouseDown(button, mouseButtonDownFlag, pos);
+        try
+        {
+            if(!ImGui::GetIO().WantCaptureMouse)
+            {
+                SetCapture(m_Wnd);
+                const MouseButton button = msg == WM_LBUTTONDOWN ? MouseButton::Left :
+                    msg == WM_MBUTTONDOWN ? MouseButton::Middle :
+                    MouseButton::Right;
+                const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
+                const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                m_Game->OnMouseDown(button, mouseButtonDownFlag, pos);
+            }
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-    }
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
-    {
-        const MouseButton button = msg == WM_LBUTTONUP ? MouseButton::Left :
-            msg == WM_MBUTTONUP ? MouseButton::Middle :
-            MouseButton::Right;
-        const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
-        const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        m_Game->OnMouseUp(button, mouseButtonDownFlag, pos);
-        ReleaseCapture();
+        try
+        {
+            if(!ImGui::GetIO().WantCaptureMouse)
+            {
+                const MouseButton button = msg == WM_LBUTTONUP ? MouseButton::Left :
+                    msg == WM_MBUTTONUP ? MouseButton::Middle :
+                    MouseButton::Right;
+                const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
+                const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                m_Game->OnMouseUp(button, mouseButtonDownFlag, pos);
+                ReleaseCapture();
+            }
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-    }
     case WM_MOUSEWHEEL:
-    {
-        const int16_t distance = GET_WHEEL_DELTA_WPARAM(wParam);
-        const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(GET_KEYSTATE_WPARAM(wParam));
-        const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        m_Game->OnMouseWheel(distance, mouseButtonDownFlag, pos);
+        try
+        {
+            if(!ImGui::GetIO().WantCaptureMouse)
+            {
+                const int16_t distance = GET_WHEEL_DELTA_WPARAM(wParam);
+                const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(GET_KEYSTATE_WPARAM(wParam));
+                const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+                m_Game->OnMouseWheel(distance, mouseButtonDownFlag, pos);
+            }
+        }
+        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
         return 0;
-    }
     }
     return DefWindowProc(wnd, msg, wParam, lParam);
 }

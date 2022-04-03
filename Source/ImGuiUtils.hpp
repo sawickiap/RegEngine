@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../ThirdParty/imgui-1.87/imgui.h"
+#include "../ThirdParty/imgui-1.87/misc/cpp/imgui_stdlib.h"
 
 class ImGuiUtils
 {
