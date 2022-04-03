@@ -104,6 +104,26 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="AssimpUtils.cpp" />
     <ClCompile Include="Cameras.cpp" />
     <ClCompile Include="CommandList.cpp" />
@@ -128,6 +148,12 @@
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imconfig.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imgui.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imgui_internal.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imstb_rectpack.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imstb_textedit.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\imstb_truetype.h" />
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
     <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h" />
