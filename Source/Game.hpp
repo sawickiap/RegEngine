@@ -43,4 +43,10 @@ public:
     void OnMouseWheel(int16_t distance, uint32_t buttonDownFlags, const ivec2& pos);
 
 private:
+    bool m_DemoWindowVisible = false;
+    bool m_MetricsWindowVisible = false;
+    bool m_AboutWindowVisible = false;
+
+    void ImGui();
+    void ShowAboutWindow();
 };

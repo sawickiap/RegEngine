@@ -37,8 +37,6 @@ void ImGuiUtils::NewFrame()
     ImGui_ImplDX12_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
-
-    ImGui::Text("Hello, world!");
 }
 
 LRESULT ImGuiUtils::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)

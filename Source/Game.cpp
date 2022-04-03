@@ -4,6 +4,7 @@
 #include "Renderer.hpp"
 #include "Cameras.hpp"
 #include "Settings.hpp"
+#include "ImGuiUtils.hpp"
 #include "../WorkingDir/Data/Include/ShaderConstants.h"
 
 extern VecSetting<glm::uvec2> g_Size;
@@ -40,6 +41,8 @@ void Game::Update()
     }
 
     g_Renderer->m_NormalMappingEnabled = !(GetAsyncKeyState('N') & 0x8000);
+
+    ImGui();
 }
 
 void Game::OnKeyDown(WPARAM key, uint32_t modifiers)
@@ -102,4 +105,43 @@ void Game::OnMouseMove(uint32_t buttonDownFlags, const ivec2& pos)
 
 void Game::OnMouseWheel(int16_t distance, uint32_t buttonDownFlags, const ivec2& pos)
 {
+}
+
+void Game::ImGui()
+{
+    ImGui::Begin("RegEngine", nullptr,
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_MenuBar);
+    ImGui::BeginMenuBar();
+    if(ImGui::BeginMenu("Help"))
+    {
+        ImGui::MenuItem("ImGui Demo", nullptr, &m_DemoWindowVisible);
+        ImGui::MenuItem("ImGui Metrics", nullptr, &m_MetricsWindowVisible);
+        ImGui::Separator();
+        ImGui::MenuItem("About", nullptr, &m_AboutWindowVisible);
+        ImGui::EndMenu();
+    }
+    ImGui::EndMenuBar();
+    ImGui::End();
+
+    if(m_DemoWindowVisible)
+        ImGui::ShowDemoWindow(&m_DemoWindowVisible);
+    if(m_MetricsWindowVisible)
+        ImGui::ShowMetricsWindow(&m_MetricsWindowVisible);
+    if(m_AboutWindowVisible)
+        ShowAboutWindow();
+}
+
+void Game::ShowAboutWindow()
+{
+    string t = "RegEngine\nConfiguration: ";
+#ifdef _DEBUG
+    t += "Debug";
+#else
+    t += "Release";
+#endif
+
+    ImGui::Begin("About", &m_AboutWindowVisible);
+    ImGui::Text(t.c_str());
+    ImGui::End();
 }

@@ -617,6 +617,7 @@ void Renderer::Render()
             cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
         }
 
+        ImGui::EndFrame();
         ImGui::Render();
         ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.GetCmdList());
 
