@@ -36,6 +36,13 @@
     <ClCompile Include="..\ThirdParty\imgui-1.87\imgui_widgets.cpp">
       <Filter>ThirdParty\ImGUI</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiUtils.cpp" />
+    <ClCompile Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_win32.cpp">
+      <Filter>ThirdParty\ImGUI\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_dx12.cpp">
+      <Filter>ThirdParty\ImGUI\backends</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -64,6 +71,9 @@
     </Filter>
     <Filter Include="ThirdParty\ImGUI">
       <UniqueIdentifier>{e57785e0-7574-481f-8262-e3bc0f35fcd5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\ImGUI\backends">
+      <UniqueIdentifier>{4f4efda4-5331-442d-a5f6-8e44de963eaa}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -116,6 +126,13 @@
     </ClInclude>
     <ClInclude Include="..\ThirdParty\imgui-1.87\imstb_truetype.h">
       <Filter>ThirdParty\ImGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiUtils.hpp" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_win32.h">
+      <Filter>ThirdParty\ImGUI\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_dx12.h">
+      <Filter>ThirdParty\ImGUI\backends</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -9,6 +9,7 @@
 #include "Cameras.hpp"
 #include "Settings.hpp"
 #include "AssimpUtils.hpp"
+#include "ImGuiUtils.hpp"
 #include "../ThirdParty/WinFontRender/WinFontRender.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -19,6 +20,7 @@
 #include <assimp/vector2.h>
 #include <assimp/vector3.h>
 #include "../WorkingDir/Data/Include/ShaderConstants.h"
+#include "../ThirdParty/imgui-1.87/backends/imgui_impl_dx12.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -368,6 +370,7 @@ void Renderer::Init()
 	CreateFrameResources();
 	CreateResources();
     CreateStandardTextures();
+    InitImGui();
     
     m_AssimpInit = std::make_unique<AssimpInit>();
     LoadModel(false);
@@ -393,6 +396,8 @@ Renderer::~Renderer()
     }
 
     ClearModel();
+
+    ShutdownImGui();
 
     for(uint32_t i = g_FrameCount.GetValue(); i--; )
         m_FrameResources[i].m_BackBuffer.reset();
@@ -611,6 +616,9 @@ void Renderer::Render()
             cmdList.GetCmdList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
             cmdList.GetCmdList()->DrawInstanced(3, 1, 0, 0);
         }
+
+        ImGui::Render();
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdList.GetCmdList());
 
         frameRes.m_BackBuffer->TransitionToStates(cmdList, D3D12_RESOURCE_STATE_PRESENT);
     }
@@ -1012,6 +1020,25 @@ void Renderer::CreateStandardTextures()
         texPtr = std::make_unique<Texture>();
         texPtr->LoadFromMemory(resDesc, data, NAMES[textureIndex]);
     }
+}
+
+void Renderer::InitImGui()
+{
+    m_ImGuiDescriptor = m_SRVDescriptorManager->AllocatePersistent(1);
+
+    CHECK_BOOL(ImGui_ImplDX12_Init(
+        m_Device.Get(),
+        (int)g_FrameCount.GetValue(),
+        RENDER_TARGET_FORMAT,
+        m_SRVDescriptorManager->GetHeap(),
+        m_SRVDescriptorManager->GetCPUHandle(m_ImGuiDescriptor),
+        m_SRVDescriptorManager->GetGPUHandle(m_ImGuiDescriptor)));
+}
+
+void Renderer::ShutdownImGui()
+{
+    ImGui_ImplDX12_Shutdown();
+    m_SRVDescriptorManager->FreePersistent(m_ImGuiDescriptor);
 }
 
 void Renderer::ClearModel()

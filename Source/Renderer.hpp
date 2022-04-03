@@ -189,6 +189,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;
 	ComPtr<ID3D12PipelineState> m_LightingPipelineState;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
+    Descriptor m_ImGuiDescriptor;
 
     struct SceneMesh
     {
@@ -223,6 +224,8 @@ private:
     void CreateLightingPipelineStates();
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
+    void InitImGui();
+    void ShutdownImGui();
     void ClearModel();
     void CreateLights();
     void LoadModel(bool refreshAll);

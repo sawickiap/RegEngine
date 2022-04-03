@@ -22,6 +22,8 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\D3D12MemoryAllocator
 - **[d3dx12.h](https://github.com/microsoft/DirectX-Headers)** - D3D12 helpers, by Microsoft. License: MIT.
   - Directory: ThirdParty\d3dx12
+- **[Dear ImGui](https://github.com/ocornut/imgui/)** by Omar Cornut. License: MIT.
+  - Directory: ThirdParty\imgui-1.87
 - **[DirectX Shader Compiler](https://github.com/microsoft/DirectXShaderCompiler)** by Microsoft. License: University of Illinois Open Source License.
   - Directory: ThirdParty\dxc_2021_12_08
 - **[DirectXTex](URL)** - for reading and writing texture file formats, by Microsoft. License: MIT.

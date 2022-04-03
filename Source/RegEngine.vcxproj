@@ -104,6 +104,14 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_dx12.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\ThirdParty\imgui-1.87\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -130,6 +138,7 @@
     <ClCompile Include="ConstantBuffers.cpp" />
     <ClCompile Include="Descriptors.cpp" />
     <ClCompile Include="Game.cpp" />
+    <ClCompile Include="ImGuiUtils.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="BaseUtils.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -148,6 +157,8 @@
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_dx12.h" />
+    <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\imconfig.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\imgui.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\imgui_internal.h" />
@@ -164,6 +175,7 @@
     <ClInclude Include="ConstantBuffers.hpp" />
     <ClInclude Include="Descriptors.hpp" />
     <ClInclude Include="Game.hpp" />
+    <ClInclude Include="ImGuiUtils.hpp" />
     <ClInclude Include="Main.hpp" />
     <ClInclude Include="Mesh.hpp" />
     <ClInclude Include="MultiFrameRingBuffer.hpp" />

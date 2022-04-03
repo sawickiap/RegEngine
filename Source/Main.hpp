@@ -2,6 +2,7 @@
 
 class Renderer;
 class Game;
+class ImGuiUtils;
 
 /*
 Represents the main object responsible for application initialization and management
@@ -28,6 +29,7 @@ private:
     ComPtr<IDXGIFactory4> m_DXGIFactory4;
     ComPtr<IDXGIFactory6> m_DXGIFactory6;
     ComPtr<IDXGIAdapter1> m_Adapter;
+    unique_ptr<ImGuiUtils> m_ImGuiContext;
     unique_ptr<Renderer> m_Renderer;
     unique_ptr<Game> m_Game;
 

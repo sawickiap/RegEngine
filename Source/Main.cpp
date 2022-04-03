@@ -4,6 +4,7 @@
 #include "Renderer.hpp"
 #include "Settings.hpp"
 #include "SmallFileCache.hpp"
+#include "ImGuiUtils.hpp"
 #include <windowsx.h>
 
 enum EXIT_CODE
@@ -105,6 +106,8 @@ void Application::InitWindowAndRenderer()
 
     RegisterWindowClass();
     CreateWindow_();
+    m_ImGuiContext = make_unique<ImGuiUtils>();
+    m_ImGuiContext->Init(m_Wnd);
     m_Renderer = make_unique<Renderer>(m_DXGIFactory4.Get(), m_Adapter.Get(), m_Wnd);
     m_Renderer->Init();
     m_Game = std::make_unique<Game>();
@@ -209,6 +212,8 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if(m_Wnd == NULL)
         m_Wnd = wnd;
+
+    m_ImGuiContext->WndProc(wnd, msg, wParam, lParam);
 
     switch(msg)
     {
@@ -352,6 +357,7 @@ int Application::Run()
 
             if(m_Renderer)
             {
+                m_ImGuiContext->NewFrame();
                 m_Game->Update();
                 m_Renderer->Render();
             }
