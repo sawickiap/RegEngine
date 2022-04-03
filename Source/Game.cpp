@@ -115,8 +115,9 @@ void Game::ImGui()
     ImGui::BeginMenuBar();
     if(ImGui::BeginMenu("Help"))
     {
-        ImGui::MenuItem("ImGui Demo", nullptr, &m_DemoWindowVisible);
-        ImGui::MenuItem("ImGui Metrics", nullptr, &m_MetricsWindowVisible);
+        ImGui::MenuItem("ImGui demo", nullptr, &m_DemoWindowVisible);
+        ImGui::MenuItem("ImGui metrics", nullptr, &m_MetricsWindowVisible);
+        ImGui::MenuItem("ImGui stack tool", nullptr, &m_StackToolWindowVisible);
         ImGui::Separator();
         ImGui::MenuItem("About", nullptr, &m_AboutWindowVisible);
         ImGui::EndMenu();
@@ -128,6 +129,8 @@ void Game::ImGui()
         ImGui::ShowDemoWindow(&m_DemoWindowVisible);
     if(m_MetricsWindowVisible)
         ImGui::ShowMetricsWindow(&m_MetricsWindowVisible);
+    if(m_StackToolWindowVisible)
+        ImGui::ShowStackToolWindow(&m_StackToolWindowVisible);
     if(m_AboutWindowVisible)
         ShowAboutWindow();
 }

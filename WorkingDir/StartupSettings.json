@@ -6,11 +6,8 @@
     // Set to true to accept unsigned shaders.
     "EnableExperimentalShaderModels": true,
 
-    "Font.FaceName": "Segoe UI",
-    "Font.Height": 32,
-    // Use a combination of values of WinFontRender::SFontDesc::FLAGS:
-    // 1 = bold, 2 = italic
-    "Font.Flags": 0,
+    "ImGui.Font.FilePath": "Data/Fonts/DroidSans.ttf",
+    "ImGui.Font.Size": 16,
 
     "SRVDescriptors.Persistent.MaxCount": 1024,
     "SRVDescriptors.Temporary.MaxCountPerFrame": 1024,

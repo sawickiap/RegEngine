@@ -2,7 +2,6 @@
 
 #include "Descriptors.hpp"
 
-class Font;
 class AssimpInit;
 
 class CommandList;
@@ -183,7 +182,6 @@ private:
     unique_ptr<RenderingResource> m_ColorRenderTarget;
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
 	ComPtr<ID3D12PipelineState> m_3DPipelineState;
-    unique_ptr<Font> m_Font;
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<OrbitingCamera> m_Camera;
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;

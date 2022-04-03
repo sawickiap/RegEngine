@@ -45,6 +45,7 @@ public:
 private:
     bool m_DemoWindowVisible = false;
     bool m_MetricsWindowVisible = false;
+    bool m_StackToolWindowVisible = false;
     bool m_AboutWindowVisible = false;
 
     void ImGui();

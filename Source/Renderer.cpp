@@ -10,7 +10,6 @@
 #include "Settings.hpp"
 #include "AssimpUtils.hpp"
 #include "ImGuiUtils.hpp"
-#include "../ThirdParty/WinFontRender/WinFontRender.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -49,9 +48,6 @@ static_assert(_countof(GBUFFER_FORMATS) == (size_t)GBuffer::Count);
 static_assert(_countof(GBUFFER_NAMES) == (size_t)GBuffer::Count);
 
 UintSetting g_FrameCount(SettingCategory::Startup, "FrameCount", 3);
-static StringSetting g_FontFaceName(SettingCategory::Startup, "Font.FaceName", L"Sagoe UI");
-static IntSetting g_FontHeight(SettingCategory::Startup, "Font.Height", 32);
-static UintSetting g_FontFlags(SettingCategory::Startup, "Font.Flags", 0);
 static UintSetting g_AssimpLogSeverity(SettingCategory::Startup, "Assimp.LogSeverity", 3);
 static StringSetting g_AssimpLogFilePath(SettingCategory::Startup, "Assimp.LogFilePath");
 static BoolSetting g_EnableExperimentalShaderModels(SettingCategory::Startup, "EnableExperimentalShaderModels", true);
@@ -148,20 +144,6 @@ public:
     ~AssimpInit();
 };
 
-class Font
-{
-public:
-    void Init();
-    ~Font();
-    Texture* GetTexture() const { return m_Texture.get(); }
-
-private:
-    static const DXGI_FORMAT FORMAT = DXGI_FORMAT_R8_UNORM;
-
-    WinFontRender::CFont m_WinFont;
-    unique_ptr<Texture> m_Texture;
-};
-
 class AssimpLogStream : public Assimp::LogStream
 {
 public:
@@ -210,44 +192,6 @@ AssimpInit::~AssimpInit()
 void AssimpLogStream::write(const char* message)
 {
     LogInfo(ConvertCharsToUnicode(message, CP_ACP));
-}
-
-void Font::Init()
-{
-    ERR_TRY;
-
-    // Create WinFontRender object.
-    WinFontRender::SFontDesc fontDesc = {};
-    fontDesc.FaceName = g_FontFaceName.GetValue();
-    fontDesc.Height = g_FontHeight.GetValue();
-    fontDesc.Flags = g_FontFlags.GetValue();
-    CHECK_BOOL(m_WinFont.Init(fontDesc));
-
-    // Fetch texture data.
-    WinFontRender::uvec2 textureDataSize = WinFontRender::uvec2(0, 0);
-    size_t textureDataRowPitch = SIZE_MAX;
-    const void* textureDataPtr = nullptr;
-    m_WinFont.GetTextureData(textureDataPtr, textureDataSize, textureDataRowPitch);
-
-    CD3DX12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
-        FORMAT, // format
-        textureDataSize.x, // width
-        textureDataSize.y, // height
-        1, // arraySize
-        1); // mipLevels
-    m_Texture = std::make_unique<Texture>();
-    D3D12_SUBRESOURCE_DATA subresourceData = {};
-    subresourceData.pData = textureDataPtr;
-    subresourceData.RowPitch = textureDataRowPitch;
-    m_Texture->LoadFromMemory(resDesc, subresourceData, L"Font texture");
-
-    m_WinFont.FreeTextureData();
-
-    ERR_CATCH_FUNC;
-}
-
-Font::~Font()
-{
 }
 
 StandardRootSignature::StandardRootSignature()
@@ -774,12 +718,6 @@ void Renderer::CreateResources()
     */
 
 	m_StandardRootSignature = std::make_unique<StandardRootSignature>();
-
-    // Font
-    {
-        m_Font = std::make_unique<Font>();
-        m_Font->Init();
-    }
 
     {
         D3D12_RESOURCE_DESC resDesc = CD3DX12_RESOURCE_DESC::Tex2D(
