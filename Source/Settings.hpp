@@ -17,6 +17,7 @@ public:
     Setting(SettingCategory category, const str_view& name);
     virtual ~Setting() = default;
     const string& GetName() const { return m_Name; }
+    virtual void ImGui(bool readOnly);
 
 protected:
     friend class SettingCollection;
@@ -51,6 +52,7 @@ public:
         ScalarSetting<bool>(category, name, defaultValue)
     {
     }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
@@ -73,6 +75,7 @@ public:
         NumericSetting<float>(category, name, defaultValue)
     {
     }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
@@ -85,6 +88,7 @@ public:
         NumericSetting<uint32_t>(category, name, defaultValue)
     {
     }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
@@ -97,6 +101,7 @@ public:
         NumericSetting<int32_t>(category, name, defaultValue)
     {
     }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
@@ -108,12 +113,19 @@ template<typename MatT>
 bool LoadMatFromJSON(MatT& outMat, const void* jsonVal);
 
 template<typename VecT>
+void ImGuiVectorSetting(const char* label, VecT& inoutVec);
+
+template<typename VecT>
 class VecSetting : public ScalarSetting<VecT>
 {
 public:
     VecSetting(SettingCategory category, const str_view& name, const VecT& defaultValue) :
         ScalarSetting<VecT>(category, name, defaultValue)
     {
+    }
+    void ImGui(bool readOnly) override
+    {
+        ImGuiVectorSetting(this->GetName().c_str(), this->m_Value);
     }
 
 protected:
@@ -172,19 +184,20 @@ protected:
 class StringSetting : public Setting
 {
 public:
-    StringSetting(SettingCategory category, const str_view& name, const wstr_view& defaultValue = wstr_view()) :
+    StringSetting(SettingCategory category, const str_view& name, const str_view& defaultValue = str_view()) :
         Setting(category, name),
         m_Value{defaultValue.data(), defaultValue.size()}
     {
     }
-    const wstring& GetValue() const { return m_Value; }
-    void SetValue(const wstr_view& v) { v.to_string(m_Value); }
+    const string& GetValue() const { return m_Value; }
+    void SetValue(const str_view& v) { v.to_string(m_Value); }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
 
 private:
-    wstring m_Value;
+    string m_Value;
 };
 
 class StringSequenceSetting : public Setting
@@ -193,6 +206,7 @@ public:
     std::vector<string> m_Strings;
 
     StringSequenceSetting(SettingCategory category, const str_view& name);
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
@@ -202,3 +216,6 @@ protected:
 void LoadStartupSettings();
 // On error prints error.
 void LoadLoadSettings();
+
+extern bool g_SettingsImGuiWindowVisible;
+void SettingsImGui();

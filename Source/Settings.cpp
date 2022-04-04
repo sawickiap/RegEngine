@@ -1,6 +1,7 @@
 #include "BaseUtils.hpp"
 #include "Settings.hpp"
 #include "SmallFileCache.hpp"
+#include "ImGuiUtils.hpp"
 #define RAPIDJSON_HAS_STDSTRING 1
 #include "../ThirdParty/rapidjson/include/rapidjson/document.h"
 #include "../ThirdParty/rapidjson/include/rapidjson/writer.h"
@@ -113,6 +114,96 @@ template bool LoadVecFromJSON<glm::bvec4>(glm::bvec4& outVec, const void* jsonVa
 
 template bool LoadMatFromJSON<glm::mat4>(glm::mat4& outMat, const void* jsonVal);
 
+template<>
+void ImGuiVectorSetting<glm::vec2>(const char* label, glm::vec2& inoutVec)
+{
+    ImGui::InputFloat2(label, glm::value_ptr(inoutVec));
+}
+template<>
+void ImGuiVectorSetting<glm::vec3>(const char* label, glm::vec3& inoutVec)
+{
+    ImGui::InputFloat3(label, glm::value_ptr(inoutVec));
+}
+template<>
+void ImGuiVectorSetting<glm::vec4>(const char* label, glm::vec4& inoutVec)
+{
+    ImGui::InputFloat4(label, glm::value_ptr(inoutVec));
+}
+template<>
+void ImGuiVectorSetting<glm::uvec2>(const char* label, glm::uvec2& inoutVec)
+{
+    if(inoutVec.x <= (uint32_t)INT_MAX && inoutVec.y <= (uint32_t)INT_MAX)
+    {
+        ivec2 i{(int32_t)inoutVec.x, (int32_t)inoutVec.y};
+        if(ImGui::InputInt2(label, glm::value_ptr(i)))
+        {
+            if(i.x >= 0 && i.y >= 0)
+            {
+                inoutVec.x = (uint32_t)i.x;
+                inoutVec.y = (uint32_t)i.y;
+            }
+        }
+    }
+    else
+        ImGui::LabelText(label, "VALUE OUT OF BOUNDS.");
+}
+template<>
+void ImGuiVectorSetting<glm::uvec3>(const char* label, glm::uvec3& inoutVec)
+{
+    if(inoutVec.x <= (uint32_t)INT_MAX && inoutVec.y <= (uint32_t)INT_MAX &&
+        inoutVec.z <= (uint32_t)INT_MAX)
+    {
+        ivec3 i{(int32_t)inoutVec.x, (int32_t)inoutVec.y, (int32_t)inoutVec.z};
+        if(ImGui::InputInt3(label, glm::value_ptr(i)))
+        {
+            if(i.x >= 0 && i.y >= 0 && i.z >= 0)
+            {
+                inoutVec.x = (uint32_t)i.x;
+                inoutVec.y = (uint32_t)i.y;
+                inoutVec.z = (uint32_t)i.z;
+            }
+        }
+    }
+    else
+        ImGui::LabelText(label, "VALUE OUT OF BOUNDS.");
+}
+template<>
+void ImGuiVectorSetting<glm::uvec4>(const char* label, glm::uvec4& inoutVec)
+{
+    if(inoutVec.x <= (uint32_t)INT_MAX && inoutVec.y <= (uint32_t)INT_MAX &&
+        inoutVec.z <= (uint32_t)INT_MAX && inoutVec.w <= (uint32_t)INT_MAX)
+    {
+        ivec4 i{(int32_t)inoutVec.x, (int32_t)inoutVec.y, (int32_t)inoutVec.z, (int32_t)inoutVec.w};
+        if(ImGui::InputInt4(label, glm::value_ptr(i)))
+        {
+            if(i.x >= 0 && i.y >= 0 && i.z >= 0 && i.w >= 0)
+            {
+                inoutVec.x = (uint32_t)i.x;
+                inoutVec.y = (uint32_t)i.y;
+                inoutVec.z = (uint32_t)i.z;
+                inoutVec.w = (uint32_t)i.w;
+            }
+        }
+    }
+    else
+        ImGui::LabelText(label, "VALUE OUT OF BOUNDS.");
+}
+template<>
+void ImGuiVectorSetting<glm::ivec2>(const char* label, glm::ivec2& inoutVec)
+{
+    ImGui::InputInt2(label, glm::value_ptr(inoutVec));
+}
+template<>
+void ImGuiVectorSetting<glm::ivec3>(const char* label, glm::ivec3& inoutVec)
+{
+    ImGui::InputInt3(label, glm::value_ptr(inoutVec));
+}
+template<>
+void ImGuiVectorSetting<glm::ivec4>(const char* label, glm::ivec4& inoutVec)
+{
+    ImGui::InputInt4(label, glm::value_ptr(inoutVec));
+}
+
 // If error, returns UINT8_MAX.
 static uint8_t ParseHexadecimalDigit(char ch)
 {
@@ -206,6 +297,7 @@ public:
     }
 
     void LoadFromFile(const wstr_view& filePath);
+    void ImGui(bool readOnly, const ImGuiTextFilter& filter);
 private:
     std::vector<Setting*> m_Settings;
 };
@@ -232,16 +324,23 @@ public:
 
     void LoadStartupSettings();
     void LoadLoadSettings();
+    void ImGui();
 
 private:
     SettingCollection m_StartupSettings;
     SettingCollection m_LoadSettings;
+    ImGuiTextFilter m_ImGuiFilter;
 };
 
 Setting::Setting(SettingCategory category, const str_view& name) :
     m_Name{name.data(), name.size()}
 {
     SettingManager::GetSingleton().Register(category, this);
+}
+
+void Setting::ImGui(bool readOnly)
+{
+    ImGui::LabelText(GetName().c_str(), "");
 }
 
 void SettingCollection::LoadFromFile(const wstr_view& filePath)
@@ -264,6 +363,17 @@ void SettingCollection::LoadFromFile(const wstr_view& filePath)
             LogWarningF(L"Setting \"{}\" not found. Leaving current value.", str_view(setting->GetName()));
     }
     ERR_CATCH_MSG(std::format(L"Cannot load settings from file \"{}\".", filePath));
+}
+
+void SettingCollection::ImGui(bool readOnly, const ImGuiTextFilter& filter)
+{
+    ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.6f);
+    for(const auto& it : m_Settings)
+    {
+        if(filter.PassFilter(it->GetName().c_str()))
+            it->ImGui(readOnly);
+    }
+    ImGui::PopItemWidth();
 }
 
 SettingManager& SettingManager::GetSingleton()
@@ -292,11 +402,56 @@ void SettingManager::LoadLoadSettings()
     CATCH_PRINT_ERROR(;);
 }
 
+void SettingManager::ImGui()
+{
+    if(ImGui::Begin("Settings", &g_SettingsImGuiWindowVisible, 0))
+    {
+        m_ImGuiFilter.Draw(ICON_FA_MAGNIFYING_GLASS);
+        ImGui::SameLine();
+        if(ImGui::Button(ICON_FA_XMARK))
+            m_ImGuiFilter.Clear();
+
+        if(ImGui::CollapsingHeader("StartupSettings", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextColored(
+                ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+                "Loaded from \"StartupSettings.json\" at program startup.");
+            ImGui::PushID("StartupSettings");
+            //ImGui::BeginDisabled();
+            m_StartupSettings.ImGui(true, m_ImGuiFilter);
+            //ImGui::EndDisabled();//TODO restore
+            ImGui::PopID();
+        }
+        if(ImGui::CollapsingHeader("LoadSettings", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextColored(
+                ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+                "Loaded from \"LoadSettings.json\". Reloaded on [F5].");
+            ImGui::PushID("LoadSettings");
+            //ImGui::BeginDisabled();
+            m_LoadSettings.ImGui(true, m_ImGuiFilter);
+            //ImGui::EndDisabled();// TODO restore
+            ImGui::PopID();
+        }
+    }
+    ImGui::End();
+}
+
+void BoolSetting::ImGui(bool readOnly)
+{
+    ImGui::Checkbox(GetName().c_str(), &m_Value);
+}
+
 void BoolSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid bool setting \"{}\".", str_view(GetName()));
+}
+
+void FloatSetting::ImGui(bool readOnly)
+{
+    ImGui::InputFloat(GetName().c_str(), &m_Value, 0.1f, 1.f, "%.3f");
 }
 
 void FloatSetting::LoadFromJSON(const void* jsonVal)
@@ -306,11 +461,31 @@ void FloatSetting::LoadFromJSON(const void* jsonVal)
         LogWarningF(L"Invalid float setting \"{}\".", str_view(GetName()));
 }
 
+void UintSetting::ImGui(bool readOnly)
+{
+    if(m_Value <= (uint32_t)INT_MAX)
+    {
+        int i = (int)m_Value;
+        if(ImGui::InputInt(GetName().c_str(), &i))
+        {
+            if(i >= 0)
+                m_Value = (uint32_t)i;
+        }
+    }
+    else
+        ImGui::LabelText(GetName().c_str(), "VALUE OUT OF RANGE FOR INT.");
+}
+
 void UintSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(!LoadValueFromJSON(m_Value, *realVal))
         LogWarningF(L"Invalid uint setting \"{}\".", str_view(GetName()));
+}
+
+void IntSetting::ImGui(bool readOnly)
+{
+    ImGui::InputInt(GetName().c_str(), &m_Value);
 }
 
 void IntSetting::LoadFromJSON(const void* jsonVal)
@@ -320,11 +495,16 @@ void IntSetting::LoadFromJSON(const void* jsonVal)
         LogWarningF(L"Invalid int setting \"{}\".", str_view(GetName()));
 }
 
+void StringSetting::ImGui(bool readOnly)
+{
+    ImGui::InputText(GetName().c_str(), &m_Value);
+}
+
 void StringSetting::LoadFromJSON(const void* jsonVal)
 {
     const rapidjson::Value* realVal = (const rapidjson::Value*)jsonVal;
     if(realVal->IsString())
-        m_Value = ConvertCharsToUnicode(str_view{realVal->GetString(), realVal->GetStringLength()}, CP_UTF8);
+        m_Value.assign(realVal->GetString(), realVal->GetStringLength());
     else
         LogWarningF(L"Invalid string setting \"{}\".", str_view(GetName()));
 }
@@ -333,6 +513,19 @@ StringSequenceSetting::StringSequenceSetting(SettingCategory category, const str
     Setting(category, name)
 {
 
+}
+
+void StringSequenceSetting::ImGui(bool readOnly)
+{
+    if(ImGui::BeginListBox(GetName().c_str()))
+    {
+        for(const auto& it : m_Strings)
+        {
+            bool selected = false;
+            ImGui::Selectable(it.c_str(), &selected);
+        }
+        ImGui::EndListBox();
+    }
 }
 
 void StringSequenceSetting::LoadFromJSON(const void* jsonVal)
@@ -366,4 +559,13 @@ void LoadStartupSettings()
 void LoadLoadSettings()
 {
     SettingManager::GetSingleton().LoadLoadSettings();
+}
+
+bool g_SettingsImGuiWindowVisible = false;
+
+void SettingsImGui()
+{
+    if(!g_SettingsImGuiWindowVisible)
+        return;
+    SettingManager::GetSingleton().ImGui();
 }

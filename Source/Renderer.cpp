@@ -178,7 +178,7 @@ AssimpInit::AssimpInit()
         assert(0);
     }
 
-    Assimp::DefaultLogger::create(ConvertUnicodeToChars(g_AssimpLogFilePath.GetValue(), CP_ACP).c_str(), logSeverity);
+    Assimp::DefaultLogger::create(g_AssimpLogFilePath.GetValue().c_str(), logSeverity);
     Assimp::DefaultLogger::get()->attachStream(&g_AssimpLogStream, errorSeverity);
 }
 
@@ -1028,7 +1028,7 @@ void Renderer::LoadModel(bool refreshAll)
     - Flip winding order.
     */
 
-    const wstr_view filePath = g_AssimpModelPath.GetValue();
+    const str_view filePath = g_AssimpModelPath.GetValue();
     LogMessageF(L"Loading model from \"{}\"...", filePath);
 
     ERR_TRY;
@@ -1036,8 +1036,7 @@ void Renderer::LoadModel(bool refreshAll)
 
     {
         Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(
-            ConvertUnicodeToChars(filePath, CP_ACP).c_str(), ASSIMP_READ_FLAGS);
+        const aiScene* scene = importer.ReadFile(filePath.c_str(), ASSIMP_READ_FLAGS);
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         

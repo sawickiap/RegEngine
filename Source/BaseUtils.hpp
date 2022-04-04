@@ -354,6 +354,7 @@ wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);
 void ToUpperCase(wstring& inoutStr);
 
 std::filesystem::path StrToPath(const wstr_view& str);
+std::filesystem::path StrToPath(const str_view& str);
 
 enum class LogLevel { Info, Message, Warning, Error, Count };
 void Log(LogLevel level, const wstr_view& msg);

@@ -41,11 +41,22 @@ void ImGuiUtils::Init(HWND wnd)
         0x00F3, 0x00F3,
         0x015A, 0x015B,
         0x0179, 0x017C};
-    const string filePath = ConvertUnicodeToChars(g_ImGuiFontFilePath.GetValue(), CP_UTF8);
+    const string filePath = g_ImGuiFontFilePath.GetValue();
     ImFont* const font = io.Fonts->AddFontFromFileTTF(filePath.c_str(), g_ImGuiFontSize.GetValue(), nullptr, glyphRanges);
     CHECK_BOOL(font);
-    CHECK_BOOL(io.Fonts->Build());
 
+    const ImWchar awesomeGlyphRanges[] = {
+        0xf002, 0xf002, // ICON_FA_MAGNIFYING_GLASS
+        0xf00d, 0xf00d}; // ICON_FA_XMARK
+    ImFontConfig awesomeConfig;
+    awesomeConfig.MergeMode = true;
+    ImFont* const awesomeFont = io.Fonts->AddFontFromFileTTF(
+        "Data/Fonts/Font Awesome 6 Free-Solid-900.otf",
+        g_ImGuiFontSize.GetValue(), &awesomeConfig, awesomeGlyphRanges);
+    CHECK_BOOL(awesomeFont);
+
+    CHECK_BOOL(io.Fonts->Build());
+    
     ImGui_ImplWin32_Init((void*)wnd);
 }
 

@@ -521,6 +521,10 @@ std::filesystem::path StrToPath(const wstr_view& str)
 {
     return std::filesystem::path(str.begin(), str.end(), std::filesystem::path::native_format);
 }
+std::filesystem::path StrToPath(const str_view& str)
+{
+    return std::filesystem::path(str.begin(), str.end(), std::filesystem::path::native_format);
+}
 
 static void SetConsoleColor(LogLevel level)
 {

@@ -83,6 +83,9 @@
     <Filter Include="ThirdParty\ImGUI\misc\cpp">
       <UniqueIdentifier>{6ea44f49-d357-4eff-b395-1f82174d9fdf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="ThirdParty\IconFontCppHeaders">
+      <UniqueIdentifier>{6c45d41f-0e07-4e15-85c6-cb73c78a67e6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h">
@@ -144,6 +147,9 @@
     </ClInclude>
     <ClInclude Include="..\ThirdParty\imgui-1.87\misc\cpp\imgui_stdlib.h">
       <Filter>ThirdParty\ImGUI\misc\cpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ThirdParty\IconFontCppHeaders\IconsFontAwesome6.h">
+      <Filter>ThirdParty\IconFontCppHeaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

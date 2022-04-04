@@ -2,6 +2,7 @@
 
 #include "../ThirdParty/imgui-1.87/imgui.h"
 #include "../ThirdParty/imgui-1.87/misc/cpp/imgui_stdlib.h"
+#include "../ThirdParty/IconFontCppHeaders/IconsFontAwesome6.h"
 
 class ImGuiUtils
 {

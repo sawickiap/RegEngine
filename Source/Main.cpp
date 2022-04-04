@@ -270,7 +270,6 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             if(!ImGui::GetIO().WantCaptureMouse)
             {
-                SetCapture(m_Wnd);
                 const MouseButton button = msg == WM_LBUTTONDOWN ? MouseButton::Left :
                     msg == WM_MBUTTONDOWN ? MouseButton::Middle :
                     MouseButton::Right;
@@ -294,7 +293,6 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
                 const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                 m_Game->OnMouseUp(button, mouseButtonDownFlag, pos);
-                ReleaseCapture();
             }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)

@@ -28,8 +28,12 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\dxc_2021_12_08
 - **[DirectXTex](URL)** - for reading and writing texture file formats, by Microsoft. License: MIT.
   - Directory: Source\packages\directxtex_desktop_win10.2021.11.8.1
+- **[Font Awesome](https://fontawesome.com/)** - font with icons, by Fonticons, Inc. License: Font Awesome Free license.
+  - File: WorkingDir\Data\Fonts\Font Awesome 6 Free-Solid-900.otf
 - **[GLM](https://github.com/g-truc/glm)** - mathematics library for graphics software, by G-Truc Creation. License: The Happy Bunny License or MIT.
   - Directory: ThirdParty\glm
+- **[IconFontCppHeaders](https://github.com/juliettef/IconFontCppHeaders)** - haader with constants for icons from Font Awesome, by Juliette Foucaut and Doug Binks. License: zlib.
+  - Directory: ThirdParty\IconFontCppHeaders
 - **[RapidJSON](https://rapidjson.org/)** - a fast JSON parser/generator, by Tencent. License: MIT.
   - Directory: ThirdParty\rapidjson
 - **[str_view](https://github.com/sawickiap/str_view)** - null-termination-aware string-view class for C++, by Adam Sawicki. License: MIT.

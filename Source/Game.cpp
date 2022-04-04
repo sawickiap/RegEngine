@@ -113,6 +113,11 @@ void Game::ImGui()
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse |
         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_MenuBar);
     ImGui::BeginMenuBar();
+    if(ImGui::BeginMenu("Edit"))
+    {
+        ImGui::MenuItem("Settings", nullptr, &g_SettingsImGuiWindowVisible);
+        ImGui::EndMenu();
+    }
     if(ImGui::BeginMenu("Help"))
     {
         ImGui::MenuItem("ImGui demo", nullptr, &m_DemoWindowVisible);
@@ -125,6 +130,7 @@ void Game::ImGui()
     ImGui::EndMenuBar();
     ImGui::End();
 
+    SettingsImGui();
     if(m_DemoWindowVisible)
         ImGui::ShowDemoWindow(&m_DemoWindowVisible);
     if(m_MetricsWindowVisible)

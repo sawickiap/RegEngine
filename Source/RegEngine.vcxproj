@@ -160,6 +160,7 @@
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
     <ClInclude Include="..\ThirdParty\d3dx12\d3dx12.h" />
+    <ClInclude Include="..\ThirdParty\IconFontCppHeaders\IconsFontAwesome6.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_dx12.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\backends\imgui_impl_win32.h" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\imconfig.h" />
