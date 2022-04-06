@@ -5,6 +5,7 @@
 #include "Settings.hpp"
 #include "SmallFileCache.hpp"
 #include "ImGuiUtils.hpp"
+#include "Time.hpp"
 #include <windowsx.h>
 
 enum EXIT_CODE
@@ -17,6 +18,107 @@ static const wchar_t* const CLASS_NAME = L"REG_ENGINE_1";
 static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 
 VecSetting<glm::uvec2> g_Size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
+
+static const NativeCursorID SYSTEM_CURSOR_IDENTIFIERS[] = {
+    IDC_APPSTARTING,
+    IDC_ARROW,
+    IDC_CROSS,
+    IDC_HAND,
+    IDC_HELP,
+    IDC_IBEAM,
+    IDC_NO,
+    IDC_SIZEALL,
+    IDC_SIZENESW,
+    IDC_SIZENS,
+    IDC_SIZENWSE,
+    IDC_SIZEWE,
+    IDC_UPARROW,
+    IDC_WAIT,
+};
+
+static NativeCursorID ImGuiCursorToNativeCursorID(ImGuiMouseCursor imGuiCursor)
+{
+    switch(imGuiCursor)
+    {
+    case ImGuiMouseCursor_None: return NULL;
+    case ImGuiMouseCursor_Arrow: return IDC_ARROW;
+    case ImGuiMouseCursor_TextInput: return IDC_IBEAM;
+    case ImGuiMouseCursor_ResizeAll: return IDC_SIZEALL;
+    case ImGuiMouseCursor_ResizeNS: return IDC_SIZENS;
+    case ImGuiMouseCursor_ResizeEW: return IDC_SIZEWE;
+    case ImGuiMouseCursor_ResizeNESW: return IDC_SIZENESW;
+    case ImGuiMouseCursor_ResizeNWSE: return IDC_SIZENWSE;
+    case ImGuiMouseCursor_Hand: return IDC_HAND;
+    case ImGuiMouseCursor_NotAllowed: return IDC_NO;
+    default:
+        assert(0);
+        return NULL;
+    }
+}
+
+class SystemCursors
+{
+public:
+    SystemCursors();
+    HCURSOR GetCursor(const NativeCursorID id) const;
+    void SetCursorFromImGui(ImGuiMouseCursor imGuiCursor) const;
+    void SetCursorFromID(const NativeCursorID id) const;
+
+private:
+    HCURSOR m_Cursors[_countof(SYSTEM_CURSOR_IDENTIFIERS)];
+};
+
+static SystemCursors g_SystemCursors;
+
+SystemCursors::SystemCursors()
+{
+    for(size_t i = 0; i < _countof(SYSTEM_CURSOR_IDENTIFIERS); ++i)
+    {
+        m_Cursors[i] = LoadCursor(NULL, SYSTEM_CURSOR_IDENTIFIERS[i]);
+        assert(m_Cursors[i]);
+    }
+}
+
+HCURSOR SystemCursors::GetCursor(const NativeCursorID id) const
+{
+    switch((ULONG_PTR)id)
+    {
+    case (ULONG_PTR)IDC_APPSTARTING: return m_Cursors[0];
+    case (ULONG_PTR)IDC_ARROW: return m_Cursors[1];
+    case (ULONG_PTR)IDC_CROSS: return m_Cursors[2];
+    case (ULONG_PTR)IDC_HAND: return m_Cursors[3];
+    case (ULONG_PTR)IDC_HELP: return m_Cursors[4];
+    case (ULONG_PTR)IDC_IBEAM: return m_Cursors[5];
+    case (ULONG_PTR)IDC_NO: return m_Cursors[6];
+    case (ULONG_PTR)IDC_SIZEALL: return m_Cursors[7];
+    case (ULONG_PTR)IDC_SIZENESW: return m_Cursors[8];
+    case (ULONG_PTR)IDC_SIZENS: return m_Cursors[9];
+    case (ULONG_PTR)IDC_SIZENWSE: return m_Cursors[10];
+    case (ULONG_PTR)IDC_SIZEWE: return m_Cursors[11];
+    case (ULONG_PTR)IDC_UPARROW: return m_Cursors[12];
+    case (ULONG_PTR)IDC_WAIT: return m_Cursors[13];
+    default:
+        assert(0);
+        return NULL;
+    }
+}
+
+void SystemCursors::SetCursorFromImGui(ImGuiMouseCursor imGuiCursor) const
+{
+    const NativeCursorID id = ImGuiCursorToNativeCursorID(imGuiCursor);
+    SetCursorFromID(id);
+}
+
+void SystemCursors::SetCursorFromID(const NativeCursorID id) const
+{
+    if(id)
+    {
+        const HCURSOR nativeCursor = GetCursor(id);
+        SetCursor(nativeCursor);
+    }
+    else
+        SetCursor(NULL);
+}
 
 struct ApplicationParameters
 {
@@ -75,10 +177,13 @@ Application::Application()
 {
     m_Instance = (HINSTANCE)GetModuleHandle(NULL);
     SetThreadName(GetCurrentThreadId(), "MAIN");
+    InitTime();
 }
 
 Application::~Application()
 {
+    SaveRuntimeSettings();
+
     delete g_SmallFileCache;
     g_SmallFileCache = nullptr;
 }
@@ -93,6 +198,7 @@ void Application::Init()
     CHECK_HR(m_DXGIFactory4->QueryInterface(IID_PPV_ARGS(&m_DXGIFactory6)));
     g_SmallFileCache = new SmallFileCache{};
     LoadStartupSettings();
+    LoadRuntimeSettings();
     LoadLoadSettings();
     SelectAdapter();
     assert(m_Adapter);
@@ -157,7 +263,7 @@ void Application::RegisterWindowClass()
     wndClass.cbSize = sizeof(wndClass);
     wndClass.style = CS_VREDRAW | CS_HREDRAW | CS_DBLCLKS;
     wndClass.hbrBackground = NULL;
-    wndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wndClass.hCursor = g_SystemCursors.GetCursor(m_NativeCursorID);
     wndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
     wndClass.hInstance = m_Instance;
     wndClass.lpfnWndProc = &GlobalWndProc;
@@ -254,11 +360,16 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_MOUSEMOVE:
         try
         {
-            if(!ImGui::GetIO().WantCaptureMouse)
+            if(ImGui::GetIO().WantCaptureMouse)
+            {
+                g_SystemCursors.SetCursorFromImGui(m_LastImGuiMouseCursor);
+            }
+            else
             {
                 const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
                 const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                 m_Game->OnMouseMove(mouseButtonDownFlag, pos);
+                g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
@@ -268,7 +379,11 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_RBUTTONDOWN:
         try
         {
-            if(!ImGui::GetIO().WantCaptureMouse)
+            if(ImGui::GetIO().WantCaptureMouse)
+            {
+                g_SystemCursors.SetCursorFromImGui(m_LastImGuiMouseCursor);
+            }
+            else
             {
                 const MouseButton button = msg == WM_LBUTTONDOWN ? MouseButton::Left :
                     msg == WM_MBUTTONDOWN ? MouseButton::Middle :
@@ -276,6 +391,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
                 const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                 m_Game->OnMouseDown(button, mouseButtonDownFlag, pos);
+                g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
@@ -285,7 +401,11 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_RBUTTONUP:
         try
         {
-            if(!ImGui::GetIO().WantCaptureMouse)
+            if(ImGui::GetIO().WantCaptureMouse)
+            {
+                g_SystemCursors.SetCursorFromImGui(m_LastImGuiMouseCursor);
+            }
+            else
             {
                 const MouseButton button = msg == WM_LBUTTONUP ? MouseButton::Left :
                     msg == WM_MBUTTONUP ? MouseButton::Middle :
@@ -293,6 +413,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(wParam);
                 const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                 m_Game->OnMouseUp(button, mouseButtonDownFlag, pos);
+                g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
@@ -300,12 +421,17 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
     case WM_MOUSEWHEEL:
         try
         {
-            if(!ImGui::GetIO().WantCaptureMouse)
+            if(ImGui::GetIO().WantCaptureMouse)
+            {
+                g_SystemCursors.SetCursorFromImGui(m_LastImGuiMouseCursor);
+            }
+            else
             {
                 const int16_t distance = GET_WHEEL_DELTA_WPARAM(wParam);
                 const uint32_t mouseButtonDownFlag = WParamToMouseButtonDownFlags(GET_KEYSTATE_WPARAM(wParam));
                 const ivec2 pos = ivec2(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
                 m_Game->OnMouseWheel(distance, mouseButtonDownFlag, pos);
+                g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
         CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
@@ -327,7 +453,7 @@ void Application::OnKeyDown(WPARAM key)
     // ESC: Exit.
     if(key == VK_ESCAPE && modifiers == 0)
     {
-        PostMessage(m_Wnd, WM_CLOSE, 0, 0);
+        Exit();
         return;
     }
     
@@ -340,6 +466,8 @@ void Application::OnKeyDown(WPARAM key)
         LoadLoadSettings();
         if(g_Renderer)
             g_Renderer->Reload(refreshAll);
+        if(m_Game)
+            m_Game->Reload(refreshAll);
         return;
     }
 
@@ -361,6 +489,8 @@ void Application::OnChar(wchar_t ch)
 int Application::Run()
 {
     LogMessage(L"Application initialized, running...");
+    const Time now = Now();
+    m_Time.Start(now);
     MSG msg;
     for (;;)
     {
@@ -373,22 +503,47 @@ int Application::Run()
         }
         else
         {
-            /*const UINT64 newTimeValue = GetTickCount64() - g_TimeOffset;
-            g_TimeDelta = (float)(newTimeValue - g_TimeValue) * 0.001f;
-            g_TimeValue = newTimeValue;
-            g_Time = (float)newTimeValue * 0.001f;
-            */
-
             if(m_Renderer)
-            {
-                m_ImGuiContext->NewFrame();
-                m_Game->Update();
-                m_Renderer->Render();
-            }
+                LoopIteration();
         }
     }
     LogMessage(L"Application exiting.");
     return (int)msg.wParam;
+}
+
+void Application::LoopIteration()
+{
+    const Time now = Now();
+    m_Time.NewFrame(now);
+
+    m_ImGuiContext->NewFrame();
+    m_Game->Update();
+
+    const ImGuiMouseCursor newImGuiMouseCursor = ImGui::GetMouseCursor();
+    if (newImGuiMouseCursor != m_LastImGuiMouseCursor)
+    {
+        g_SystemCursors.SetCursorFromImGui(newImGuiMouseCursor);
+        m_LastImGuiMouseCursor = newImGuiMouseCursor;
+    }
+
+    m_Renderer->Render();
+}
+
+void Application::Exit()
+{
+    PostMessage(m_Wnd, WM_CLOSE, 0, 0);
+}
+
+void Application::SetCursor(NativeCursorID id)
+{
+    if(id != m_NativeCursorID)
+    {
+        if(m_Wnd && !ImGui::GetIO().WantCaptureMouse)
+        {
+            g_SystemCursors.SetCursorFromID(id);
+        }
+        m_NativeCursorID = id;
+    }
 }
 
 #endif // _APPLICATION_IMPL

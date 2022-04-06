@@ -1,6 +1,4 @@
 {
-    "UsePIXEvents": true,
-    "SyncInterval": 1,
     // Array of strings to be passed as parameters to every shader compilation using DXC compiler.
     "Shaders.ExtraParameters": [ "-O3" ],
     // When set to true, equivalent of adding extra parameters: -Zi -Qembed_debug
@@ -11,7 +9,8 @@
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",
     
     "Assimp.PrintSceneInfo": false,
-
+    
+    /*
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Apple\\apple.obj",
     "TexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\Diffuse.tif",
     "NormalTexturePath": "e:\\Tmp\\MODELS\\Apple\\Textures\\apple-NM_u0_v0.tif",
@@ -24,6 +23,7 @@
     ],
     "Assimp.NegateBitangent": false,
     "BackFaceCullingMode": 1,
+    */
 
     /*
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Cauldron-Media-master\\DamagedHelmet\\glTF\\DamagedHelmet.gltf",
@@ -50,17 +50,15 @@
     ],
     "BackFaceCullingMode": 0,*/
 
-    /*
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Cauldron-Media-master\\Sponza\\glTF\\Sponza.gltf",
     "Assimp.Scale": 1.0,
     "Assimp.Transform": [
+        0, 0, 1, 0,
         1, 0, 0, 0,
         0, 1, 0, 0,
-        0, 0, 1, 0,
         0, 0, 0, 1
     ],
     "BackFaceCullingMode": 1,
-    */
 
     /*
     "TexturePath": "",
@@ -77,9 +75,6 @@
     ],
     "Assimp.NegateBitangent": true,
     */
-
-    "Background.Color": [0.0,0.0,0.1],
-    //"Background.Color": "808080",
 
     "DirectionToLight": [-1, 3, 0.5],
     //"DirectionToLight": [-0.7,-0.5,1],

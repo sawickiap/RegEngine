@@ -132,3 +132,13 @@ std::vector<char> LoadFile(const wstr_view& path)
 
     ERR_CATCH_MSG(std::format(L"Cannot load file \"{}\".", path));
 }
+
+void SaveFile(const wstr_view& path, std::span<const char> bytes)
+{
+    ERR_TRY;
+
+    FileStream s(path, FileStream::Flag_Write | FileStream::Flag_Sequential);
+    s.Write(bytes);
+
+    ERR_CATCH_MSG(std::format(L"Cannot save file \"{}\".", path));
+}

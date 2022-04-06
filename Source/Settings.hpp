@@ -8,6 +8,10 @@ enum class SettingCategory
     // Loaded from file "LoadSettings.json" on startup and after refresh with F5.
     // Should not be changed during runtime. Never saved to a file.
     Load,
+    // Loaded from file "RuntimeSettings.json" on startup, saved on exit.
+    // Can be changed during runtime, but some of them not always e.g.
+    // OK to change during Update and input handling but not during rendering.
+    Runtime,
     Count,
 };
 
@@ -24,6 +28,9 @@ protected:
     // On error: prints warning.
     // jsonVal type: const rapidjson::Value*
     virtual void LoadFromJSON(const void* jsonVal) = 0;
+    // jsonVal type: rapidjson::Value*
+    // allocator type: rapidjson::MemoryPoolAllocator<rapidjson::CrtAllocator>*
+    virtual void SaveToJSON(void* jsonVal, void* jsonAllocator) = 0;
 
 private:
     const string m_Name;
@@ -56,6 +63,7 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 };
 
 template<typename T>
@@ -79,6 +87,7 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 };
 
 class UintSetting : public NumericSetting<uint32_t>
@@ -92,6 +101,7 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 };
 
 class IntSetting : public NumericSetting<int32_t>
@@ -105,12 +115,18 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 };
 
 template<typename VecT>
 bool LoadVecFromJSON(VecT& outVec, const void* jsonVal);
 template<typename MatT>
 bool LoadMatFromJSON(MatT& outMat, const void* jsonVal);
+
+template<typename VecT>
+void SaveVecToJSON(void* jsonVal, void* jsonAllocator, const VecT& vec);
+template<typename MatT>
+void SaveMatToJSON(void* jsonVal, void* jsonAllocator, const MatT& mat);
 
 template<typename VecT>
 void ImGuiVectorSetting(const char* label, VecT& inoutVec);
@@ -138,6 +154,24 @@ protected:
         else
             LogWarningF(L"Invalid vector setting \"{}\".", str_view(this->GetName()));
     }
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override
+    {
+        // `this` is needed due to a compiler bug!
+        SaveVecToJSON<VecT>(jsonVal, jsonAllocator, this->m_Value);
+    }
+};
+
+class Vec3ColorSetting : public VecSetting<vec3>
+{
+public:
+    Vec3ColorSetting(SettingCategory category, const str_view& name, const vec3& defaultValue) :
+        VecSetting<vec3>(category, name, defaultValue)
+    {
+    }
+    void ImGui(bool readOnly) override;
+
+protected:
+    void LoadFromJSON(const void* jsonVal) override;
 };
 
 /*
@@ -148,17 +182,21 @@ Floats are in linear space and loaded as-is.
 String format is assumed in sRGB space and converted to linear.
 In both cases, alpha can be omitted, which is then assumed to be 1.0.
 */
-class ColorSetting : public VecSetting<vec4>
+class Vec4ColorSetting : public VecSetting<vec4>
 {
 public:
-    ColorSetting(SettingCategory category, const str_view& name, const vec4& defaultValue) :
+    Vec4ColorSetting(SettingCategory category, const str_view& name, const vec4& defaultValue) :
         VecSetting<vec4>(category, name, defaultValue)
     {
     }
+    void ImGui(bool readOnly) override;
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
 };
+
+template<typename MatT>
+void ImGuiMatrixSetting(const char* label, MatT& inoutMat);
 
 template<typename MatT>
 class MatSetting : public ScalarSetting<MatT>
@@ -167,6 +205,10 @@ public:
     MatSetting(SettingCategory category, const str_view& name, const MatT& defaultValue) :
         ScalarSetting<MatT>(category, name, defaultValue)
     {
+    }
+    void ImGui(bool readOnly) override
+    {
+        ImGuiMatrixSetting(this->GetName().c_str(), this->m_Value);
     }
 
 protected:
@@ -178,6 +220,11 @@ protected:
             this->m_Value = mat;
         else
             LogWarningF(L"Invalid matrix setting \"{}\".", str_view(this->GetName()));
+    }
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override
+    {
+        // `this` is needed due to a compiler bug!
+        SaveMatToJSON<MatT>(jsonVal, jsonAllocator, this->m_Value);
     }
 };
 
@@ -195,6 +242,7 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 
 private:
     string m_Value;
@@ -210,12 +258,17 @@ public:
 
 protected:
     void LoadFromJSON(const void* jsonVal) override;
+    void SaveToJSON(void* jsonVal, void* jsonAllocator) override;
 };
 
 // On error throws Exception.
 void LoadStartupSettings();
 // On error prints error.
 void LoadLoadSettings();
+// On error prints error.
+void LoadRuntimeSettings();
+// On error prints error.
+void SaveRuntimeSettings();
 
 extern bool g_SettingsImGuiWindowVisible;
 void SettingsImGui();

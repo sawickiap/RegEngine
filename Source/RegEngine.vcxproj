@@ -156,6 +156,7 @@
     <ClCompile Include="SmallFileCache.cpp" />
     <ClCompile Include="Streams.cpp" />
     <ClCompile Include="Texture.cpp" />
+    <ClCompile Include="Time.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\ThirdParty\D3D12MemoryAllocator\include\D3D12MemAlloc.h" />
@@ -191,12 +192,14 @@
     <ClInclude Include="SmallFileCache.hpp" />
     <ClInclude Include="Streams.hpp" />
     <ClInclude Include="Texture.hpp" />
+    <ClInclude Include="Time.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\WorkingDir\LoadSettings.json" />
+    <None Include="..\WorkingDir\RuntimeSettings.json" />
     <None Include="..\WorkingDir\StartupSettings.json" />
     <None Include="Formatters.inl" />
     <None Include="packages.config" />

@@ -45,6 +45,7 @@
     <ClCompile Include="..\ThirdParty\imgui-1.87\misc\cpp\imgui_stdlib.cpp">
       <Filter>ThirdParty\ImGUI\misc\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="Time.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="ThirdParty">
@@ -151,6 +152,7 @@
     <ClInclude Include="..\ThirdParty\IconFontCppHeaders\IconsFontAwesome6.h">
       <Filter>ThirdParty\IconFontCppHeaders</Filter>
     </ClInclude>
+    <ClInclude Include="Time.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
@@ -164,6 +166,9 @@
       <Filter>ConfigFiles</Filter>
     </None>
     <None Include="..\WorkingDir\StartupSettings.json">
+      <Filter>ConfigFiles</Filter>
+    </None>
+    <None Include="..\WorkingDir\RuntimeSettings.json">
       <Filter>ConfigFiles</Filter>
     </None>
   </ItemGroup>

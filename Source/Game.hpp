@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Time.hpp"
+
 enum class MouseButton { Left, Middle, Right, Count };
 
 // Bit flags used to indicate which buttons are down during mouse even.
@@ -21,6 +23,23 @@ enum KEY_MODIFIERS
     KEY_MODIFIER_SHIFT = 0x4,
 };
 
+class FrameTimeHistory
+{
+public:
+    size_t GetCount() const { return m_Count; }
+    float Get(size_t i) const;
+
+    void Reset() { *this = {}; }
+    void Post(float dt);
+
+private:
+    static constexpr size_t m_Capacity = 1024;
+    size_t m_Back = 0;
+    size_t m_Front = 0;
+    size_t m_Count = 0;
+    float m_DeltaTime[m_Capacity];
+};
+
 /*
 Represents main object responsible for game/program logic.
 */
@@ -30,6 +49,7 @@ public:
     Game();
     void Init();
     ~Game();
+    void Reload(bool refreshAll);
 
     // Called every frame before rendering
     void Update();
@@ -45,9 +65,16 @@ public:
 private:
     bool m_DemoWindowVisible = false;
     bool m_MetricsWindowVisible = false;
+    bool m_StatisticsWindowVisible = false;
     bool m_StackToolWindowVisible = false;
     bool m_AboutWindowVisible = false;
 
+    bool m_MouseDragEnabled = false;
+    ivec2 m_MouseDragPrevPos = ivec2(INT_MAX, INT_MAX);
+
+    FrameTimeHistory m_FrameTimeHistory;
+
     void ImGui();
     void ShowAboutWindow();
+    void ShowStatisticsWindow();
 };

@@ -68,7 +68,7 @@ static UintSetting g_DSVPersistentDescriptorMaxCount(SettingCategory::Startup,
 static UintSetting g_MaxAnisotropy(SettingCategory::Startup, "MaxAnisotropy", 16);
 
 static BoolSetting g_AssimpPrintSceneInfo(SettingCategory::Load, "Assimp.PrintSceneInfo", false);
-static UintSetting g_SyncInterval(SettingCategory::Load, "SyncInterval", 1);
+static UintSetting g_SyncInterval(SettingCategory::Runtime, "SyncInterval", 1);
 static StringSetting g_AssimpModelPath(SettingCategory::Load, "Assimp.ModelPath");
 static StringSetting g_TexturePath(SettingCategory::Load, "TexturePath");
 static StringSetting g_NormalTexturePath(SettingCategory::Load, "NormalTexturePath");
@@ -76,10 +76,11 @@ static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static BoolSetting g_AssimpNegateBitangent(SettingCategory::Load, "Assimp.NegateBitangent", true);
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
-static ColorSetting g_BackgroundColor(SettingCategory::Load, "Background.Color", vec4(0.f, 0.f, 0.f, 1.f));
+
+static Vec4ColorSetting g_BackgroundColor(SettingCategory::Runtime, "Background.Color", vec4(0.f, 0.f, 0.f, 1.f));
 static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLight", vec3(0.f, 1.f, 0.f));
-static VecSetting<vec3> g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
-static VecSetting<vec3> g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
+static Vec3ColorSetting g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
+static Vec3ColorSetting g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
 
 Renderer* g_Renderer;
 
@@ -320,7 +321,8 @@ void Renderer::Init()
     LoadModel(false);
     //CreateProceduralModel();
     
-    m_Camera = std::make_unique<OrbitingCamera>();
+    //m_Camera = std::make_unique<OrbitingCamera>();
+    m_Camera = std::make_unique<FlyingCamera>();
     m_Camera->SetAspectRatio(GetFinalResolutionF().x / GetFinalResolutionF().y);
     //m_Camera->SetDistance(3.f);
 

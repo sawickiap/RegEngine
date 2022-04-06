@@ -36,8 +36,8 @@ protected:
 
 private:
     float m_FovY = glm::radians(80.f);
-    float m_AspectRatio= 1.f;
-    float m_ZNear = 0.5f;
+    float m_AspectRatio = 1.f;
+    float m_ZNear = 0.1f;
     mat4 m_Projection;
     mat4 m_ProjectionInverse;
     mat4 m_View;
@@ -84,6 +84,41 @@ protected:
 private:
     vec3 m_Target = vec3(0.f);
     float m_Distance = 10.f;
+    // Rotation around up (Z) axis.
+    float m_Yaw = 0.f;
+    // Rotation around right (X) axis.
+    float m_Pitch = 0.f;
+};
+
+class FlyingCamera : public Camera
+{
+public:
+    const vec3& GetPosition() const { return m_Position; }
+    float GetYaw() const { return m_Yaw; }
+    float GetPitch() const { return m_Pitch; }
+
+    void SetPosition(const vec3& pos)
+    {
+        if(pos != m_Position) { m_Position = pos; InvalidateView(); }
+    }
+    void SetYaw(float yaw)
+    {
+        if(yaw != m_Yaw) { m_Yaw = yaw; InvalidateView(); }
+    }
+    void SetPitch(float pitch)
+    {
+        pitch = std::clamp(pitch, -glm::half_pi<float>() + 1e-6f, glm::half_pi<float>() - 1e-6f);
+        if(pitch != m_Pitch) { m_Pitch = pitch; InvalidateView(); }
+    }
+
+    vec3 CalculateForward() const;
+    vec3 CalculateRight() const;
+
+protected:
+    mat4 CalculateView() override;
+
+private:
+    vec3 m_Position = vec3(0.f);
     // Rotation around up (Z) axis.
     float m_Yaw = 0.f;
     // Rotation around right (X) axis.

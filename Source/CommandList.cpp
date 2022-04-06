@@ -6,7 +6,7 @@
 #include "Renderer.hpp"
 #include <pix3.h>
 
-static BoolSetting g_UsePIXEvents(SettingCategory::Load, "UsePIXEvents", true);
+static BoolSetting g_UsePIXEvents(SettingCategory::Runtime, "UsePIXEvents", true);
 
 void CommandList::Init(
     ID3D12CommandAllocator* cmdAllocator,

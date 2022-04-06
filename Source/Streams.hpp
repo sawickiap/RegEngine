@@ -77,9 +77,11 @@ public:
     size_t SetPosition(ptrdiff_t distance, MoveMethod method) override;
     size_t TryRead(void* outBytes, size_t maxBytesToRead) override;
     void Write(const void* bytes, size_t bytesToWrite) override;
+    using BaseStream::Write;
 
 private:
     unique_ptr<HANDLE, CloseHandleDeleter> m_Handle;
 };
 
 std::vector<char> LoadFile(const wstr_view& path);
+void SaveFile(const wstr_view& path, std::span<const char> bytes);

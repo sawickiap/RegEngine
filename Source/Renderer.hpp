@@ -11,6 +11,7 @@ class Mesh;
 class TemporaryConstantBufferManager;
 class ShaderCompiler;
 class OrbitingCamera;
+class FlyingCamera;
 
 struct aiScene;
 struct aiNode;
@@ -131,7 +132,7 @@ public:
     TemporaryConstantBufferManager* GetTemporaryConstantBufferManager() { return m_TemporaryConstantBufferManager.get(); }
     StandardSamplers* GetStandardSamplers() { return &m_StandardSamplers; }
     ShaderCompiler* GetShaderCompiler() { return m_ShaderCompiler.get(); }
-    OrbitingCamera* GetCamera() { return m_Camera.get(); }
+    FlyingCamera* GetCamera() { return m_Camera.get(); }
 
     uvec2 GetFinalResolutionU();
     vec2 GetFinalResolutionF();
@@ -183,7 +184,7 @@ private:
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
 	ComPtr<ID3D12PipelineState> m_3DPipelineState;
     unique_ptr<AssimpInit> m_AssimpInit;
-    unique_ptr<OrbitingCamera> m_Camera;
+    unique_ptr<FlyingCamera> m_Camera;
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;
 	ComPtr<ID3D12PipelineState> m_LightingPipelineState;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;

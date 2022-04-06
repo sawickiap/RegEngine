@@ -1,0 +1,15 @@
+{
+    "UsePIXEvents": true,
+    "FlyingCamera.RotationSpeed.RadiansPerPixel": [
+        -0.004999999888241291,
+        0.004999999888241291
+    ],
+    "FlyingCamera.MovementSpeed.UnitsPerSecond": 2.0,
+    "SyncInterval": 1,
+    "Background.Color": [
+        0.027239222079515457,
+        0.05194316804409027,
+        0.18987339735031128,
+        1.0
+    ]
+}

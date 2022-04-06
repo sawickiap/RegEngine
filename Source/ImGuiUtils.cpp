@@ -23,6 +23,7 @@ void ImGuiUtils::Init(HWND wnd)
 
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
+    //io.MouseDrawCursor = true;
     io.ConfigFlags = ImGuiConfigFlags_NavEnableKeyboard |
         ImGuiConfigFlags_NavEnableSetMousePos |
         ImGuiConfigFlags_IsSRGB;

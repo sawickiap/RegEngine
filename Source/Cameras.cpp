@@ -65,3 +65,27 @@ mat4 OrbitingCamera::CalculateView()
         m_Target, // center
         vec3(0.f, 0.f, 1.f)); // up
 }
+
+vec3 FlyingCamera::CalculateForward() const
+{
+    // Is this normalization needed?
+    return glm::normalize(vec3(
+        sin(m_Yaw),
+        cos(m_Yaw) * cos(m_Pitch),
+        -sin(m_Pitch)));
+}
+
+vec3 FlyingCamera::CalculateRight() const
+{
+    return glm::normalize(glm::cross(
+        vec3(0.f, 0.f, 1.f),
+        CalculateForward()));
+}
+
+mat4 FlyingCamera::CalculateView()
+{
+    return glm::lookAtLH(
+        m_Position, // eye
+        m_Position + CalculateForward(), // center
+        vec3(0.f, 0.f, 1.f)); // up
+}
