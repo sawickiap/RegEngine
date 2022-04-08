@@ -11,6 +11,7 @@ extern VecSetting<glm::uvec2> g_Size;
 
 static VecSetting<vec2> g_FlyingCameraRotationSpeed(SettingCategory::Runtime, "FlyingCamera.RotationSpeed.RadiansPerPixel", vec2(-0.005, 0.005));
 static FloatSetting g_FlyingCameraMovementSpeed(SettingCategory::Runtime, "FlyingCamera.MovementSpeed.UnitsPerSecond", 1.f);
+static FloatSetting g_SceneTimeSpeed(SettingCategory::Runtime, "SceneTimeSpeed", 1.f);
 
 FrameTimeHistory::Entry FrameTimeHistory::Get(size_t i) const
 {
@@ -53,7 +54,21 @@ void Game::Update()
     const TimeData& appTime = g_App->GetTime();
 
     m_FrameTimeHistory.Post(appTime.m_DeltaTime_Float);
-    m_SceneTime.NewFrameFromDelta(m_TimePaused ? Time{0} : appTime.m_DeltaTime);
+
+    {
+        Time deltaTime = {0};
+        const float timeSpeed = std::max(0.f, g_SceneTimeSpeed.GetValue());
+        if(!m_TimePaused && timeSpeed > 0.f)
+        {
+            deltaTime = appTime.m_DeltaTime;
+            if(timeSpeed != 1.f)
+            {
+                const int64_t numerator = (int64_t)(timeSpeed * 1000.f + 0.5f);
+                deltaTime.m_Value = deltaTime.m_Value * numerator / 1000;
+            }
+        }
+        m_SceneTime.NewFrameFromDelta(deltaTime);
+    }
 
     for(size_t li = 1; li < g_Renderer->m_Lights.size(); ++li)
     {

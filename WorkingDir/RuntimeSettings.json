@@ -5,6 +5,7 @@
         0.004999999888241291
     ],
     "FlyingCamera.MovementSpeed.UnitsPerSecond": 2.0,
+    "SceneTimeSpeed": 1.0,
     "FrameRandomSleep": [
         0,
         0
