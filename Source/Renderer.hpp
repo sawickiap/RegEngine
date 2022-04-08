@@ -113,7 +113,6 @@ class Renderer
 {
 public:
     bool m_AmbientEnabled = false;
-    bool m_NormalMappingEnabled = true;
     std::vector<Light> m_Lights;
 
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);

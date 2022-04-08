@@ -16,5 +16,7 @@
         0.05194316804409027,
         0.18987339735031128,
         1.0
-    ]
+    ],
+    "Renderer.Debug.NormalMaps.Enabled": true,
+    "Renderer.Debug.BackfaceCulling.Enabled": true
 }

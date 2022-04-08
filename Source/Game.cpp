@@ -109,8 +109,6 @@ void Game::Update()
         cam->SetPosition(cam->GetPosition() + v);
     }
 
-    g_Renderer->m_NormalMappingEnabled = !ImGui::IsKeyDown(ImGuiKey_N);
-
     ImGui();
 }
 

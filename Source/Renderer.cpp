@@ -82,6 +82,9 @@ static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLi
 static Vec3ColorSetting g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
 static Vec3ColorSetting g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
 
+static BoolSetting g_NormalMapsEnabled(SettingCategory::Runtime, "Renderer.Debug.NormalMaps.Enabled", true);
+static BoolSetting g_BackfaceCullingEnabled(SettingCategory::Runtime, "Renderer.Debug.BackfaceCulling.Enabled", true);
+
 Renderer* g_Renderer;
 
 #define HELPER_CAT_1(a, b) a ## b
@@ -1380,7 +1383,8 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     assert(materialIndex < m_Materials.size());
     const SceneMaterial& mat = m_Materials[materialIndex];
 
-    ID3D12PipelineState* const pso = mat.m_TwoSided ? m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
+    ID3D12PipelineState* const pso = (mat.m_TwoSided || !g_BackfaceCullingEnabled.GetValue()) ?
+        m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
     cmdList.SetPipelineState(pso);
 
     Texture* albedoTexture = mat.m_AlbedoTextureIndex != SIZE_MAX ?
@@ -1402,7 +1406,7 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
         m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
     D3D12_GPU_DESCRIPTOR_HANDLE normalTextureDescriptorHandle;
-    if(normalTexture && m_NormalMappingEnabled)
+    if(normalTexture && g_NormalMapsEnabled.GetValue())
     {
         normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
             m_Textures[mat.m_NormalTextureIndex].m_Texture->GetDescriptor());
