@@ -102,12 +102,24 @@ void TimeData::Start(Time now)
     m_AbsoluteStartTime = now;
 }
 
-void TimeData::NewFrame(Time now)
+void TimeData::NewFrameFromNow(Time now)
 {
-    assert(!m_AbsoluteStartTime.IsZero());
     // Cannot be smaller than previous time.
     Time newTime = std::max(now - m_AbsoluteStartTime, m_PreviousTime);
     m_DeltaTime = newTime - m_Time;
+    m_PreviousTime = m_Time;
+    m_Time = newTime;
+    m_Time_Float = TimeToSeconds<float>(newTime);
+    m_DeltaTime_Float = TimeToSeconds<float>(m_DeltaTime);
+    ++m_FrameIndex;
+}
+
+void TimeData::NewFrameFromDelta(Time delta)
+{
+    // Cannot be smaller than previous time.
+    delta = std::max(delta, Time{0});
+    Time newTime = m_Time + delta;
+    m_DeltaTime = delta;
     m_PreviousTime = m_Time;
     m_Time = newTime;
     m_Time_Float = TimeToSeconds<float>(newTime);

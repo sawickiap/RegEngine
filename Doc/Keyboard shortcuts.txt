@@ -1,0 +1,2 @@
+ESC - exit the program
+Pause - pause/resume scene time

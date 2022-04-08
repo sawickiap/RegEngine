@@ -549,7 +549,7 @@ int Application::Run()
 void Application::LoopIteration()
 {
     const Time now = Now();
-    m_Time.NewFrame(now);
+    m_Time.NewFrameFromNow(now);
     m_FPSCalculator.NewFrame(m_Time);
 
     m_ImGuiContext->NewFrame();

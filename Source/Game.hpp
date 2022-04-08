@@ -78,6 +78,8 @@ private:
     ivec2 m_MouseDragPrevPos = ivec2(INT_MAX, INT_MAX);
 
     FrameTimeHistory m_FrameTimeHistory;
+    TimeData m_SceneTime;
+    bool m_TimePaused = false;
 
     void ImGui();
     void ShowAboutWindow();

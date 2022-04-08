@@ -35,6 +35,7 @@ Game::Game()
 
 void Game::Init()
 {
+    m_SceneTime.Start(g_App->GetTime().m_Time);
 }
 
 Game::~Game()
@@ -44,7 +45,7 @@ Game::~Game()
 
 void Game::Reload(bool refreshAll)
 {
-
+    m_SceneTime.Start(g_App->GetTime().m_Time);
 }
 
 void Game::Update()
@@ -52,6 +53,7 @@ void Game::Update()
     const TimeData& appTime = g_App->GetTime();
 
     m_FrameTimeHistory.Post(appTime.m_DeltaTime_Float);
+    m_SceneTime.NewFrameFromDelta(m_TimePaused ? Time{0} : appTime.m_DeltaTime);
 
     for(size_t li = 1; li < g_Renderer->m_Lights.size(); ++li)
     {
@@ -125,6 +127,9 @@ void Game::OnKeyDown(WPARAM key, uint32_t modifiers)
         case '3':
             if(g_Renderer->m_Lights.size() > 1)
                 g_Renderer->m_Lights[2].m_Enabled = !g_Renderer->m_Lights[2].m_Enabled;
+            break;
+        case VK_PAUSE:
+            m_TimePaused = !m_TimePaused;
             break;
         }
     }
@@ -274,23 +279,27 @@ static vec4 DeltaTimeToColor(float dt)
     return vec4(colors[_countof(dts) - 1], 1.f);
 }
 
+static string DurationToStr(Time duration)
+{
+    uint32_t msec = TimeToMilliseconds<uint32_t>(duration);
+    uint32_t sec = msec / 1000;
+    msec %= 1000;
+    uint32_t min = sec / 60;
+    sec %= 60;
+    uint32_t hr = min / 60;
+    min %= 60;
+    return std::format("{}:{:02}:{:02}:{:03}", hr, min, sec, msec);
+}
+
 void Game::ShowStatisticsWindow()
 {
     const TimeData& appTime = g_App->GetTime();
     
-    uint32_t uptimeMsec = TimeToMilliseconds<uint32_t>(appTime.m_Time);
-    uint32_t uptimeSec = uptimeMsec / 1000;
-    uptimeMsec %= 1000;
-    uint32_t uptimeMin = uptimeSec / 60;
-    uptimeSec %= 60;
-    uint32_t uptimeHr = uptimeMin / 60;
-    uptimeMin %= 60;
-
     ImGui::Begin("Statistics", &m_StatisticsWindowVisible);
     
     ImGui::Text("FPS: %.1f", g_App->GetFPS());
-    ImGui::Text("Uptime: %u:%02u:%02u:%03u", uptimeHr, uptimeMin, uptimeSec, uptimeMsec);
-    ImGui::Text("Frame: %u", appTime.m_FrameIndex);
+    ImGui::Text("Application time: %s, frame: %u", DurationToStr(appTime.m_Time).c_str(), appTime.m_FrameIndex);
+    ImGui::Text("Scene time: %s, frame: %u", DurationToStr(m_SceneTime.m_Time).c_str(), m_SceneTime.m_FrameIndex);
 
     if(ImGui::CollapsingHeader("Frame time graph"))
         ShowFrameTimeGraph();

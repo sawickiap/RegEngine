@@ -38,25 +38,15 @@ Time MillisecondsToTime(T ms);
 // DeltaTime = time since previous frame.
 struct TimeData
 {
-    Time m_AbsoluteStartTime = {};
-    Time m_PreviousTime = {};
-    Time m_Time = {};
-    Time m_DeltaTime = {};
+    Time m_AbsoluteStartTime = {0};
+    Time m_PreviousTime = {0};
+    Time m_Time = {0};
+    Time m_DeltaTime = {0};
     float m_Time_Float = 0.f;
     float m_DeltaTime_Float = 0.f;
     uint32_t m_FrameIndex = 0;
 
     void Start(Time now);
-    void NewFrame(Time now);
-};
-
-struct AppTimeData
-{
-    // Relative to the app startup.
-    // Always real time, never changing speed or pausing.
-    // Use for UI animation or keyboard, mouse input handling.
-    TimeData m_AppTime;
-    // Relative to the scene loading.
-    // Can stop or change speed. Use for game logic.
-    TimeData m_SceneTime;
+    void NewFrameFromNow(Time now);
+    void NewFrameFromDelta(Time delta);
 };
