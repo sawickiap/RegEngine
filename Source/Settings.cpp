@@ -457,6 +457,9 @@ public:
         case SettingCategory::Runtime:
             m_RuntimeSettings.Register(setting);
             break;
+        case SettingCategory::Volatile:
+            m_VolatileSettings.Register(setting);
+            break;
         default:
             assert(0);
         }
@@ -472,6 +475,7 @@ private:
     SettingCollection m_StartupSettings;
     SettingCollection m_LoadSettings;
     SettingCollection m_RuntimeSettings;
+    SettingCollection m_VolatileSettings;
     ImGuiTextFilter m_ImGuiFilter;
 };
 
@@ -599,7 +603,7 @@ void SettingManager::ImGui()
         if(ImGui::Button(ICON_FA_XMARK))
             m_ImGuiFilter.Clear();
 
-        if(ImGui::CollapsingHeader("StartupSettings"))
+        if(ImGui::CollapsingHeader("Startup settings"))
         {
             ImGui::TextColored(
                 ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
@@ -610,7 +614,7 @@ void SettingManager::ImGui()
             ImGui::EndDisabled();
             ImGui::PopID();
         }
-        if(ImGui::CollapsingHeader("LoadSettings"))
+        if(ImGui::CollapsingHeader("Load settings"))
         {
             ImGui::TextColored(
                 ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
@@ -621,13 +625,22 @@ void SettingManager::ImGui()
             ImGui::EndDisabled();
             ImGui::PopID();
         }
-        if(ImGui::CollapsingHeader("RuntimeSettings", ImGuiTreeNodeFlags_DefaultOpen))
+        if(ImGui::CollapsingHeader("Runtime settings", ImGuiTreeNodeFlags_DefaultOpen))
         {
             ImGui::TextColored(
                 ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
                 "Loaded from \"RuntimeSettings.json\" at program startup, saved at exit.");
             ImGui::PushID("RuntimeSettings");
             m_RuntimeSettings.ImGui(true, m_ImGuiFilter);
+            ImGui::PopID();
+        }
+        if(ImGui::CollapsingHeader("Volatile settings", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::TextColored(
+                ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled),
+                "Initialized with default values at program startup, never loaded or saved to a file.");
+            ImGui::PushID("VolatileSettings");
+            m_VolatileSettings.ImGui(true, m_ImGuiFilter);
             ImGui::PopID();
         }
     }

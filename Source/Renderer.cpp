@@ -82,8 +82,9 @@ static VecSetting<vec3> g_DirectionToLight(SettingCategory::Load, "DirectionToLi
 static Vec3ColorSetting g_LightColor(SettingCategory::Load, "LightColor", vec3(0.9f));
 static Vec3ColorSetting g_AmbientColor(SettingCategory::Load, "AmbientColor", vec3(0.1f));
 
-static BoolSetting g_NormalMapsEnabled(SettingCategory::Runtime, "Renderer.Debug.NormalMaps.Enabled", true);
-static BoolSetting g_BackfaceCullingEnabled(SettingCategory::Runtime, "Renderer.Debug.BackfaceCulling.Enabled", true);
+static BoolSetting g_AlbedoTexturesEnabled(SettingCategory::Volatile, "Renderer.Debug.AlbedoTextures.Enabled", true);
+static BoolSetting g_NormalMapsEnabled(SettingCategory::Volatile, "Renderer.Debug.NormalMaps.Enabled", true);
+static BoolSetting g_BackfaceCullingEnabled(SettingCategory::Volatile, "Renderer.Debug.BackfaceCulling.Enabled", true);
 
 Renderer* g_Renderer;
 
@@ -1387,7 +1388,7 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
         m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
     cmdList.SetPipelineState(pso);
 
-    Texture* albedoTexture = mat.m_AlbedoTextureIndex != SIZE_MAX ?
+    Texture* albedoTexture = (mat.m_AlbedoTextureIndex != SIZE_MAX && g_AlbedoTexturesEnabled.GetValue()) ?
         m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
     D3D12_GPU_DESCRIPTOR_HANDLE albedoTextureDescriptorHandle;
     if(albedoTexture)

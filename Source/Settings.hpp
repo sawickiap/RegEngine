@@ -12,6 +12,9 @@ enum class SettingCategory
     // Can be changed during runtime, but some of them not always e.g.
     // OK to change during Update and input handling but not during rendering.
     Runtime,
+    // Initialized with default value on startup.
+    // Never loaded from file, never saved to file.
+    Volatile,
     Count,
 };
 
