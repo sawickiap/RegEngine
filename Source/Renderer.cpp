@@ -1386,6 +1386,8 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
 
     ID3D12PipelineState* const pso = (mat.m_TwoSided || !g_BackfaceCullingEnabled.GetValue()) ?
         m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
+    if(!pso)
+        return;
     cmdList.SetPipelineState(pso);
 
     Texture* albedoTexture = (mat.m_AlbedoTextureIndex != SIZE_MAX && g_AlbedoTexturesEnabled.GetValue()) ?
