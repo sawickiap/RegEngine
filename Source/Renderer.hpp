@@ -182,7 +182,8 @@ private:
     unique_ptr<RenderingResource> m_GBuffers[(size_t)GBuffer::Count];
     unique_ptr<RenderingResource> m_ColorRenderTarget;
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
-	ComPtr<ID3D12PipelineState> m_3DPipelineState;
+    // [0] = default backface culling, [1] = two-sided
+	ComPtr<ID3D12PipelineState> m_3DPipelineState[2];
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<FlyingCamera> m_Camera;
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;
@@ -199,6 +200,7 @@ private:
     {
         size_t m_AlbedoTextureIndex = SIZE_MAX;
         size_t m_NormalTextureIndex = SIZE_MAX;
+        bool m_TwoSided = false;
     };
     struct SceneTexture
     {

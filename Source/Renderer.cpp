@@ -354,7 +354,8 @@ void Renderer::Reload(bool refreshAll)
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
     
-    m_3DPipelineState.Reset();
+    m_3DPipelineState[0].Reset();
+    m_3DPipelineState[1].Reset();
     ClearModel();
 
     Create3DPipelineState();
@@ -466,30 +467,26 @@ void Renderer::Render()
                 0, nullptr); // NumRects, pRects
         }
 
-        if(m_3DPipelineState)
-        {
-            PIX_EVENT_SCOPE(cmdList, L"3D");
+        PIX_EVENT_SCOPE(cmdList, L"3D");
 
-            static_assert((size_t)GBuffer::Count == 2);
-            cmdList.SetRenderTargets(m_DepthTexture.get(),
-                {m_GBuffers[0].get(), m_GBuffers[1].get()});
+        static_assert((size_t)GBuffer::Count == 2);
+        cmdList.SetRenderTargets(m_DepthTexture.get(),
+            {m_GBuffers[0].get(), m_GBuffers[1].get()});
 
-	        cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
-            cmdList.SetPipelineState(m_3DPipelineState.Get());
+	    cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
 
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                m_StandardRootSignature->GetCBVParamIndex(0),
-                perFrameConstants);
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                m_StandardRootSignature->GetSamplerParamIndex(0),
-                m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetCBVParamIndex(0),
+            perFrameConstants);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetSamplerParamIndex(0),
+            m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
-            vec3 scaleVec = vec3(g_AssimpScale.GetValue());
-            mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
-            globalXform *= g_AssimpTransform.GetValue();
-            //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
-            RenderEntity(cmdList, globalXform, m_RootEntity);
-        }
+        vec3 scaleVec = vec3(g_AssimpScale.GetValue());
+        mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
+        globalXform *= g_AssimpTransform.GetValue();
+        //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
+        RenderEntity(cmdList, globalXform, m_RootEntity);
 
         if(m_AmbientPipelineState && m_LightingPipelineState)
         {
@@ -761,7 +758,8 @@ void Renderer::Create3DPipelineState()
 {
     assert(m_ColorRenderTarget);
 
-    m_3DPipelineState.Reset();
+    m_3DPipelineState[0].Reset();
+    m_3DPipelineState[1].Reset();
 
     ERR_TRY
     ERR_TRY
@@ -794,8 +792,13 @@ void Renderer::Create3DPipelineState()
 	FillBlendDesc_NoBlending(desc.BlendState);
     FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
 	
-    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState));
-    SetD3D12ObjectName(m_3DPipelineState, L"Test pipeline state");
+    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState[0]));
+    SetD3D12ObjectName(m_3DPipelineState[0], L"3D pipeline state 0");
+
+    desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState[1]));
+    SetD3D12ObjectName(m_3DPipelineState[1], L"3D pipeline state 1");
 
     ERR_CATCH_MSG(L"Cannot create pipeline state.");
     } CATCH_PRINT_ERROR(;);
@@ -1145,7 +1148,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, boo
     m_Meshes.push_back(std::move(mesh));
 }
 
-const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
+static const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
 {
     for(uint32_t i = 0; i < material->mNumProperties; ++i)
     {
@@ -1155,7 +1158,7 @@ const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const
     }
     return nullptr;
 }
-bool GetStringMaterialProperty(string& out, const aiMaterial* material, const str_view& key)
+static bool GetStringMaterialProperty(string& out, const aiMaterial* material, const str_view& key)
 {
     const aiMaterialProperty* prop = FindMaterialProperty(material, key);
     if(!prop)
@@ -1164,6 +1167,19 @@ bool GetStringMaterialProperty(string& out, const aiMaterial* material, const st
         return false;
     const aiString* s = (const aiString*)prop->mData;
     out = string(s->data, s->length);
+    return true;
+}
+// Property must be a buffer of the same size as outBuf.
+static bool GetFixedBufferMaterialProperty(std::span<char> outBuf, const aiMaterial* material, const str_view& key)
+{
+    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
+    if(!prop)
+        return false;
+    const size_t size = outBuf.size();
+    if(prop->mType != aiPTI_Buffer || prop->mDataLength != size)
+        return false;
+    if(size)
+        memcpy(outBuf.data(), prop->mData, size);
     return true;
 }
 
@@ -1226,9 +1242,18 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
 
+    // Two sided. Property found in Sponza scene, as 1-byte buffer = 0 or 1.
+    bool twoSided = false;
+    {
+        char buf;
+        if(GetFixedBufferMaterialProperty(std::span<char>(&buf, 1), material, "$mat.twosided"))
+            twoSided = (buf != 0);
+    }
+
     SceneMaterial sceneMat;
     sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathP, true, !refreshAll);
     sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathP, false, !refreshAll);
+    sceneMat.m_TwoSided = twoSided;
     m_Materials.push_back(std::move(sceneMat));
 
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
@@ -1354,6 +1379,9 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     const size_t materialIndex = m_Meshes[meshIndex].m_MaterialIndex;
     assert(materialIndex < m_Materials.size());
     const SceneMaterial& mat = m_Materials[materialIndex];
+
+    ID3D12PipelineState* const pso = mat.m_TwoSided ? m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
+    cmdList.SetPipelineState(pso);
 
     Texture* albedoTexture = mat.m_AlbedoTextureIndex != SIZE_MAX ?
         m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
