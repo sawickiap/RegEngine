@@ -313,6 +313,7 @@ void Game::ShowFrameTimeGraph()
         constexpr float dtMax = 1.f / 15.f;
         const float dtMin_Log2 = log2(dtMin);
         const float dtMax_Log2 = log2(dtMax);
+        drawList->AddRectFilled(basePos, ImVec2(basePos.x + width, basePos.y + maxHeight), 0xFF404040);
         for(size_t frameIndex = 0; frameIndex < frameCount && endX > 0.f; ++frameIndex)
         {
             const FrameTimeHistory::Entry dt = m_FrameTimeHistory.Get(frameIndex);
@@ -323,7 +324,7 @@ void Game::ShowFrameTimeGraph()
             const float begX = endX - frameWidth;
             const uint32_t color = glm::packUnorm4x8(DeltaTimeToColor(dt.m_DT));
             drawList->AddRectFilled(
-                ImVec2(basePos.x + floor(begX), basePos.y + maxHeight - frameHeight),
+                ImVec2(basePos.x + std::max(0.f, floor(begX)), basePos.y + maxHeight - frameHeight),
                 ImVec2(basePos.x + ceil(endX), basePos.y + maxHeight),
                 color);
             endX = begX;
