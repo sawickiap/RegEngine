@@ -209,7 +209,10 @@ Application::Application()
 
 Application::~Application()
 {
-    SaveRuntimeSettings();
+    if(m_ExitWithFailure)
+        LogMessage(L"Exiting with failure. Runtime settings are not saved.");
+    else
+        SaveRuntimeSettings();
 
     delete g_SmallFileCache;
     g_SmallFileCache = nullptr;
@@ -357,7 +360,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             OnDestroy();
         }
-        CATCH_PRINT_ERROR(;)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true;)
         PostQuitMessage(0);
         return 0;
     case WM_KEYDOWN:
@@ -372,7 +375,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     OnKeyUp(wParam);
             }
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_CHAR:
         try
@@ -399,7 +402,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
@@ -421,7 +424,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
@@ -443,7 +446,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_MOUSEWHEEL:
         try
@@ -461,7 +464,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
         return 0;
     }
     return DefWindowProc(wnd, msg, wParam, lParam);
@@ -480,7 +483,7 @@ void Application::OnKeyDown(WPARAM key)
     // ESC: Exit.
     if(key == VK_ESCAPE && modifiers == 0)
     {
-        Exit();
+        Exit(false);
         return;
     }
     
@@ -515,28 +518,32 @@ void Application::OnChar(wchar_t ch)
 
 int Application::Run()
 {
-    LogMessage(L"Application initialized, running...");
-    const Time now = Now();
-    m_Time.Start(now);
-    m_FPSCalculator.Start(m_Time);
-    MSG msg;
-    for (;;)
+    try
     {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        LogMessage(L"Application initialized, running...");
+        const Time now = Now();
+        m_Time.Start(now);
+        m_FPSCalculator.Start(m_Time);
+        MSG msg;
+        for (;;)
         {
-            if (msg.message == WM_QUIT)
-                break;
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            {
+                if (msg.message == WM_QUIT)
+                    break;
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
+            else
+            {
+                if(m_Renderer)
+                    LoopIteration();
+            }
         }
-        else
-        {
-            if(m_Renderer)
-                LoopIteration();
-        }
+        LogMessage(L"Application exiting.");
+        return (int)msg.wParam;
     }
-    LogMessage(L"Application exiting.");
-    return (int)msg.wParam;
+    CATCH_PRINT_ERROR(m_ExitWithFailure=true; return EXIT_CODE_RUNTIME_ERROR;)
 }
 
 void Application::LoopIteration()
@@ -574,8 +581,10 @@ void Application::FrameRandomSleep()
     }
 }
 
-void Application::Exit()
+void Application::Exit(bool failure)
 {
+    if(failure)
+        m_ExitWithFailure = true;
     PostMessage(m_Wnd, WM_CLOSE, 0, 0);
 }
 

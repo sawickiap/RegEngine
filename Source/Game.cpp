@@ -195,7 +195,7 @@ void Game::ImGui()
     if(ImGui::BeginMenu("File"))
     {
         if(ImGui::MenuItem("Exit", "ESC"))
-            g_App->Exit();
+            g_App->Exit(false);
         ImGui::EndMenu();
     }
     if(ImGui::BeginMenu("Edit"))

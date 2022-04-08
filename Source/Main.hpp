@@ -38,6 +38,7 @@ public:
     ~Application();
     void Init();
     void InitWindowAndRenderer();
+    // On error: prints error, returns error code to be returned by the process.
     int Run();
 
     HINSTANCE GetInsatnce() const { return m_Instance; }
@@ -48,7 +49,7 @@ public:
     const TimeData& GetTime() const { return m_Time; }
     float GetFPS() const { return m_FPSCalculator.GetFPS(); }
 
-    void Exit();
+    void Exit(bool failure);
     void SetCursor(NativeCursorID id);
 
 private:
@@ -64,6 +65,7 @@ private:
     ImGuiMouseCursor m_LastImGuiMouseCursor = -1; // ImGuiMouseCursor_None
     TimeData m_Time;
     FPSCalculator m_FPSCalculator;
+    bool m_ExitWithFailure = false;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static uint32_t GetKeyModifiers(); // Returns bit flags KEY_MODIFIERS.

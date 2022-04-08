@@ -393,6 +393,8 @@ void Renderer::CompleteUploadCommandList(CommandList& cmdList)
 
 void Renderer::Render()
 {
+    ERR_TRY
+
 	m_FrameIndex = m_SwapChain->GetCurrentBackBufferIndex();
 	FrameResources& frameRes = m_FrameResources[m_FrameIndex];
     WaitForFenceOnCPU(frameRes.m_SubmittedFenceValue);
@@ -575,6 +577,8 @@ void Renderer::Render()
 	CHECK_HR(m_CmdQueue->Signal(m_Fence.Get(), frameRes.m_SubmittedFenceValue));
 
 	CHECK_HR(m_SwapChain->Present(g_SyncInterval.GetValue(), 0));
+
+    ERR_CATCH_FUNC
 }
 
 void Renderer::CreateDevice()
