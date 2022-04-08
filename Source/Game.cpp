@@ -12,15 +12,15 @@ extern VecSetting<glm::uvec2> g_Size;
 static VecSetting<vec2> g_FlyingCameraRotationSpeed(SettingCategory::Runtime, "FlyingCamera.RotationSpeed.RadiansPerPixel", vec2(-0.005, 0.005));
 static FloatSetting g_FlyingCameraMovementSpeed(SettingCategory::Runtime, "FlyingCamera.MovementSpeed.UnitsPerSecond", 1.f);
 
-float FrameTimeHistory::Get(size_t i) const
+FrameTimeHistory::Entry FrameTimeHistory::Get(size_t i) const
 {
     i = (m_Back + m_Count - i - 1) % m_Capacity;
-    return m_DeltaTime[i];
+    return m_Entries[i];
 }
 
 void FrameTimeHistory::Post(float dt)
 {
-    m_DeltaTime[m_Front] = dt;
+    m_Entries[m_Front] = {dt, log2(dt)};
     m_Front = (m_Front + 1) % m_Capacity;
     if(m_Count == m_Capacity)
         m_Back = m_Front;
@@ -249,67 +249,85 @@ void Game::ShowAboutWindow()
 
 static vec4 DeltaTimeToColor(float dt)
 {
-    // Red when dt >= 25 FPS.
-    constexpr vec4 color0 = {1.f, 0.f, 0.f, 1.f};
-    constexpr float dt0 = 1.f / 25.f;
-    // Yellow when dt = 30 FPS.
-    constexpr vec4 color1 = {1.f, 1.f, 0.f, 1.f};
-    constexpr float dt1 = 1.f / 30.f;
-    // Green when dt <= 60 FPS.
-    constexpr vec4 color2 = {0.5f, 1.f, 0.5f, 1.f};
-    constexpr float dt2 = 1.f / 60.f;
-
-    if(dt <= dt2)
-        return color2;
-    else if(dt <= dt1)
+    constexpr vec3 colors[] = {
+        {0.f, 0.f, 1.f}, // blue
+        {0.f, 1.f, 0.f}, // green
+        {1.f, 1.f, 0.f}, // yellow
+        {1.f, 0.f, 0.f}, // red
+    };
+    constexpr float dts[] = {
+        1.f / 120.f,
+        1.f / 60.f,
+        1.f / 30.f,
+        1.f / 15.f,
+    };
+    if(dt < dts[0])
+        return vec4(colors[0], 1.f);
+    for(size_t i = 1; i < _countof(dts); ++i)
     {
-        const float t = (dt - dt2) / (dt1 - dt2);
-        return glm::mix(color2, color1, t);
+        if(dt < dts[i])
+        {
+            const float t = (dt - dts[i - 1]) / (dts[i] - dts[i - 1]);
+            return vec4(glm::mix(colors[i - 1], colors[i], t), 1.f);
+        }
     }
-    else if(dt <= dt0)
-    {
-        const float t = (dt - dt1) / (dt0 - dt1);
-        return glm::mix(color1, color0, t);
-    }
-    else
-        return color0;
+    return vec4(colors[_countof(dts) - 1], 1.f);
 }
 
 void Game::ShowStatisticsWindow()
 {
     const TimeData& appTime = g_App->GetTime();
+    
+    uint32_t uptimeMsec = TimeToMilliseconds<uint32_t>(appTime.m_Time);
+    uint32_t uptimeSec = uptimeMsec / 1000;
+    uptimeMsec %= 1000;
+    uint32_t uptimeMin = uptimeSec / 60;
+    uptimeSec %= 60;
+    uint32_t uptimeHr = uptimeMin / 60;
+    uptimeMin %= 60;
 
     ImGui::Begin("Statistics", &m_StatisticsWindowVisible);
     
-    ImGui::Text("Frame %u, application time: %.3f s", appTime.m_FrameIndex, appTime.m_Time_Float);
+    ImGui::Text("FPS: %.1f", g_App->GetFPS());
+    ImGui::Text("Uptime: %u:%02u:%02u:%03u", uptimeHr, uptimeMin, uptimeSec, uptimeMsec);
+    ImGui::Text("Frame: %u", appTime.m_FrameIndex);
 
     if(ImGui::CollapsingHeader("Frame time graph"))
-    {
-        const float width = ImGui::GetWindowWidth();
-        const size_t frameCount = m_FrameTimeHistory.GetCount();
-        if(width > 0.f && frameCount > 0)
-        {
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            ImVec2 basePos = ImGui::GetCursorScreenPos();
-            constexpr float maxHeight = 64.f;
-            float endX = width;
-            size_t frameIndex = 0;
-            while(frameIndex < frameCount && endX > 0.f)
-            {
-                const float deltaTime = m_FrameTimeHistory.Get(frameIndex);
-                const float begX = endX - deltaTime * 100.f;
-                const float height = maxHeight * std::min(1.f, deltaTime * 20.f);
-                const uint32_t color = glm::packUnorm4x8(DeltaTimeToColor(deltaTime));
-                drawList->AddRectFilled(
-                    ImVec2(basePos.x + floor(begX), basePos.y + maxHeight - height),
-                    ImVec2(basePos.x + floor(endX), basePos.y + maxHeight),
-                    color);
-                endX = begX;
-                ++frameIndex;
-            }
-            ImGui::Dummy(ImVec2(width, maxHeight));
-        }
-    }
+        ShowFrameTimeGraph();
 
     ImGui::End();
+}
+
+void Game::ShowFrameTimeGraph()
+{
+    const float width = ImGui::GetWindowWidth();
+    const size_t frameCount = m_FrameTimeHistory.GetCount();
+    if(width > 0.f && frameCount > 0)
+    {
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        ImVec2 basePos = ImGui::GetCursorScreenPos();
+        constexpr float minHeight = 2.f;
+        constexpr float maxHeight = 64.f;
+        float endX = width;
+        constexpr float dtMin = 1.f / 120.f;
+        constexpr float dtMax = 1.f / 15.f;
+        const float dtMin_Log2 = log2(dtMin);
+        const float dtMax_Log2 = log2(dtMax);
+        for(size_t frameIndex = 0; frameIndex < frameCount && endX > 0.f; ++frameIndex)
+        {
+            const FrameTimeHistory::Entry dt = m_FrameTimeHistory.Get(frameIndex);
+            const float frameWidth = dt.m_DT / dtMin;
+            const float frameHeightFactor = (dt.m_DT_Log2 - dtMin_Log2) / (dtMax_Log2 - dtMin_Log2);
+            const float frameHeightFactor_Nrm = std::min(std::max(0.f, frameHeightFactor), 1.f);
+            const float frameHeight = glm::mix(minHeight, maxHeight, frameHeightFactor_Nrm);
+            const float begX = endX - frameWidth;
+            const uint32_t color = glm::packUnorm4x8(DeltaTimeToColor(dt.m_DT));
+            drawList->AddRectFilled(
+                ImVec2(basePos.x + floor(begX), basePos.y + maxHeight - frameHeight),
+                ImVec2(basePos.x + ceil(endX), basePos.y + maxHeight),
+                color);
+            endX = begX;
+        }
+        ImGui::Dummy(ImVec2(width, maxHeight));
+    }
 }

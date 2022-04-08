@@ -11,6 +11,22 @@ typedef int ImGuiMouseCursor;
 // Use constants like IDC_ARROW, IDC_CROSS, NULL for no cursor.
 typedef LPWSTR NativeCursorID;
 
+class FPSCalculator
+{
+public:
+    FPSCalculator();
+    void Start(const TimeData& appTime);
+    void NewFrame(const TimeData& appTime);
+    float GetFPS() const { return m_FPS; }
+
+private:
+    static constexpr uint32_t CALC_MIN_INTERVAL_MILLISECONDS = 500;
+    Time m_CalcMinInterval = {0};
+    Time m_LastCalcTime = {0};
+    float m_FrameCount = 0.f;
+    float m_FPS = 0.f;
+};
+
 /*
 Represents the main object responsible for application initialization and management
 of a Windows window.
@@ -30,6 +46,7 @@ public:
     IDXGIFactory6* GetFactory6() const { return m_DXGIFactory6.Get(); }
     IDXGIAdapter1* GetAdapter() const { return m_Adapter.Get(); }
     const TimeData& GetTime() const { return m_Time; }
+    float GetFPS() const { return m_FPSCalculator.GetFPS(); }
 
     void Exit();
     void SetCursor(NativeCursorID id);
@@ -46,10 +63,12 @@ private:
     NativeCursorID m_NativeCursorID = IDC_CROSS;
     ImGuiMouseCursor m_LastImGuiMouseCursor = -1; // ImGuiMouseCursor_None
     TimeData m_Time;
+    FPSCalculator m_FPSCalculator;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static uint32_t GetKeyModifiers(); // Returns bit flags KEY_MODIFIERS.
     void LoopIteration();
+    void FrameRandomSleep();
     void SelectAdapter();
     void RegisterWindowClass();
     void CreateWindow_();

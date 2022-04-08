@@ -17,7 +17,8 @@ enum EXIT_CODE
 static const wchar_t* const CLASS_NAME = L"REG_ENGINE_1";
 static const wchar_t* const WINDOW_TITLE = L"RegEngine";
 
-VecSetting<glm::uvec2> g_Size(SettingCategory::Startup, "Size", glm::uvec2(1024, 576));
+VecSetting<uvec2> g_Size(SettingCategory::Startup, "Size", uvec2(1024, 576));
+VecSetting<uvec2> g_FrameRandomSleep(SettingCategory::Runtime, "FrameRandomSleep", uvec2(0, 0));
 
 static const NativeCursorID SYSTEM_CURSOR_IDENTIFIERS[] = {
     IDC_APPSTARTING,
@@ -169,6 +170,33 @@ int ApplicationParameters::ParseCommandLine(int argc, wchar_t** argv)
     }
 }
 
+#ifndef _FPS_CALCULATOR_IMPL
+
+FPSCalculator::FPSCalculator()
+{
+    m_CalcMinInterval = MillisecondsToTime(CALC_MIN_INTERVAL_MILLISECONDS);
+}
+
+void FPSCalculator::Start(const TimeData& appTime)
+{
+    m_LastCalcTime = appTime.m_Time;
+    m_FrameCount = 0.f;
+    m_FPS = 0.f;
+}
+
+void FPSCalculator::NewFrame(const TimeData& appTime)
+{
+    m_FrameCount += 1.f;
+    if(appTime.m_Time >= m_LastCalcTime + m_CalcMinInterval)
+    {
+        m_FPS = m_FrameCount / TimeToSeconds<float>(appTime.m_Time - m_LastCalcTime);
+        m_LastCalcTime = appTime.m_Time;
+        m_FrameCount = 0.f;
+    }
+}
+
+#endif // #ifndef _FPS_CALCULATOR_IMPL
+
 #ifndef _APPLICATION_IMPL
 
 Application* g_App;
@@ -177,7 +205,6 @@ Application::Application()
 {
     m_Instance = (HINSTANCE)GetModuleHandle(NULL);
     SetThreadName(GetCurrentThreadId(), "MAIN");
-    InitTime();
 }
 
 Application::~Application()
@@ -491,6 +518,7 @@ int Application::Run()
     LogMessage(L"Application initialized, running...");
     const Time now = Now();
     m_Time.Start(now);
+    m_FPSCalculator.Start(m_Time);
     MSG msg;
     for (;;)
     {
@@ -515,6 +543,7 @@ void Application::LoopIteration()
 {
     const Time now = Now();
     m_Time.NewFrame(now);
+    m_FPSCalculator.NewFrame(m_Time);
 
     m_ImGuiContext->NewFrame();
     m_Game->Update();
@@ -527,6 +556,22 @@ void Application::LoopIteration()
     }
 
     m_Renderer->Render();
+
+    FrameRandomSleep();
+}
+
+void Application::FrameRandomSleep()
+{
+    uvec2 range = g_FrameRandomSleep.GetValue();
+    range.y = std::max(range.x, range.y);
+    if(range.y > 0)
+    {
+        uint32_t val = range.x;
+        if(range.y > range.x)
+            val += rand() % (range.y - range.x);
+        if(val)
+            Sleep(val);
+    }
 }
 
 void Application::Exit()
@@ -557,6 +602,7 @@ int wmain(int argc, wchar_t** argv)
         if(result != 0)
             return result;
 
+        InitTime(); // Must be called before Application constructor.
         Application app;
         g_App = &app;
         app.Init();

@@ -5,6 +5,10 @@
         0.004999999888241291
     ],
     "FlyingCamera.MovementSpeed.UnitsPerSecond": 2.0,
+    "FrameRandomSleep": [
+        0,
+        0
+    ],
     "SyncInterval": 1,
     "Background.Color": [
         0.027239222079515457,

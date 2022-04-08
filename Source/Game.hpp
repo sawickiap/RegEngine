@@ -26,8 +26,13 @@ enum KEY_MODIFIERS
 class FrameTimeHistory
 {
 public:
+    struct Entry
+    {
+        float m_DT;
+        float m_DT_Log2;
+    };
     size_t GetCount() const { return m_Count; }
-    float Get(size_t i) const;
+    Entry Get(size_t i) const;
 
     void Reset() { *this = {}; }
     void Post(float dt);
@@ -37,7 +42,7 @@ private:
     size_t m_Back = 0;
     size_t m_Front = 0;
     size_t m_Count = 0;
-    float m_DeltaTime[m_Capacity];
+    Entry m_Entries[m_Capacity];
 };
 
 /*
@@ -77,4 +82,5 @@ private:
     void ImGui();
     void ShowAboutWindow();
     void ShowStatisticsWindow();
+    void ShowFrameTimeGraph();
 };

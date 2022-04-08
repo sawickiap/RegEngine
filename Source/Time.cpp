@@ -65,6 +65,37 @@ uint64_t TimeToMilliseconds<uint64_t>(Time t)
     return (uint64_t)(t.m_Value * 1000 / g_PerformanceFrequency.QuadPart);
 }
 
+template<>
+Time MillisecondsToTime<float>(float ms)
+{
+    return {(int64_t)((double)ms * 1e-3 * g_PerformanceFrequency_Double)};
+}
+template<>
+Time MillisecondsToTime<double>(double ms)
+{
+    return {(int64_t)(ms * 1e-3 * g_PerformanceFrequency_Double)};
+}
+template<>
+Time MillisecondsToTime<int32_t>(int32_t ms)
+{
+    return {(int64_t)ms * g_PerformanceFrequency.QuadPart / 1000};
+}
+template<>
+Time MillisecondsToTime<uint32_t>(uint32_t ms)
+{
+    return {(int64_t)ms * g_PerformanceFrequency.QuadPart / 1000};
+}
+template<>
+Time MillisecondsToTime<int64_t>(int64_t ms)
+{
+    return {ms * g_PerformanceFrequency.QuadPart / 1000};
+}
+template<>
+Time MillisecondsToTime<uint64_t>(uint64_t ms)
+{
+    return {(int64_t)ms * g_PerformanceFrequency.QuadPart / 1000};
+}
+
 void TimeData::Start(Time now)
 {
     *this = {};
