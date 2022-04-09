@@ -356,6 +356,51 @@ static void AppendNodeInfo(wstring& out, uint32_t indentLevel, const aiNode* nod
         AppendNodeInfo(out, indentLevel, node->mChildren[i]);
 }
 
+const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
+{
+    for(uint32_t i = 0; i < material->mNumProperties; ++i)
+    {
+        const aiMaterialProperty* prop = material->mProperties[i];
+        if(str_view(prop->mKey.C_Str()) == key)
+            return prop;
+    }
+    return nullptr;
+}
+
+bool GetFloatMaterialProperty(float& out, const aiMaterial* material, const str_view& key)
+{
+    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
+    if(!prop || prop->mType != aiPTI_Float || prop->mDataLength != sizeof(float))
+        return false;
+    out = *(const float*)prop->mData;
+    return true;
+}
+
+bool GetStringMaterialProperty(string& out, const aiMaterial* material, const str_view& key)
+{
+    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
+    if(!prop)
+        return false;
+    if(prop->mType != aiPTI_String)
+        return false;
+    const aiString* s = (const aiString*)prop->mData;
+    out = string(s->data, s->length);
+    return true;
+}
+
+bool GetFixedBufferMaterialProperty(std::span<char> outBuf, const aiMaterial* material, const str_view& key)
+{
+    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
+    if(!prop)
+        return false;
+    const size_t size = outBuf.size();
+    if(prop->mType != aiPTI_Buffer || prop->mDataLength != size)
+        return false;
+    if(size)
+        memcpy(outBuf.data(), prop->mData, size);
+    return true;
+}
+
 void PrintAssimpSceneInfo(const aiScene* scene)
 {
     wstring out = std::format(L"Assimp scene: NumAnimations={}, NumCameras={}, NumLights={}, NumMaterials={}, NumMeshes={}, NumTextures={}\n",

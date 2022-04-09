@@ -1,5 +1,10 @@
 #include "Include/Common.hlsl"
 
+/*
+Macros:
+ALPHA_TEST = 0, 1
+*/
+
 struct PerObjectConstants
 {
 	float4x4 WorldViewProj;
@@ -53,7 +58,14 @@ void MainPS(
 	out float4 outAlbedo : SV_Target0,
 	out float4 outNormal_View : SV_Target1)
 {
-	outAlbedo.rgb = albedoTexture.Sample(s, input.texCoord).rgb;
+	float4 albedoSample = albedoTexture.Sample(s, input.texCoord);
+
+#if ALPHA_TEST
+	const float alphaCutoff = 0.5;
+	clip(albedoSample.a - alphaCutoff);
+#endif
+
+	outAlbedo.rgb = albedoSample.rgb;
 	outAlbedo.a = 1.0;
 
 	float3 normal_Tangent = normalTexture.Sample(s, input.texCoord).rgb * 2.0 - 1.0;

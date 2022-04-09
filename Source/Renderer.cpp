@@ -314,6 +314,13 @@ void Renderer::Init()
     m_StandardSamplers.Init();
     m_ShaderCompiler= std::make_unique<ShaderCompiler>();
     m_ShaderCompiler->Init();
+
+    {
+        wstr_view MACRO_NAMES[] = { L"ALPHA_TEST" };
+        m_GBufferMultiPixelShader = std::make_unique<MultiShader>();
+        m_GBufferMultiPixelShader->Init(ShaderType::Pixel, L"Data/ThreeD.hlsl", L"MainPS", MACRO_NAMES);
+    }
+
 	CreateCommandQueues();
 	CreateSwapChain();
 	CreateFrameResources();
@@ -358,8 +365,7 @@ void Renderer::Reload(bool refreshAll)
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
     
-    m_3DPipelineState[0].Reset();
-    m_3DPipelineState[1].Reset();
+    ClearGBufferShader();
     ClearModel();
 
     Create3DPipelineState();
@@ -471,26 +477,28 @@ void Renderer::Render()
                 0, nullptr); // NumRects, pRects
         }
 
-        PIX_EVENT_SCOPE(cmdList, L"3D");
+        {
+            PIX_EVENT_SCOPE(cmdList, L"3D");
 
-        static_assert((size_t)GBuffer::Count == 2);
-        cmdList.SetRenderTargets(m_DepthTexture.get(),
-            {m_GBuffers[0].get(), m_GBuffers[1].get()});
+            static_assert((size_t)GBuffer::Count == 2);
+            cmdList.SetRenderTargets(m_DepthTexture.get(),
+                {m_GBuffers[0].get(), m_GBuffers[1].get()});
 
-	    cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
+	        cmdList.SetRootSignature(m_StandardRootSignature->GetRootSignature());
 
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-            m_StandardRootSignature->GetCBVParamIndex(0),
-            perFrameConstants);
-        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-            m_StandardRootSignature->GetSamplerParamIndex(0),
-            m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                m_StandardRootSignature->GetCBVParamIndex(0),
+                perFrameConstants);
+            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+                m_StandardRootSignature->GetSamplerParamIndex(0),
+                m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
-        vec3 scaleVec = vec3(g_AssimpScale.GetValue());
-        mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
-        globalXform *= g_AssimpTransform.GetValue();
-        //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
-        RenderEntity(cmdList, globalXform, m_RootEntity);
+            vec3 scaleVec = vec3(g_AssimpScale.GetValue());
+            mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
+            globalXform *= g_AssimpTransform.GetValue();
+            //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
+            RenderEntity(cmdList, globalXform, m_RootEntity);
+        }
 
         if(m_AmbientPipelineState && m_LightingPipelineState)
         {
@@ -762,50 +770,60 @@ void Renderer::Create3DPipelineState()
 {
     assert(m_ColorRenderTarget);
 
-    m_3DPipelineState[0].Reset();
-    m_3DPipelineState[1].Reset();
+    ClearGBufferShader();
 
-    ERR_TRY
-    ERR_TRY
+    for(size_t backfaceCullingVariant = 0; backfaceCullingVariant < GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT; ++backfaceCullingVariant)
+    {
+        for(size_t alphaTestVariant = 0; alphaTestVariant < GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT; ++alphaTestVariant)
+        {
+            wstring variantDebugStr = std::format(L"{},{}", backfaceCullingVariant, alphaTestVariant);
 
-    Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/ThreeD.hlsl", L"MainVS");
-    ps.Init(ShaderType::Pixel,  L"Data/ThreeD.hlsl", L"MainPS");
+            ERR_TRY
+            ERR_TRY
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
-	    .VS = {
-            .pShaderBytecode = vs.GetCode().data(),
-            .BytecodeLength = vs.GetCode().size()},
-	    .PS = {
-            .pShaderBytecode = ps.GetCode().data(),
-            .BytecodeLength = ps.GetCode().size()},
-        .SampleMask = UINT32_MAX,
-	    .InputLayout = {
-            .pInputElementDescs = Vertex::GetInputElements(),
-            .NumElements = Vertex::GetInputElementCount()},
-	    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-	    .NumRenderTargets = (UINT)GBuffer::Count,
-	    .DSVFormat = DEPTH_STENCIL_FORMAT,
-        .SampleDesc = {.Count = 1}};
-    for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
-	    desc.RTVFormats[i] = GBUFFER_FORMATS[i];
-    FillRasterizerDesc(desc.RasterizerState,
-        g_BackFaceCullingMode.GetValue() > 0 ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE,
-        g_BackFaceCullingMode.GetValue() == 2 ? TRUE : FALSE);
-	FillBlendDesc_NoBlending(desc.BlendState);
-    FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
+            const uint32_t macroValues[] = {
+                (uint32_t)alphaTestVariant }; // ALPHA_TEST
+
+            const bool backfaceCullingEnabled = g_BackFaceCullingMode.GetValue() > 0 && backfaceCullingVariant == 0;
+
+            Shader vs;
+            vs.Init(ShaderType::Vertex, L"Data/ThreeD.hlsl", L"MainVS");
+
+            const Shader* ps = m_GBufferMultiPixelShader->GetShader(macroValues);
+            CHECK_BOOL(ps);
+
+	        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
+	            .pRootSignature = m_StandardRootSignature->GetRootSignature(),
+	            .VS = {
+                    .pShaderBytecode = vs.GetCode().data(),
+                    .BytecodeLength = vs.GetCode().size()},
+	            .PS = {
+                    .pShaderBytecode = ps->GetCode().data(),
+                    .BytecodeLength = ps->GetCode().size()},
+                .SampleMask = UINT32_MAX,
+	            .InputLayout = {
+                    .pInputElementDescs = Vertex::GetInputElements(),
+                    .NumElements = Vertex::GetInputElementCount()},
+	            .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+	            .NumRenderTargets = (UINT)GBuffer::Count,
+	            .DSVFormat = DEPTH_STENCIL_FORMAT,
+                .SampleDesc = {.Count = 1}};
+            for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+	            desc.RTVFormats[i] = GBUFFER_FORMATS[i];
+            FillRasterizerDesc(desc.RasterizerState,
+                backfaceCullingEnabled ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE,
+                g_BackFaceCullingMode.GetValue() == 2 ? TRUE : FALSE);
+	        FillBlendDesc_NoBlending(desc.BlendState);
+            FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
 	
-    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState[0]));
-    SetD3D12ObjectName(m_3DPipelineState[0], L"3D pipeline state 0");
+            ComPtr<ID3D12PipelineState>& psoPtr = m_3DPipelineState[backfaceCullingVariant][alphaTestVariant];
+            CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &psoPtr));
+            SetD3D12ObjectName(psoPtr, std::format(L"G-buffer pipeline state {}", variantDebugStr));
 
-    desc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-
-    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &m_3DPipelineState[1]));
-    SetD3D12ObjectName(m_3DPipelineState[1], L"3D pipeline state 1");
-
-    ERR_CATCH_MSG(L"Cannot create pipeline state.");
-    } CATCH_PRINT_ERROR(;);
+            ERR_CATCH_MSG(std::format(L"Cannot create G-buffer pipeline state {}.", variantDebugStr));
+            } CATCH_PRINT_ERROR(;);
+        }
+    }
 }
 
 void Renderer::CreateLightingPipelineStates()
@@ -1002,6 +1020,18 @@ void Renderer::ClearModel()
     m_RootEntity = Entity{};
 }
 
+void Renderer::ClearGBufferShader()
+{
+    for(size_t i = 0; i < GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT; ++i)
+    {
+        for(size_t j = 0; j < GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT; ++j)
+        {
+            m_3DPipelineState[i][j].Reset();
+        }
+    }
+    m_GBufferMultiPixelShader->Clear();
+}
+
 void Renderer::CreateLights()
 {
     Light dl = {
@@ -1152,41 +1182,6 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, boo
     m_Meshes.push_back(std::move(mesh));
 }
 
-static const aiMaterialProperty* FindMaterialProperty(const aiMaterial* material, const str_view& key)
-{
-    for(uint32_t i = 0; i < material->mNumProperties; ++i)
-    {
-        const aiMaterialProperty* prop = material->mProperties[i];
-        if(str_view(prop->mKey.C_Str()) == key)
-            return prop;
-    }
-    return nullptr;
-}
-static bool GetStringMaterialProperty(string& out, const aiMaterial* material, const str_view& key)
-{
-    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
-    if(!prop)
-        return false;
-    if(prop->mType != aiPTI_String)
-        return false;
-    const aiString* s = (const aiString*)prop->mData;
-    out = string(s->data, s->length);
-    return true;
-}
-// Property must be a buffer of the same size as outBuf.
-static bool GetFixedBufferMaterialProperty(std::span<char> outBuf, const aiMaterial* material, const str_view& key)
-{
-    const aiMaterialProperty* prop = FindMaterialProperty(material, key);
-    if(!prop)
-        return false;
-    const size_t size = outBuf.size();
-    if(prop->mType != aiPTI_Buffer || prop->mDataLength != size)
-        return false;
-    if(size)
-        memcpy(outBuf.data(), prop->mData, size);
-    return true;
-}
-
 void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
     const aiMaterial* material, bool refreshAll)
 {
@@ -1246,7 +1241,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
 
-    // Two sided. Property found in Sponza scene, as 1-byte buffer = 0 or 1.
+    // Twosided. Property found in Sponza scene, as 1-byte buffer = 0 or 1.
     bool twoSided = false;
     {
         char buf;
@@ -1254,10 +1249,36 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
             twoSided = (buf != 0);
     }
 
+    // Alpha mask. Property found in Sponza scene, as strinrg = "MASK".
+    bool alphaMask = false;
+    {
+        string s;
+        if(GetStringMaterialProperty(s, material, "$mat.gltf.alphaMode"))
+        {
+            if(s == "MASK")
+                alphaMask = true;
+            else if(s != "OPAQUE")
+                LogWarningF(L"Unrecognized material property \"$mat.gltf.alphaMode\" value: {}", str_view(s));
+        }
+    }
+
+    // Alpha cutoff.
+    float alphaCutoff = 0.5f;
+    if(alphaMask)
+    {
+        float v;
+        if(GetFloatMaterialProperty(v, material, "$mat.gltf.alphaCutoff"))
+            alphaCutoff = v;
+    }
+
     SceneMaterial sceneMat;
     sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathP, true, !refreshAll);
     sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathP, false, !refreshAll);
-    sceneMat.m_TwoSided = twoSided;
+    if(twoSided)
+        sceneMat.m_Flags |= SceneMaterial::FLAG_TWOSIDED;
+    if(alphaMask)
+        sceneMat.m_Flags |= SceneMaterial::FLAG_ALPHA_MASK;
+    sceneMat.m_AlphaCutoff = alphaCutoff;
     m_Materials.push_back(std::move(sceneMat));
 
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
@@ -1384,8 +1405,14 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     assert(materialIndex < m_Materials.size());
     const SceneMaterial& mat = m_Materials[materialIndex];
 
-    ID3D12PipelineState* const pso = (mat.m_TwoSided || !g_BackfaceCullingEnabled.GetValue()) ?
-        m_3DPipelineState[1].Get() : m_3DPipelineState[0].Get();
+    const size_t backfaceCullingVariant = g_BackfaceCullingEnabled.GetValue() && (mat.m_Flags & SceneMaterial::FLAG_TWOSIDED) == 0 ?
+        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_DEFAULT :
+        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_TWOSIDED;
+    const size_t alphaTestVariant = (mat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0 ?
+        GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED : 
+        GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED;
+    ID3D12PipelineState* const pso = m_3DPipelineState[backfaceCullingVariant][alphaTestVariant].Get();
+
     if(!pso)
         return;
     cmdList.SetPipelineState(pso);

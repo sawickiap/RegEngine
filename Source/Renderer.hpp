@@ -9,6 +9,8 @@ class RenderingResource;
 class Texture;
 class Mesh;
 class TemporaryConstantBufferManager;
+class Shader;
+class MultiShader;
 class ShaderCompiler;
 class OrbitingCamera;
 class FlyingCamera;
@@ -181,8 +183,22 @@ private:
     unique_ptr<RenderingResource> m_GBuffers[(size_t)GBuffer::Count];
     unique_ptr<RenderingResource> m_ColorRenderTarget;
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
-    // [0] = default backface culling, [1] = two-sided
-	ComPtr<ID3D12PipelineState> m_3DPipelineState[2];
+    unique_ptr<MultiShader> m_GBufferMultiPixelShader;
+    
+    enum GBUFFER_SHADER_VARIANT_BACKFACE_CULLING
+    {
+        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_DEFAULT,
+        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_TWOSIDED,
+        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT,
+    };
+    enum GBUFFER_SHADER_VARIANT_ALPHA_TEST
+    {
+        GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED,
+        GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED,
+        GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT
+    };
+	ComPtr<ID3D12PipelineState> m_3DPipelineState[GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT][GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT];
+    
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<FlyingCamera> m_Camera;
 	ComPtr<ID3D12PipelineState> m_AmbientPipelineState;
@@ -197,9 +213,18 @@ private:
     };
     struct SceneMaterial
     {
+        enum FLAG
+        {
+            FLAG_TWOSIDED = 0x1,
+            FLAG_ALPHA_MASK = 0x2,
+        };
+
+        uint32_t m_Flags = 0;
         size_t m_AlbedoTextureIndex = SIZE_MAX;
         size_t m_NormalTextureIndex = SIZE_MAX;
-        bool m_TwoSided = false;
+        // Valid only when m_Flags & FLAG_ALPHA_MASK.
+        // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
+        float m_AlphaCutoff = 0.5f;
     };
     struct SceneTexture
     {
@@ -227,6 +252,7 @@ private:
     void InitImGui();
     void ShutdownImGui();
     void ClearModel();
+    void ClearGBufferShader();
     void CreateLights();
     void LoadModel(bool refreshAll);
     void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
