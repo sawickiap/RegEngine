@@ -80,9 +80,9 @@ struct Light
 
 /*
 It offers:
-- CBV b0 ... b7, each separate DESCRIPTOR_TABLE, visible to ALL shader stages.
-- SRV t0 ... t7, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stage.
-- Sampler s0 ... s3, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stages.
+- CBV b0..b7, each separate DESCRIPTOR_TABLE, visible to ALL shader stages.
+- SRV t0..t7, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stage.
+- Sampler s0..s3, each separate DESCRIPTOR_TABLE, visible to PIXEL shader stages.
 
 Flags:
 ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT

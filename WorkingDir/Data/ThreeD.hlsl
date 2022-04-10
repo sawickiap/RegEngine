@@ -12,6 +12,14 @@ struct PerObjectConstants
 };
 ConstantBuffer<PerObjectConstants> perObjectConstants : register(b1);
 
+struct PerMaterialConstants
+{
+	uint Flags; // Use MATERIAL_FLAG_*
+	float AlphaCutoff; // Valid only when (Flags & MATERIAL_FLAG_ALPHA_MASK)
+	uint2 _padding0;
+};
+ConstantBuffer<PerMaterialConstants> perMaterialConstants : register(b2);
+
 struct VS_INPUT
 {
 	float3 pos_Local : POSITION;
@@ -61,8 +69,7 @@ void MainPS(
 	float4 albedoSample = albedoTexture.Sample(s, input.texCoord);
 
 #if ALPHA_TEST
-	const float alphaCutoff = 0.5;
-	clip(albedoSample.a - alphaCutoff);
+	clip(albedoSample.a - perMaterialConstants.AlphaCutoff);
 #endif
 
 	outAlbedo.rgb = albedoSample.rgb;

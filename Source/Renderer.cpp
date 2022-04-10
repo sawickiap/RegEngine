@@ -133,6 +133,13 @@ struct PerObjectConstants
     packed_mat4 m_WorldView;
 };
 
+struct PerMaterialConstants
+{
+    uint32_t m_Flags;
+    float m_AlphaCutoff;
+    uint32_t _padding0[2];
+};
+
 struct LightConstants
 {
     packed_vec3 m_Color;
@@ -1416,6 +1423,28 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     if(!pso)
         return;
     cmdList.SetPipelineState(pso);
+
+    // Per material constant buffer
+    {
+        PerMaterialConstants perMaterialConstants = {};
+        perMaterialConstants.m_Flags = 0;
+        if((mat.m_Flags & SceneMaterial::FLAG_TWOSIDED) != 0)
+            perMaterialConstants.m_Flags |= MATERIAL_FLAG_TWOSIDED;
+        if((mat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0)
+        {
+            perMaterialConstants.m_Flags |= MATERIAL_FLAG_ALPHA_MASK;
+            perMaterialConstants.m_AlphaCutoff = mat.m_AlphaCutoff;
+        }
+
+        void* perMaterialConstantsPtr = nullptr;
+        D3D12_GPU_DESCRIPTOR_HANDLE perMaterialConstantsDescriptorHandle;
+        m_TemporaryConstantBufferManager->CreateBuffer(sizeof(perMaterialConstants), perMaterialConstantsPtr, perMaterialConstantsDescriptorHandle);
+        memcpy(perMaterialConstantsPtr, &perMaterialConstants, sizeof(perMaterialConstants));
+
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetCBVParamIndex(2),
+            perMaterialConstantsDescriptorHandle);
+    }
 
     Texture* albedoTexture = (mat.m_AlbedoTextureIndex != SIZE_MAX && g_AlbedoTexturesEnabled.GetValue()) ?
         m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
