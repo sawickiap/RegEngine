@@ -142,6 +142,7 @@ public:
     // Closes, submits, and waits for the upload command list on the CPU to finish.
     void CompleteUploadCommandList(CommandList& cmdList);
 
+    void ImGui_D3D12MAStatistics();
 	void Render();
 
 private:

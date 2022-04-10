@@ -347,6 +347,21 @@ void StringOffsetToRowCol(uint32_t& outRow, uint32_t& outCol, const str_view_tem
     }
 }
 
+// As T use unsigned integer type.
+template<typename T>
+wstring SizeToStr(T size)
+{
+    if(size == 0)
+        return L"0 B";
+    if(size < 1024)
+        return std::format(L"{} B", size);
+    if(size < 1024 * 1024)
+        return std::format(L"{:.2f} KB", (double)size / (1024.));
+    if(size < 1024 * 1024 * 1024)
+        return std::format(L"{:.2f} MB", (double)size / (1024. * 1024.));
+    return std::format(L"{:.2f} GB", (double)size / (1024. * 1024. * 1024.));
+}
+
 // As codePage use e.g. CP_ACP (system ASCII code page), CP_UTF8, 125 for Windows-1250.
 string ConvertUnicodeToChars(const wstr_view& str, uint32_t codePage);
 wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);

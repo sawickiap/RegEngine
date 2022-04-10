@@ -317,6 +317,9 @@ void Game::ShowStatisticsWindow()
     if(ImGui::CollapsingHeader("Frame time graph"))
         ShowFrameTimeGraph();
 
+    if(ImGui::CollapsingHeader("D3D12 Memory Allocator"))
+        g_Renderer->ImGui_D3D12MAStatistics();
+
     ImGui::End();
 }
 

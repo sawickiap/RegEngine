@@ -409,6 +409,43 @@ void Renderer::CompleteUploadCommandList(CommandList& cmdList)
     WaitForFenceOnCPU(m_UploadCmdListSubmittedFenceValue);
 }
 
+void Renderer::ImGui_D3D12MAStatistics()
+{
+    D3D12MA::Budget b[2] = {};
+    m_MemoryAllocator->GetBudget(b, b + 1);
+    for(size_t i = 0; i < 2; ++i)
+    {
+        if(ImGui::TreeNodeEx(i ? "Non-local" : "Local", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const double usagePercent = b[i].BudgetBytes ?
+                (double)b[i].UsageBytes / (double)b[i].BudgetBytes * 100. : 0.;
+            const double allocationBytesPercent = b[i].Stats.BlockBytes ?
+                (double)b[i].Stats.AllocationBytes / (double)b[i].Stats.BlockBytes * 100. : 0.;
+            
+            ImVec4 usageColor;
+            if(usagePercent > 90.)
+                usageColor = {1.f, 0.f, 0.f, 1.f}; // Red
+            else if(usagePercent > 70.)
+                usageColor = {1.f, 1.f, 0.f, 1.f}; // Yellow
+            else
+                usageColor = {0.f, 1.f, 0.f, 1.f}; // Green
+
+            ImGui::Text("Blocks: %u, %s",
+                b[i].Stats.BlockCount,
+                ConvertUnicodeToChars(SizeToStr(b[i].Stats.BlockBytes), CP_UTF8).c_str());
+            ImGui::Text("Allocations: %u, %s (%.1f%%)",
+                b[i].Stats.AllocationCount,
+                ConvertUnicodeToChars(SizeToStr(b[i].Stats.AllocationBytes), CP_UTF8).c_str(),
+                allocationBytesPercent);
+            ImGui::TextColored(usageColor, "Budget: %s, usage: %s (%.1f%%)",
+                ConvertUnicodeToChars(SizeToStr(b[i].BudgetBytes), CP_UTF8).c_str(),
+                ConvertUnicodeToChars(SizeToStr(b[i].UsageBytes), CP_UTF8).c_str(),
+                usagePercent);
+            ImGui::TreePop();
+        }
+    }
+}
+
 void Renderer::Render()
 {
     ERR_TRY
