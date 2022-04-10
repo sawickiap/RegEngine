@@ -197,7 +197,7 @@ private:
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED,
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT
     };
-	ComPtr<ID3D12PipelineState> m_3DPipelineState[GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT][GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT];
+	ComPtr<ID3D12PipelineState> m_GBufferPipelineState[GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT][GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT];
     
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<FlyingCamera> m_Camera;
@@ -245,7 +245,7 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
-    void Create3DPipelineState();
+    void CreateGBufferPipelineState();
     void CreateLightingPipelineStates();
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();

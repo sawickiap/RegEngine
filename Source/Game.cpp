@@ -5,7 +5,7 @@
 #include "Cameras.hpp"
 #include "Settings.hpp"
 #include "ImGuiUtils.hpp"
-#include "../WorkingDir/Data/Include/ShaderConstants.h"
+#include "../WorkingDir/Shaders/Include/ShaderConstants.h"
 
 extern VecSetting<glm::uvec2> g_Size;
 

@@ -66,9 +66,6 @@
     <Filter Include="ThirdParty\D3D12MemoryAllocator">
       <UniqueIdentifier>{02e0fc4e-e869-458e-9d29-a6b8ba1d71a9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Shaders\Include">
-      <UniqueIdentifier>{a89f3837-609c-4538-b9da-efd7d780a7ca}</UniqueIdentifier>
-    </Filter>
     <Filter Include="ConfigFiles">
       <UniqueIdentifier>{8d665066-43b7-4386-919a-4684141589c2}</UniqueIdentifier>
     </Filter>
@@ -86,6 +83,9 @@
     </Filter>
     <Filter Include="ThirdParty\IconFontCppHeaders">
       <UniqueIdentifier>{6c45d41f-0e07-4e15-85c6-cb73c78a67e6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Include">
+      <UniqueIdentifier>{7a8a7cec-acd8-4e57-9907-711b2a5f2e88}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -116,9 +116,6 @@
     <ClInclude Include="Game.hpp" />
     <ClInclude Include="Cameras.hpp" />
     <ClInclude Include="Streams.hpp" />
-    <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h">
-      <Filter>Shaders\Include</Filter>
-    </ClInclude>
     <ClInclude Include="SmallFileCache.hpp" />
     <ClInclude Include="Main.hpp" />
     <ClInclude Include="..\ThirdParty\imgui-1.87\imconfig.h">
@@ -153,6 +150,9 @@
       <Filter>ThirdParty\IconFontCppHeaders</Filter>
     </ClInclude>
     <ClInclude Include="Time.hpp" />
+    <ClInclude Include="..\WorkingDir\Shaders\Include\ShaderConstants.h">
+      <Filter>Shaders\Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\ThirdParty\str_view\str_view.natvis">
@@ -173,22 +173,22 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Include\Common.hlsl">
       <Filter>Shaders\Include</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\Postprocessing.hlsl">
-      <Filter>Shaders</Filter>
-    </Text>
-    <Text Include="..\WorkingDir\Data\Lighting.hlsl">
-      <Filter>Shaders</Filter>
-    </Text>
-    <Text Include="..\WorkingDir\Data\Ambient.hlsl">
-      <Filter>Shaders</Filter>
-    </Text>
-    <Text Include="..\WorkingDir\Data\Include\LightingCommon.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Include\LightingCommon.hlsl">
       <Filter>Shaders\Include</Filter>
     </Text>
-    <Text Include="..\WorkingDir\Data\ThreeD.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Ambient.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Shaders\GBuffer.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Shaders\Lighting.hlsl">
+      <Filter>Shaders</Filter>
+    </Text>
+    <Text Include="..\WorkingDir\Shaders\Postprocessing.hlsl">
       <Filter>Shaders</Filter>
     </Text>
   </ItemGroup>

@@ -18,7 +18,7 @@
 #include <assimp/DefaultLogger.hpp>
 #include <assimp/vector2.h>
 #include <assimp/vector3.h>
-#include "../WorkingDir/Data/Include/ShaderConstants.h"
+#include "../WorkingDir/Shaders/Include/ShaderConstants.h"
 #include "../ThirdParty/imgui-1.87/backends/imgui_impl_dx12.h"
 
 static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
@@ -325,7 +325,7 @@ void Renderer::Init()
     {
         wstr_view MACRO_NAMES[] = { L"ALPHA_TEST" };
         m_GBufferMultiPixelShader = std::make_unique<MultiShader>();
-        m_GBufferMultiPixelShader->Init(ShaderType::Pixel, L"Data/ThreeD.hlsl", L"MainPS", MACRO_NAMES);
+        m_GBufferMultiPixelShader->Init(ShaderType::Pixel, L"Shaders/GBuffer.hlsl", L"MainPS", MACRO_NAMES);
     }
 
 	CreateCommandQueues();
@@ -375,7 +375,7 @@ void Renderer::Reload(bool refreshAll)
     ClearGBufferShader();
     ClearModel();
 
-    Create3DPipelineState();
+    CreateGBufferPipelineState();
     CreatePostprocessingPipelineState();
     CreateLightingPipelineStates();
     LoadModel(refreshAll);
@@ -766,14 +766,14 @@ void Renderer::CreateResources()
         m_GBuffers[i]->Init(resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, std::format(L"GBuffer {}", GBUFFER_NAMES[i]));
     }
 
-	Create3DPipelineState();
+	CreateGBufferPipelineState();
 	CreateLightingPipelineStates();
 	CreatePostprocessingPipelineState();
 
     ERR_CATCH_FUNC;
 }
 
-void Renderer::Create3DPipelineState()
+void Renderer::CreateGBufferPipelineState()
 {
     assert(m_ColorRenderTarget);
 
@@ -794,7 +794,7 @@ void Renderer::Create3DPipelineState()
             const bool backfaceCullingEnabled = g_BackFaceCullingMode.GetValue() > 0 && backfaceCullingVariant == 0;
 
             Shader vs;
-            vs.Init(ShaderType::Vertex, L"Data/ThreeD.hlsl", L"MainVS");
+            vs.Init(ShaderType::Vertex, L"Shaders/GBuffer.hlsl", L"MainVS");
 
             const Shader* ps = m_GBufferMultiPixelShader->GetShader(macroValues);
             CHECK_BOOL(ps);
@@ -823,7 +823,7 @@ void Renderer::Create3DPipelineState()
 	        FillBlendDesc_NoBlending(desc.BlendState);
             FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
 	
-            ComPtr<ID3D12PipelineState>& psoPtr = m_3DPipelineState[backfaceCullingVariant][alphaTestVariant];
+            ComPtr<ID3D12PipelineState>& psoPtr = m_GBufferPipelineState[backfaceCullingVariant][alphaTestVariant];
             CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &psoPtr));
             SetD3D12ObjectName(psoPtr, std::format(L"G-buffer pipeline state {}", variantDebugStr));
 
@@ -844,8 +844,8 @@ void Renderer::CreateLightingPipelineStates()
     // Ambient root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/Ambient.hlsl", L"FullScreenQuadVS");
-        ps.Init(ShaderType::Pixel,  L"Data/Ambient.hlsl", L"MainPS");
+        vs.Init(ShaderType::Vertex, L"Shaders/Ambient.hlsl", L"FullScreenQuadVS");
+        ps.Init(ShaderType::Pixel,  L"Shaders/Ambient.hlsl", L"MainPS");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
             .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -873,8 +873,8 @@ void Renderer::CreateLightingPipelineStates()
     // Lighting root signature
     {
         Shader vs, ps;
-        vs.Init(ShaderType::Vertex, L"Data/Lighting.hlsl", L"FullScreenQuadVS");
-        ps.Init(ShaderType::Pixel,  L"Data/Lighting.hlsl", L"MainPS");
+        vs.Init(ShaderType::Vertex, L"Shaders/Lighting.hlsl", L"FullScreenQuadVS");
+        ps.Init(ShaderType::Pixel,  L"Shaders/Lighting.hlsl", L"MainPS");
 
 	    D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
 	        .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -913,8 +913,8 @@ void Renderer::CreatePostprocessingPipelineState()
     ERR_TRY
 
     Shader vs, ps;
-    vs.Init(ShaderType::Vertex, L"Data/Postprocessing.hlsl", L"FullScreenQuadVS");
-    ps.Init(ShaderType::Pixel,  L"Data/Postprocessing.hlsl", L"MainPS");
+    vs.Init(ShaderType::Vertex, L"Shaders/Postprocessing.hlsl", L"FullScreenQuadVS");
+    ps.Init(ShaderType::Pixel,  L"Shaders/Postprocessing.hlsl", L"MainPS");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
 	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
@@ -1033,7 +1033,7 @@ void Renderer::ClearGBufferShader()
     {
         for(size_t j = 0; j < GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT; ++j)
         {
-            m_3DPipelineState[i][j].Reset();
+            m_GBufferPipelineState[i][j].Reset();
         }
     }
     m_GBufferMultiPixelShader->Clear();
@@ -1418,7 +1418,7 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     const size_t alphaTestVariant = (mat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0 ?
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED : 
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED;
-    ID3D12PipelineState* const pso = m_3DPipelineState[backfaceCullingVariant][alphaTestVariant].Get();
+    ID3D12PipelineState* const pso = m_GBufferPipelineState[backfaceCullingVariant][alphaTestVariant].Get();
 
     if(!pso)
         return;

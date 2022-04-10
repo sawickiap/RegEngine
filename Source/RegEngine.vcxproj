@@ -173,7 +173,7 @@
     <ClInclude Include="..\ThirdParty\imgui-1.87\misc\cpp\imgui_stdlib.h" />
     <ClInclude Include="..\ThirdParty\str_view\str_view.hpp" />
     <ClInclude Include="..\ThirdParty\WinFontRender\WinFontRender.h" />
-    <ClInclude Include="..\WorkingDir\Data\Include\ShaderConstants.h" />
+    <ClInclude Include="..\WorkingDir\Shaders\Include\ShaderConstants.h" />
     <ClInclude Include="AssimpUtils.hpp" />
     <ClInclude Include="BaseUtils.hpp" />
     <ClInclude Include="Cameras.hpp" />
@@ -205,30 +205,22 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="..\WorkingDir\Data\Include\Common.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Ambient.hlsl">
       <FileType>Document</FileType>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\WorkingDir\Data\Postprocessing.hlsl">
+    <Text Include="..\WorkingDir\Shaders\GBuffer.hlsl">
       <FileType>Document</FileType>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\WorkingDir\Data\Lighting.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Include\Common.hlsl">
       <FileType>Document</FileType>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\WorkingDir\Data\Ambient.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Include\LightingCommon.hlsl">
       <FileType>Document</FileType>
     </Text>
-    <Text Include="..\WorkingDir\Data\Include\LightingCommon.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Lighting.hlsl">
       <FileType>Document</FileType>
     </Text>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="..\WorkingDir\Data\ThreeD.hlsl">
+    <Text Include="..\WorkingDir\Shaders\Postprocessing.hlsl">
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>
