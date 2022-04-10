@@ -2,7 +2,20 @@
 
 Yet another approach to developing a personal 3D graphics engine. Windows + Direct3D 12.
 
-**Work in progress...** Nothing to see here. I just rendered a first triangle 😀
+**Work in progress...** Nothing to see here. Just playing around 😀 Features implemented:
+
+Rendering:
+
+- Direct3D 12 initialization and usage
+- Loading 3D models (using Assimp library)
+- Basic deferred shading
+
+Other:
+
+- GUI (using Dear ImGui library)
+- Configuration loaded from and saved to a file (using RapidJSON library)
+
+![RegEngine screenshot](Doc/Screenshot.jpg "RegEngine screenshot")
 
 # License
 
@@ -34,6 +47,8 @@ The project uses following thirt-party libraries:
   - Directory: ThirdParty\glm
 - **[IconFontCppHeaders](https://github.com/juliettef/IconFontCppHeaders)** - haader with constants for icons from Font Awesome, by Juliette Foucaut and Doug Binks. License: zlib.
   - Directory: ThirdParty\IconFontCppHeaders
+- **[Open Asset Import Library (assimp)](https://github.com/assimp/assimp)** - for loading 3D model file formats, by assimp team. License: BSD.
+  - Directory: Source\packages\AssimpCpp.5.0.1.6
 - **[RapidJSON](https://rapidjson.org/)** - a fast JSON parser/generator, by Tencent. License: MIT.
   - Directory: ThirdParty\rapidjson
 - **[str_view](https://github.com/sawickiap/str_view)** - null-termination-aware string-view class for C++, by Adam Sawicki. License: MIT.
