@@ -185,6 +185,7 @@ private:
     unique_ptr<RenderingResource> m_ColorRenderTarget;
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
     unique_ptr<MultiShader> m_GBufferMultiPixelShader;
+    uint32_t m_NextD3D12MAJSONDumpIndex = 0;
     
     enum GBUFFER_SHADER_VARIANT_BACKFACE_CULLING
     {
@@ -269,6 +270,7 @@ private:
 
     void RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity);
     void RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex);
+    void SaveD3D12MAJSONDump();
 };
 
 extern Renderer* g_Renderer;

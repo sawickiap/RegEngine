@@ -1,6 +1,8 @@
 #include "BaseUtils.hpp"
 #include "Settings.hpp"
 #include <DirectXTex.h>
+#include <cwchar>
+#include <ctime>
 
 // Use this macro to pass the 2 parameters to formatting function matching formatting string like "%.*s", "%.*hs" etc.
 // for s of type like std::string, std::wstring, str_view, wstr_view.
@@ -515,6 +517,16 @@ wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage)
 void ToUpperCase(wstring& inoutStr)
 {
     std::transform(inoutStr.begin(), inoutStr.end(), inoutStr.begin(), ::towupper);
+}
+
+wstring CurrentDateTime()
+{
+    std::time_t t1 = std::time(nullptr);
+    tm t2;
+    localtime_s(&t2, &t1);
+    wchar_t s[24];
+    wcsftime(s, _countof(s), L"%Y-%m-%d %H:%M:%S", &t2);
+    return s;
 }
 
 std::filesystem::path StrToPath(const wstr_view& str)

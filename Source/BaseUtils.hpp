@@ -368,6 +368,9 @@ wstring ConvertCharsToUnicode(const str_view& str, uint32_t codePage);
 
 void ToUpperCase(wstring& inoutStr);
 
+// Returns current date and time in format "YYYY-MM-DD HH:MM:SS".
+wstring CurrentDateTime();
+
 std::filesystem::path StrToPath(const wstr_view& str);
 std::filesystem::path StrToPath(const str_view& str);
 

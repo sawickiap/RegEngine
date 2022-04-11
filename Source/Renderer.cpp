@@ -10,6 +10,7 @@
 #include "Settings.hpp"
 #include "AssimpUtils.hpp"
 #include "ImGuiUtils.hpp"
+#include "Streams.hpp"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -444,6 +445,9 @@ void Renderer::ImGui_D3D12MAStatistics()
             ImGui::TreePop();
         }
     }
+
+    if(ImGui::Button("JSON dump"))
+        SaveD3D12MAJSONDump();
 }
 
 void Renderer::Render()
@@ -1533,7 +1537,27 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     }
 }
 
+void Renderer::SaveD3D12MAJSONDump()
+{
+    LogMessage(L"Saving D3D12 Memory Allocator JSON dump...");
+    wchar_t* json;
+    m_MemoryAllocator->BuildStatsString(&json, TRUE);
+    try
+    {
+        wstring dateTime = CurrentDateTime();
+        // Convert to file-name-friendly "YYYY-MM-DD HH.MM.SS"
+        dateTime[13] = L'.';
+        dateTime[16] = L'.';
+        wstring filePath = std::format(L"D3D12MA {} {}.json", dateTime, m_NextD3D12MAJSONDumpIndex++);
+        SaveFile(filePath, std::span<const char>{(const char*)json, wcslen(json) * sizeof(wchar_t)});
+    }
+    CATCH_PRINT_ERROR(;)
+    m_MemoryAllocator->FreeStatsString(json);
+}
+
 #endif // _RENDERER_IMPL
+
+#ifndef _STANDARD_SAMPLERS_IMPL
 
 void StandardSamplers::Init()
 {
@@ -1618,6 +1642,8 @@ D3D12_GPU_DESCRIPTOR_HANDLE StandardSamplers::GetD3D12(D3D12_FILTER filter, D3D1
     assert(g_Renderer && g_Renderer->GetSamplerDescriptorManager());
     return g_Renderer->GetSamplerDescriptorManager()->GetGPUHandle(desc);
 }
+
+#endif // #ifndef _STANDARD_SAMPLERS_IMPL
 
 void AssimpPrint(const wstr_view& filePath)
 {
