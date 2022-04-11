@@ -78,3 +78,17 @@ LRESULT ImGuiUtils::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     return ImGui_ImplWin32_WndProcHandler(wnd, msg, wParam, lParam);
 }
+
+template<>
+void ImGuiMatrixSetting<glm::mat4>(const char* label, glm::mat4& inoutMat)
+{
+    mat4 matTransposed = glm::transpose(inoutMat);
+    ImGui::PushID(label);
+    bool changed = ImGui::InputFloat4(label, glm::value_ptr(matTransposed[0]));
+    changed = changed || ImGui::InputFloat4("##b", glm::value_ptr(matTransposed[1]));
+    changed = changed || ImGui::InputFloat4("##c", glm::value_ptr(matTransposed[2]));
+    changed = changed || ImGui::InputFloat4("##d", glm::value_ptr(matTransposed[3]));
+    ImGui::PopID();
+    if(changed)
+        inoutMat = glm::transpose(matTransposed);
+}

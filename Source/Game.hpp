@@ -2,6 +2,8 @@
 
 #include "Time.hpp"
 
+struct Entity;
+
 enum class MouseButton { Left, Middle, Right, Count };
 
 // Bit flags used to indicate which buttons are down during mouse even.
@@ -70,6 +72,7 @@ public:
 private:
     bool m_DemoWindowVisible = false;
     bool m_MetricsWindowVisible = false;
+    bool m_SceneWindowVisible = false;
     bool m_StatisticsWindowVisible = false;
     bool m_StackToolWindowVisible = false;
     bool m_AboutWindowVisible = false;
@@ -85,4 +88,6 @@ private:
     void ShowAboutWindow();
     void ShowStatisticsWindow();
     void ShowFrameTimeGraph();
+    void ShowSceneWindow();
+    void ShowSceneEntity(Entity& e);
 };

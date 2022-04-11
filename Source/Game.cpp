@@ -5,6 +5,8 @@
 #include "Cameras.hpp"
 #include "Settings.hpp"
 #include "ImGuiUtils.hpp"
+#include "Texture.hpp"
+#include "Mesh.hpp"
 #include "../WorkingDir/Shaders/Include/ShaderConstants.h"
 
 extern VecSetting<glm::uvec2> g_Size;
@@ -218,6 +220,7 @@ void Game::ImGui()
     }
     if(ImGui::BeginMenu("Edit"))
     {
+        ImGui::MenuItem("Scene", nullptr, &m_SceneWindowVisible);
         ImGui::MenuItem("Settings", nullptr, &g_SettingsImGuiWindowVisible);
         ImGui::EndMenu();
     }
@@ -249,6 +252,8 @@ void Game::ImGui()
         ImGui::ShowStackToolWindow(&m_StackToolWindowVisible);
     if(m_AboutWindowVisible)
         ShowAboutWindow();
+    if(m_SceneWindowVisible)
+        ShowSceneWindow();
 }
 
 void Game::ShowAboutWindow()
@@ -355,5 +360,118 @@ void Game::ShowFrameTimeGraph()
             endX = begX;
         }
         ImGui::Dummy(ImVec2(width, maxHeight));
+    }
+}
+
+void Game::ShowSceneWindow()
+{
+    if(ImGui::Begin("Scene", &m_SceneWindowVisible))
+    {
+        if(ImGui::CollapsingHeader("Entities", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ShowSceneEntity(g_Renderer->m_RootEntity);
+        }
+        if(ImGui::CollapsingHeader("Meshes"))
+        {
+            string s;
+            for(size_t i = 0, count = g_Renderer->m_Meshes.size(); i < count; ++i)
+            {
+                Renderer::SceneMesh& m = g_Renderer->m_Meshes[i];
+
+                s = std::format("{}: Material={}, Vertices={}", i, m.m_MaterialIndex, m.m_Mesh->GetVertexCount());
+                if(m.m_Mesh->HasIndices())
+                    s += std::format(", Indices={}", m.m_Mesh->GetIndexCount());
+                
+                ImGui::Text("%s", s.c_str());
+            }
+        }
+        if(ImGui::CollapsingHeader("Materials"))
+        {
+            string s;
+            for(size_t i = 0, count = g_Renderer->m_Materials.size(); i < count; ++i)
+            {
+                Renderer::SceneMaterial& m = g_Renderer->m_Materials[i];
+
+                s = std::format("{}: ", i);
+                if(m.m_AlbedoTextureIndex != SIZE_MAX)
+                    s += std::format("AlbedoTexture={}", m.m_AlbedoTextureIndex);
+                else
+                    s += "AlbedoTexture=NULL";
+                if(m.m_NormalTextureIndex != SIZE_MAX)
+                    s += std::format(", NormalTexture={}", m.m_NormalTextureIndex);
+                else
+                    s += ", NormalTexture=NULL";
+                if(m.m_Flags & Renderer::SceneMaterial::FLAG_TWOSIDED)
+                    s += " TWOSIDED";
+                if(m.m_Flags & Renderer::SceneMaterial::FLAG_ALPHA_MASK)
+                    s += std::format(" ALPHA_MASK AlphaCutoff={:.1}", m.m_AlphaCutoff);
+                
+                ImGui::Text("%s", s.c_str());
+            }
+        }
+        if(ImGui::CollapsingHeader("Textures"))
+        {
+            for(size_t i = 0, count = g_Renderer->m_Textures.size(); i < count; ++i)
+            {
+                Renderer::SceneTexture& t = g_Renderer->m_Textures[i];
+                if(ImGui::TreeNodeEx(&t, 0, "%zu: %s", i, ConvertUnicodeToChars(t.m_ProcessedPath, CP_UTF8).c_str()))
+                {
+                    if(t.m_Texture)
+                    {
+                        const D3D12_RESOURCE_DESC& desc = t.m_Texture->GetDesc();
+                        ImGui::Text("%llu x %u", desc.Width, desc.Height);
+                    }
+                    else
+                    {
+                        ImGui::Text("NULL");
+                    }
+                    ImGui::TreePop();
+                }
+            }
+        }
+        if(ImGui::CollapsingHeader("Lights", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            for(size_t i = 0, count = g_Renderer->m_Lights.size(); i < count; ++i)
+            {
+                Light& l = g_Renderer->m_Lights[i];
+                const char* typeStr = "";
+                switch(l.m_Type)
+                {
+                case LIGHT_TYPE_DIRECTIONAL: typeStr = "directional"; break;
+                }
+                if(ImGui::TreeNode(&l, "Light %zu (%s)", i, typeStr))
+                {
+                    ImGui::Checkbox("Enabled", &l.m_Enabled);
+                    ImGui::ColorEdit3("Color", glm::value_ptr(l.m_Color), ImGuiColorEditFlags_Float);
+                    if(l.m_Type == LIGHT_TYPE_DIRECTIONAL)
+                    {
+                        ImGui::InputFloat3("Direction to light", glm::value_ptr(l.m_DirectionToLight_Position));
+                    }
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+    ImGui::End();
+}
+
+void Game::ShowSceneEntity(Entity& e)
+{
+    string s;
+    if(ImGui::TreeNodeEx(&e, 0, "Entity"))
+    {
+        ImGuiMatrixSetting<mat4>("Transform", e.m_Transform);
+        s = "Meshes:";
+        const size_t meshCount = e.m_Meshes.size();
+        for(size_t i = 0, count = std::min<size_t>(meshCount, 4); i < count; ++i)
+            s += std::format(" {}", e.m_Meshes[i]);
+        if(meshCount > 4)
+            s += std::format(" ... ({})", meshCount);
+        ImGui::Text("%s", s.c_str());
+
+        for(size_t i = 0, count = e.m_Children.size(); i < count; ++i)
+            ShowSceneEntity(*e.m_Children[i].get());
+
+        ImGui::TreePop();
     }
 }

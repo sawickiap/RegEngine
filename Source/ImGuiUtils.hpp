@@ -15,3 +15,6 @@ public:
 
 private:
 };
+
+template<typename MatT>
+void ImGuiMatrixSetting(const char* label, MatT& inoutMat);

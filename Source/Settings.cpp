@@ -279,18 +279,6 @@ void ImGuiVectorSetting<glm::ivec4>(const char* label, glm::ivec4& inoutVec)
     ImGui::InputInt4(label, glm::value_ptr(inoutVec));
 }
 
-template<>
-void ImGuiMatrixSetting<glm::mat4>(const char* label, glm::mat4& inoutMat)
-{
-    mat4 matTransposed = glm::transpose(inoutMat);
-    bool changed = ImGui::InputFloat4(label, glm::value_ptr(matTransposed[0]));
-    changed = changed || ImGui::InputFloat4("", glm::value_ptr(matTransposed[1]));
-    changed = changed || ImGui::InputFloat4("", glm::value_ptr(matTransposed[2]));
-    changed = changed || ImGui::InputFloat4("", glm::value_ptr(matTransposed[3]));
-    if(changed)
-        inoutMat = glm::transpose(matTransposed);
-}
-
 // If error, returns UINT8_MAX.
 static uint8_t ParseHexadecimalDigit(char ch)
 {

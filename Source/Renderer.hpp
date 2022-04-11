@@ -114,8 +114,39 @@ It creates and keeps ID3D12Device and other key objects.
 class Renderer
 {
 public:
+    struct SceneMesh
+    {
+        unique_ptr<Mesh> m_Mesh;
+        size_t m_MaterialIndex = SIZE_MAX;
+    };
+    struct SceneMaterial
+    {
+        enum FLAG
+        {
+            FLAG_TWOSIDED = 0x1,
+            FLAG_ALPHA_MASK = 0x2,
+        };
+
+        uint32_t m_Flags = 0;
+        size_t m_AlbedoTextureIndex = SIZE_MAX;
+        size_t m_NormalTextureIndex = SIZE_MAX;
+        // Valid only when m_Flags & FLAG_ALPHA_MASK.
+        // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
+        float m_AlphaCutoff = 0.5f;
+    };
+    struct SceneTexture
+    {
+        wstring m_ProcessedPath;
+        // Can be null - use some standard texture then.
+        unique_ptr<Texture> m_Texture;
+    };
+
     bool m_AmbientEnabled = false;
     std::vector<Light> m_Lights;
+    Entity m_RootEntity;
+    std::vector<SceneMesh> m_Meshes;
+    std::vector<SceneMaterial> m_Materials;
+    std::vector<SceneTexture> m_Textures;
 
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
@@ -207,38 +238,6 @@ private:
 	ComPtr<ID3D12PipelineState> m_LightingPipelineState;
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
     Descriptor m_ImGuiDescriptor;
-
-    struct SceneMesh
-    {
-        unique_ptr<Mesh> m_Mesh;
-        size_t m_MaterialIndex = SIZE_MAX;
-    };
-    struct SceneMaterial
-    {
-        enum FLAG
-        {
-            FLAG_TWOSIDED = 0x1,
-            FLAG_ALPHA_MASK = 0x2,
-        };
-
-        uint32_t m_Flags = 0;
-        size_t m_AlbedoTextureIndex = SIZE_MAX;
-        size_t m_NormalTextureIndex = SIZE_MAX;
-        // Valid only when m_Flags & FLAG_ALPHA_MASK.
-        // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
-        float m_AlphaCutoff = 0.5f;
-    };
-    struct SceneTexture
-    {
-        wstring m_ProcessedPath;
-        // Can be null - use some standard texture then.
-        unique_ptr<Texture> m_Texture;
-    };
-
-    Entity m_RootEntity;
-    std::vector<SceneMesh> m_Meshes;
-    std::vector<SceneMaterial> m_Materials;
-    std::vector<SceneTexture> m_Textures;
 
 	void CreateDevice();
 	void CreateMemoryAllocator();
