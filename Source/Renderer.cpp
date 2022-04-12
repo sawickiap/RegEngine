@@ -526,7 +526,7 @@ void Renderer::Render()
         }
 
         {
-            PIX_EVENT_SCOPE(cmdList, L"3D");
+            PIX_EVENT_SCOPE(cmdList, L"G-buffer");
 
             static_assert((size_t)GBuffer::Count == 2);
             cmdList.SetRenderTargets(m_DepthTexture.get(),
@@ -545,7 +545,8 @@ void Renderer::Render()
             mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
             globalXform *= g_AssimpTransform.GetValue();
             //globalXform = glm::rotate(globalXform, glm::half_pi<float>(), vec3(1.f, 0.f, 0.f));
-            RenderEntity(cmdList, globalXform, m_RootEntity);
+            if(m_RootEntity.m_Visible)
+                RenderEntity(cmdList, globalXform, m_RootEntity);
         }
 
         if(m_AmbientPipelineState && m_LightingPipelineState)
@@ -654,6 +655,9 @@ void Renderer::CreateMemoryAllocator()
     D3D12MA::ALLOCATOR_DESC desc = {};
     desc.pDevice = m_Device.Get();
     desc.pAdapter = m_Adapter;
+    desc.Flags = D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED |
+        D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED |
+        D3D12MA::ALLOCATOR_FLAG_SINGLETHREADED;
     CHECK_HR(D3D12MA::CreateAllocator(&desc, &m_MemoryAllocator));
 }
 
@@ -1353,6 +1357,7 @@ size_t Renderer::TryLoadTexture(const std::filesystem::path& path, bool sRGB, bo
     try
     {
         SceneTexture tex;
+        tex.m_Title = path.native();
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
         uint32_t flags = Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;
@@ -1443,7 +1448,10 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
     }
 
     for(const auto& childEntity : entity.m_Children)
-        RenderEntity(cmdList, entityXform, *childEntity);
+    {
+        if(childEntity->m_Visible)
+            RenderEntity(cmdList, entityXform, *childEntity);
+    }
 }
 
 void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex)

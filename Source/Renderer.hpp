@@ -63,6 +63,7 @@ private:
 struct Entity
 {
     mat4 m_Transform = glm::identity<mat4>();
+    bool m_Visible = true;
     std::vector<unique_ptr<Entity>> m_Children;
     std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
 };
@@ -136,6 +137,8 @@ public:
     };
     struct SceneTexture
     {
+        // Just for display to the user.
+        wstring m_Title;
         wstring m_ProcessedPath;
         // Can be null - use some standard texture then.
         unique_ptr<Texture> m_Texture;

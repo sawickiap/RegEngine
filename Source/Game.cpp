@@ -414,7 +414,7 @@ void Game::ShowSceneWindow()
             for(size_t i = 0, count = g_Renderer->m_Textures.size(); i < count; ++i)
             {
                 Renderer::SceneTexture& t = g_Renderer->m_Textures[i];
-                if(ImGui::TreeNodeEx(&t, 0, "%zu: %s", i, ConvertUnicodeToChars(t.m_ProcessedPath, CP_UTF8).c_str()))
+                if(ImGui::TreeNodeEx(&t, 0, "%zu: %s", i, ConvertUnicodeToChars(t.m_Title, CP_UTF8).c_str()))
                 {
                     if(t.m_Texture)
                     {
@@ -458,8 +458,11 @@ void Game::ShowSceneWindow()
 void Game::ShowSceneEntity(Entity& e)
 {
     string s;
-    if(ImGui::TreeNodeEx(&e, 0, "Entity"))
+    const char* const treeNodeName = e.m_Visible ? (ICON_FA_EYE " Entity") : (ICON_FA_EYE_SLASH " Entity");
+    if(ImGui::TreeNodeEx(&e, 0, treeNodeName))
     {
+        ImGui::Checkbox("Visible", &e.m_Visible);
+
         ImGuiMatrixSetting<mat4>("Transform", e.m_Transform);
         s = "Meshes:";
         const size_t meshCount = e.m_Meshes.size();

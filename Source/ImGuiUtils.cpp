@@ -48,7 +48,9 @@ void ImGuiUtils::Init(HWND wnd)
 
     const ImWchar awesomeGlyphRanges[] = {
         0xf002, 0xf002, // ICON_FA_MAGNIFYING_GLASS
-        0xf00d, 0xf00d}; // ICON_FA_XMARK
+        0xf00d, 0xf00d, // ICON_FA_XMARK
+        0xf06e, 0xf06e, // ICON_FA_EYE
+        0xf070, 0xf070}; // ICON_FA_EYE_SLASH
     ImFontConfig awesomeConfig;
     awesomeConfig.MergeMode = true;
     ImFont* const awesomeFont = io.Fonts->AddFontFromFileTTF(
