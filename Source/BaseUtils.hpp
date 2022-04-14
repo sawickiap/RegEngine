@@ -399,6 +399,8 @@ void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
 inline void SetD3D12ObjectName(const ComPtr<ID3D12Object>& obj, const wstr_view& name) { SetD3D12ObjectName(obj.Get(), name); }
 // On error returns 0.
 uint8_t DXGIFormatToBitsPerPixel(DXGI_FORMAT format);
+// Returns string like L"R32G32_FLOAT". If unknown, returns L"".
+const wchar_t* DXGIFormatToStr(DXGI_FORMAT format);
 
 void FillShaderResourceViewDesc_Texture2D(D3D12_SHADER_RESOURCE_VIEW_DESC& dst,
     DXGI_FORMAT format);

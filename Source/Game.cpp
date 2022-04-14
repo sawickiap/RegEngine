@@ -378,7 +378,10 @@ void Game::ShowSceneWindow()
             {
                 Renderer::SceneMesh& m = g_Renderer->m_Meshes[i];
 
-                s = std::format("{}: Material={}, Vertices={}", i, m.m_MaterialIndex, m.m_Mesh->GetVertexCount());
+                s = std::format("{}: ", i);
+                if(!m.m_Title.empty())
+                    s += std::format("\"{}\"", ConvertUnicodeToChars(m.m_Title, CP_UTF8));
+                s += std::format(" Material={}, Vertices={}", m.m_MaterialIndex, m.m_Mesh->GetVertexCount());
                 if(m.m_Mesh->HasIndices())
                     s += std::format(", Indices={}", m.m_Mesh->GetIndexCount());
                 
@@ -419,7 +422,26 @@ void Game::ShowSceneWindow()
                     if(t.m_Texture)
                     {
                         const D3D12_RESOURCE_DESC& desc = t.m_Texture->GetDesc();
-                        ImGui::Text("%llu x %u", desc.Width, desc.Height);
+                        string s;
+                        switch(desc.Dimension)
+                        {
+                        case D3D12_RESOURCE_DIMENSION_TEXTURE1D:
+                            s = std::format("1D: {}", desc.Width);
+                            break;
+                        case D3D12_RESOURCE_DIMENSION_TEXTURE2D:
+                            s = std::format("2D: {} x {}", desc.Width, desc.Height);
+                            break;
+                        case D3D12_RESOURCE_DIMENSION_TEXTURE3D:
+                            s = std::format("3D: {} x {} x {}", desc.Width, desc.Height, desc.DepthOrArraySize);
+                            break;
+                        default:
+                            s = "UNKNOWN";
+                        }
+                        if(desc.Dimension != D3D12_RESOURCE_DIMENSION_TEXTURE3D && desc.DepthOrArraySize > 1)
+                            s += std::format(" [{}]", desc.DepthOrArraySize);
+                        const wchar_t* formatStr = DXGIFormatToStr(desc.Format);
+                        s += std::format(" Format={} MipLevels={}", ConvertUnicodeToChars(formatStr, CP_UTF8), desc.MipLevels);
+                        ImGui::Text("%s", s.c_str());
                     }
                     else
                     {
@@ -458,8 +480,10 @@ void Game::ShowSceneWindow()
 void Game::ShowSceneEntity(Entity& e)
 {
     string s;
-    const char* const treeNodeName = e.m_Visible ? (ICON_FA_EYE " Entity") : (ICON_FA_EYE_SLASH " Entity");
-    if(ImGui::TreeNodeEx(&e, 0, treeNodeName))
+    s = e.m_Visible ? (ICON_FA_EYE " Entity") : (ICON_FA_EYE_SLASH " Entity");
+    if(!e.m_Title.empty())
+        s += std::format(" \"{}\"", ConvertUnicodeToChars(e.m_Title, CP_UTF8));
+    if(ImGui::TreeNodeEx(&e, 0, s.c_str()))
     {
         ImGui::Checkbox("Visible", &e.m_Visible);
 

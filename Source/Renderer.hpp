@@ -62,6 +62,7 @@ private:
 
 struct Entity
 {
+    wstring m_Title;
     mat4 m_Transform = glm::identity<mat4>();
     bool m_Visible = true;
     std::vector<unique_ptr<Entity>> m_Children;
@@ -117,6 +118,7 @@ class Renderer
 public:
     struct SceneMesh
     {
+        wstring m_Title;
         unique_ptr<Mesh> m_Mesh;
         size_t m_MaterialIndex = SIZE_MAX;
     };
@@ -265,7 +267,7 @@ private:
     void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
         const aiMaterial* material, bool refreshAll);
     // Returns index of the existing or newly loaded texture in m_Textures, SIZE_MAX if failed.
-    size_t TryLoadTexture(const std::filesystem::path& path, bool sRGB, bool allowCache);
+    size_t TryLoadTexture(const wstr_view& title, const std::filesystem::path& path, bool sRGB, bool allowCache);
     void CreateProceduralModel();
 
     void WaitForFenceOnCPU(UINT64 value);

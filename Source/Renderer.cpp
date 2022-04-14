@@ -1158,6 +1158,8 @@ void Renderer::LoadModel(bool refreshAll)
 
 void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)
 {
+    outEntity.m_Title = ConvertCharsToUnicode(str_view(node->mName.data, node->mName.length), CP_UTF8);
+
     // Matrix is Assimp is also right-to-left ordered (translation in last column, vectors are column, transform is mat * vec),
     // but it is stored as row-major instead of column-major like in GLM.
     outEntity.m_Transform = glm::transpose(glm::make_mat4(&node->mTransformation.a1));
@@ -1223,6 +1225,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, boo
     }
 
     SceneMesh mesh;
+    mesh.m_Title = ConvertCharsToUnicode(str_view(assimpMesh->mName.data, assimpMesh->mName.length), CP_UTF8);
     mesh.m_MaterialIndex = assimpMesh->mMaterialIndex;
     mesh.m_Mesh = std::make_unique<Mesh>();
     mesh.m_Mesh->Init(
@@ -1275,21 +1278,35 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         GetStringMaterialProperty(albedoPath, material, "$raw.Maya|baseColor|file");
     }
 
+    wstring albedoPathW;
     std::filesystem::path albedoPathP;
     if(!albedoPath.empty())
-        albedoPathP = StrToPath(ConvertCharsToUnicode(albedoPath, CP_ACP));
+    {
+        albedoPathW = ConvertCharsToUnicode(albedoPath, CP_ACP);
+        albedoPathP = StrToPath(albedoPathW);
+    }
     else if(!g_TexturePath.GetValue().empty())
+    {
+        albedoPathW = ConvertCharsToUnicode(g_TexturePath.GetValue(), CP_UTF8);
         // "TexturePath" setting - relative to working directory not model path!
-        albedoPathP = std::filesystem::absolute(StrToPath(g_TexturePath.GetValue()));
+        albedoPathP = std::filesystem::absolute(StrToPath(albedoPathW));
+    }
     if(!albedoPathP.empty() && !albedoPathP.is_absolute())
         albedoPathP = modelDir / albedoPathP;
 
+    wstring normalPathW;
     std::filesystem::path normalPathP;
     if(!normalPath.empty())
-        normalPathP = StrToPath(ConvertCharsToUnicode(normalPath, CP_ACP));
+    {
+        normalPathW = ConvertCharsToUnicode(normalPath, CP_ACP);
+        normalPathP = StrToPath(normalPathW);
+    }
     else if(!g_NormalTexturePath.GetValue().empty())
+    {
+        normalPathW = ConvertCharsToUnicode(g_NormalTexturePath.GetValue(), CP_UTF8);
         // "NormalTexturePath" setting - relative to working directory not model path!
-        normalPathP = std::filesystem::absolute(StrToPath(g_NormalTexturePath.GetValue()));
+        normalPathP = std::filesystem::absolute(StrToPath(normalPathW));
+    }
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
 
@@ -1324,8 +1341,8 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     }
 
     SceneMaterial sceneMat;
-    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathP, true, !refreshAll);
-    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathP, false, !refreshAll);
+    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathW, albedoPathP, true, !refreshAll);
+    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathW, normalPathP, false, !refreshAll);
     if(twoSided)
         sceneMat.m_Flags |= SceneMaterial::FLAG_TWOSIDED;
     if(alphaMask)
@@ -1336,7 +1353,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
 }
 
-size_t Renderer::TryLoadTexture(const std::filesystem::path& path, bool sRGB, bool allowCache)
+size_t Renderer::TryLoadTexture(const wstr_view& title, const std::filesystem::path& path, bool sRGB, bool allowCache)
 {
     if(path.empty())
         return SIZE_MAX;
@@ -1357,7 +1374,7 @@ size_t Renderer::TryLoadTexture(const std::filesystem::path& path, bool sRGB, bo
     try
     {
         SceneTexture tex;
-        tex.m_Title = path.native();
+        tex.m_Title = title;
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
         uint32_t flags = Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;
@@ -1377,8 +1394,9 @@ void Renderer::CreateProceduralModel()
     ClearModel();
     CreateLights();
 
+    wstring normalTexturePath = ConvertCharsToUnicode(g_NormalTexturePath.GetValue(), CP_UTF8);
     SceneMaterial mat;
-    mat.m_NormalTextureIndex = TryLoadTexture(StrToPath(g_NormalTexturePath.GetValue()), false, true);
+    mat.m_NormalTextureIndex = TryLoadTexture(normalTexturePath, StrToPath(normalTexturePath), false, true);
     m_Materials.push_back(mat);
 
     Vertex vertices[] = {
