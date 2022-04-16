@@ -76,6 +76,7 @@ static StringSetting g_NormalTexturePath(SettingCategory::Load, "NormalTexturePa
 static FloatSetting g_AssimpScale(SettingCategory::Load, "Assimp.Scale", 1.f);
 static MatSetting<mat4> g_AssimpTransform(SettingCategory::Load, "Assimp.Transform", glm::identity<mat4>());
 static BoolSetting g_AssimpNegateBitangent(SettingCategory::Load, "Assimp.NegateBitangent", true);
+static BoolSetting g_AssimpUseOptimizingFlags(SettingCategory::Load, "Assimp.UseOptimizingFlags", false);
 static UintSetting g_BackFaceCullingMode(SettingCategory::Load, "BackFaceCullingMode", 0);
 
 static Vec4ColorSetting g_BackgroundColor(SettingCategory::Runtime, "Background.Color", vec4(0.f, 0.f, 0.f, 1.f));
@@ -100,11 +101,23 @@ static const uint32_t ASSIMP_READ_FLAGS =
     aiProcess_SortByPType |
     aiProcess_GenSmoothNormals |
     aiProcess_CalcTangentSpace |
+    aiProcess_ValidateDataStructure |
     // This step flips all UV coordinates along the y-axis and adjusts
     // material settings and bitangents accordingly.
     aiProcess_FlipUVs;
 // aiProcess_MakeLeftHanded
 // aiProcess_ConvertToLeftHanded
+
+static const uint32_t ASSIMP_OPTIMIZING_FLAGS =
+    aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph | aiProcess_RemoveRedundantMaterials;
+
+static uint32_t GetAssimpFlags()
+{
+    uint32_t flags = ASSIMP_READ_FLAGS;
+    if(g_AssimpUseOptimizingFlags.GetValue())
+        flags |= ASSIMP_OPTIMIZING_FLAGS;
+    return flags;
+}
 
 struct PerFrameConstants
 {
@@ -1131,7 +1144,7 @@ void Renderer::LoadModel(bool refreshAll)
 
     {
         Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFile(filePath.c_str(), ASSIMP_READ_FLAGS);
+        const aiScene* scene = importer.ReadFile(filePath.c_str(), GetAssimpFlags());
         if(!scene)
             FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         
@@ -1681,7 +1694,7 @@ void AssimpPrint(const wstr_view& filePath)
 
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(
-        ConvertUnicodeToChars(filePath, CP_ACP).c_str(), ASSIMP_READ_FLAGS);
+        ConvertUnicodeToChars(filePath, CP_ACP).c_str(), GetAssimpFlags());
     if(!scene)
         FAIL(ConvertCharsToUnicode(importer.GetErrorString(), CP_ACP));
         

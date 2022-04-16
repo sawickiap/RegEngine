@@ -9,6 +9,7 @@
     //"Assimp.ModelPath": "e:\\Tmp\\MODELS\\Airbase Control Tower\\tower.fbx",
     
     "Assimp.PrintSceneInfo": false,
+    "Assimp.UseOptimizingFlags": false,
     
     /*
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Apple\\apple.obj",
