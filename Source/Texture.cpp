@@ -217,7 +217,7 @@ void Texture::Load(uint32_t flags, DirectX::ScratchImage& image)
     }
 
     LogInfoF(L"Width={}, Height={}, Format={}, MipLevels={}",
-        metadata->width, metadata->height, (uint32_t)metadata->format, metadata->mipLevels);
+        metadata->width, metadata->height, DXGIFormatToStr(metadata->format), metadata->mipLevels);
 
     if(metadata->mipLevels == 1 && (flags & FLAG_GENERATE_MIPMAPS) != 0)
     {
