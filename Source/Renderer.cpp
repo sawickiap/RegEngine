@@ -1293,32 +1293,33 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 
     wstring albedoPathW;
     std::filesystem::path albedoPathP;
-    if(!albedoPath.empty())
-    {
-        albedoPathW = ConvertCharsToUnicode(albedoPath, CP_ACP);
-        albedoPathP = StrToPath(albedoPathW);
-    }
-    else if(!g_TexturePath.GetValue().empty())
+    if(!g_TexturePath.GetValue().empty())
     {
         albedoPathW = ConvertCharsToUnicode(g_TexturePath.GetValue(), CP_UTF8);
         // "TexturePath" setting - relative to working directory not model path!
         albedoPathP = std::filesystem::absolute(StrToPath(albedoPathW));
     }
+    else if(!albedoPath.empty())
+    {
+        albedoPathW = ConvertCharsToUnicode(albedoPath, CP_ACP);
+        albedoPathP = StrToPath(albedoPathW);
+    }
+    
     if(!albedoPathP.empty() && !albedoPathP.is_absolute())
         albedoPathP = modelDir / albedoPathP;
 
     wstring normalPathW;
     std::filesystem::path normalPathP;
-    if(!normalPath.empty())
-    {
-        normalPathW = ConvertCharsToUnicode(normalPath, CP_ACP);
-        normalPathP = StrToPath(normalPathW);
-    }
-    else if(!g_NormalTexturePath.GetValue().empty())
+    if(!g_NormalTexturePath.GetValue().empty())
     {
         normalPathW = ConvertCharsToUnicode(g_NormalTexturePath.GetValue(), CP_UTF8);
         // "NormalTexturePath" setting - relative to working directory not model path!
         normalPathP = std::filesystem::absolute(StrToPath(normalPathW));
+    }
+    else if(!normalPath.empty())
+    {
+        normalPathW = ConvertCharsToUnicode(normalPath, CP_ACP);
+        normalPathP = StrToPath(normalPathW);
     }
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
