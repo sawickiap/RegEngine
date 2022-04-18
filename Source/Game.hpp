@@ -2,7 +2,10 @@
 
 #include "Time.hpp"
 
-struct Entity;
+namespace Scene
+{
+    struct Entity;
+}
 
 enum class MouseButton { Left, Middle, Right, Count };
 
@@ -89,5 +92,5 @@ private:
     void ShowStatisticsWindow();
     void ShowFrameTimeGraph();
     void ShowSceneWindow();
-    void ShowSceneEntity(Entity& e);
+    void ShowSceneEntity(Scene::Entity& e);
 };

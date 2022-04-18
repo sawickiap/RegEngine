@@ -74,7 +74,7 @@ void Game::Update()
 
     for(size_t li = 1; li < g_Renderer->m_Lights.size(); ++li)
     {
-        Light& l = g_Renderer->m_Lights[li];
+        Scene::Light& l = g_Renderer->m_Lights[li];
         if(l.m_Type == LIGHT_TYPE_DIRECTIONAL)
         {
             l.m_DirectionToLight_Position = vec3(
@@ -376,7 +376,7 @@ void Game::ShowSceneWindow()
             string s;
             for(size_t i = 0, count = g_Renderer->m_Meshes.size(); i < count; ++i)
             {
-                Renderer::SceneMesh& m = g_Renderer->m_Meshes[i];
+                Scene::Mesh& m = g_Renderer->m_Meshes[i];
 
                 s = std::format("{}: ", i);
                 if(!m.m_Title.empty())
@@ -393,7 +393,7 @@ void Game::ShowSceneWindow()
             string s;
             for(size_t i = 0, count = g_Renderer->m_Materials.size(); i < count; ++i)
             {
-                Renderer::SceneMaterial& m = g_Renderer->m_Materials[i];
+                Scene::Material& m = g_Renderer->m_Materials[i];
 
                 s = std::format("{}: ", i);
                 if(m.m_AlbedoTextureIndex != SIZE_MAX)
@@ -404,9 +404,9 @@ void Game::ShowSceneWindow()
                     s += std::format(", NormalTexture={}", m.m_NormalTextureIndex);
                 else
                     s += ", NormalTexture=NULL";
-                if(m.m_Flags & Renderer::SceneMaterial::FLAG_TWOSIDED)
+                if(m.m_Flags & Scene::Material::FLAG_TWOSIDED)
                     s += " TWOSIDED";
-                if(m.m_Flags & Renderer::SceneMaterial::FLAG_ALPHA_MASK)
+                if(m.m_Flags & Scene::Material::FLAG_ALPHA_MASK)
                     s += std::format(" ALPHA_MASK AlphaCutoff={:.1}", m.m_AlphaCutoff);
                 
                 ImGui::Text("%s", s.c_str());
@@ -416,7 +416,7 @@ void Game::ShowSceneWindow()
         {
             for(size_t i = 0, count = g_Renderer->m_Textures.size(); i < count; ++i)
             {
-                Renderer::SceneTexture& t = g_Renderer->m_Textures[i];
+                Scene::Texture& t = g_Renderer->m_Textures[i];
                 if(ImGui::TreeNodeEx(&t, 0, "%zu: %s", i, ConvertUnicodeToChars(t.m_Title, CP_UTF8).c_str()))
                 {
                     if(t.m_Texture)
@@ -455,7 +455,7 @@ void Game::ShowSceneWindow()
         {
             for(size_t i = 0, count = g_Renderer->m_Lights.size(); i < count; ++i)
             {
-                Light& l = g_Renderer->m_Lights[i];
+                Scene::Light& l = g_Renderer->m_Lights[i];
                 const char* typeStr = "";
                 switch(l.m_Type)
                 {
@@ -477,7 +477,7 @@ void Game::ShowSceneWindow()
     ImGui::End();
 }
 
-void Game::ShowSceneEntity(Entity& e)
+void Game::ShowSceneEntity(Scene::Entity& e)
 {
     string s;
     s = e.m_Visible ? (ICON_FA_EYE " Entity") : (ICON_FA_EYE_SLASH " Entity");

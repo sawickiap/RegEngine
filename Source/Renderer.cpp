@@ -596,7 +596,7 @@ void Renderer::Render()
 
                 for(size_t lightIndex = 0; lightIndex < m_Lights.size(); ++lightIndex)
                 {
-                    const Light& l = m_Lights[lightIndex];
+                    const Scene::Light& l = m_Lights[lightIndex];
                     if(l.m_Enabled)
                     {
                         PIX_EVENT_SCOPE(cmdList, std::format(L"Light {} Type={}", lightIndex, l.m_Type));
@@ -1079,7 +1079,7 @@ void Renderer::ClearModel()
     m_Textures.clear();
     m_Materials.clear();
     m_Meshes.clear();
-    m_RootEntity = Entity{};
+    m_RootEntity = Scene::Entity{};
 }
 
 void Renderer::ClearGBufferShader()
@@ -1096,14 +1096,14 @@ void Renderer::ClearGBufferShader()
 
 void Renderer::CreateLights()
 {
-    Light dl = {
+    Scene::Light dl = {
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = g_LightColor.GetValue(),
         .m_DirectionToLight_Position = g_DirectionToLight.GetValue()
     };
     m_Lights.push_back(dl);
 
-    Light pl0 = {
+    Scene::Light pl0 = {
         .m_Enabled = false,
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = vec3(0.5f, 0.f, 0.f),
@@ -1111,7 +1111,7 @@ void Renderer::CreateLights()
     };
     m_Lights.push_back(pl0);
 
-    Light pl1 = {
+    Scene::Light pl1 = {
         .m_Enabled = false,
         .m_Type = LIGHT_TYPE_DIRECTIONAL,
         .m_Color = vec3(0.f, 0.5f, 0.f),
@@ -1166,7 +1166,7 @@ void Renderer::LoadModel(bool refreshAll)
     } CATCH_PRINT_ERROR(ClearModel(););
 }
 
-void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node)
+void Renderer::LoadModelNode(Scene::Entity& outEntity, const aiScene* scene, const aiNode* node)
 {
     outEntity.m_Title = ConvertCharsToUnicode(str_view(node->mName.data, node->mName.length), CP_UTF8);
 
@@ -1179,7 +1179,7 @@ void Renderer::LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNo
     
     for(uint32_t i = 0; i < node->mNumChildren; ++i)
     {
-        unique_ptr<Entity> childEntity = std::make_unique<Entity>();
+        unique_ptr<Scene::Entity> childEntity = std::make_unique<Scene::Entity>();
         LoadModelNode(*childEntity, scene, node->mChildren[i]);
         outEntity.m_Children.push_back(std::move(childEntity));
     }
@@ -1234,7 +1234,7 @@ void Renderer::LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, boo
             std::swap(indices[i], indices[i + 2]);
     }
 
-    SceneMesh mesh;
+    Scene::Mesh mesh;
     mesh.m_Title = ConvertCharsToUnicode(str_view(assimpMesh->mName.data, assimpMesh->mName.length), CP_UTF8);
     mesh.m_MaterialIndex = assimpMesh->mMaterialIndex;
     mesh.m_Mesh = std::make_unique<Mesh>();
@@ -1252,7 +1252,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 {
     ERR_TRY;
 
-    SceneMaterial sceneMat;
+    Scene::Material sceneMat;
 
     auto mapModesToAddressMode = [](D3D12_TEXTURE_ADDRESS_MODE &outAddressMode, const aiTextureMapMode mapModes[3]) -> bool
     {
@@ -1354,7 +1354,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         if(GetFixedBufferMaterialProperty(std::span<char>(&buf, 1), material, "$mat.twosided") &&
             buf != 0)
         {
-            sceneMat.m_Flags |= SceneMaterial::FLAG_TWOSIDED;
+            sceneMat.m_Flags |= Scene::Material::FLAG_TWOSIDED;
         }
     }
 
@@ -1364,7 +1364,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         if(GetStringMaterialProperty(s, material, "$mat.gltf.alphaMode"))
         {
             if(s == "MASK")
-                sceneMat.m_Flags |= SceneMaterial::FLAG_ALPHA_MASK;
+                sceneMat.m_Flags |= Scene::Material::FLAG_ALPHA_MASK;
             else if(s != "OPAQUE")
                 LogWarningF(L"Unrecognized material property \"$mat.gltf.alphaMode\" value: {}", str_view(s));
         }
@@ -1372,7 +1372,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 
     // Alpha cutoff.
     sceneMat.m_AlphaCutoff = 0.5f;
-    if((sceneMat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0)
+    if((sceneMat.m_Flags & Scene::Material::FLAG_ALPHA_MASK) != 0)
     {
         float v;
         if(GetFloatMaterialProperty(v, material, "$mat.gltf.alphaCutoff"))
@@ -1404,7 +1404,7 @@ size_t Renderer::TryLoadTexture(const wstr_view& title, const std::filesystem::p
     // Not found - load new texture.
     try
     {
-        SceneTexture tex;
+        Scene::Texture tex;
         tex.m_Title = title;
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
@@ -1426,7 +1426,7 @@ void Renderer::CreateProceduralModel()
     CreateLights();
 
     wstring normalTexturePath = ConvertCharsToUnicode(g_NormalTexturePath.GetValue(), CP_UTF8);
-    SceneMaterial mat;
+    Scene::Material mat;
     mat.m_NormalTextureIndex = TryLoadTexture(normalTexturePath, StrToPath(normalTexturePath), false, true);
     m_Materials.push_back(mat);
 
@@ -1450,7 +1450,7 @@ void Renderer::CreateProceduralModel()
     };
     Mesh::IndexType indices[] = {0, 1, 2, 2, 1, 3};
 
-    SceneMesh mesh;
+    Scene::Mesh mesh;
     mesh.m_MaterialIndex = 0;
     mesh.m_Mesh = std::make_unique<Mesh>();
     mesh.m_Mesh->Init(L"Procedural mesh", D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE, D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST,
@@ -1470,7 +1470,7 @@ void Renderer::WaitForFenceOnCPU(UINT64 value)
 	}
 }
 
-void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity)
+void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const Scene::Entity& entity)
 {
     // I thought this is the right way
     const mat4 entityXform = parentXform * entity.m_Transform;
@@ -1503,17 +1503,17 @@ void Renderer::RenderEntity(CommandList& cmdList, const mat4& parentXform, const
     }
 }
 
-void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex)
+void Renderer::RenderEntityMesh(CommandList& cmdList, const Scene::Entity& entity, size_t meshIndex)
 {
     const Mesh* const mesh = m_Meshes[meshIndex].m_Mesh.get();
     const size_t materialIndex = m_Meshes[meshIndex].m_MaterialIndex;
     assert(materialIndex < m_Materials.size());
-    const SceneMaterial& mat = m_Materials[materialIndex];
+    const Scene::Material& mat = m_Materials[materialIndex];
 
-    const size_t backfaceCullingVariant = g_BackfaceCullingEnabled.GetValue() && (mat.m_Flags & SceneMaterial::FLAG_TWOSIDED) == 0 ?
+    const size_t backfaceCullingVariant = g_BackfaceCullingEnabled.GetValue() && (mat.m_Flags & Scene::Material::FLAG_TWOSIDED) == 0 ?
         GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_DEFAULT :
         GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_TWOSIDED;
-    const size_t alphaTestVariant = (mat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0 ?
+    const size_t alphaTestVariant = (mat.m_Flags & Scene::Material::FLAG_ALPHA_MASK) != 0 ?
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED : 
         GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED;
     ID3D12PipelineState* const pso = m_GBufferPipelineState[backfaceCullingVariant][alphaTestVariant].Get();
@@ -1526,9 +1526,9 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     {
         PerMaterialConstants perMaterialConstants = {};
         perMaterialConstants.m_Flags = 0;
-        if((mat.m_Flags & SceneMaterial::FLAG_TWOSIDED) != 0)
+        if((mat.m_Flags & Scene::Material::FLAG_TWOSIDED) != 0)
             perMaterialConstants.m_Flags |= MATERIAL_FLAG_TWOSIDED;
-        if((mat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0)
+        if((mat.m_Flags & Scene::Material::FLAG_ALPHA_MASK) != 0)
         {
             perMaterialConstants.m_Flags |= MATERIAL_FLAG_ALPHA_MASK;
             perMaterialConstants.m_AlphaCutoff = mat.m_AlphaCutoff;

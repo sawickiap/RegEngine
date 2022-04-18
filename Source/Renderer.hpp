@@ -60,13 +60,35 @@ private:
     Descriptor m_Descriptors;
 };
 
-struct Entity
+namespace Scene
 {
+
+struct Texture
+{
+    // Just for display to the user.
     wstring m_Title;
-    mat4 m_Transform = glm::identity<mat4>();
-    bool m_Visible = true;
-    std::vector<unique_ptr<Entity>> m_Children;
-    std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
+    wstring m_ProcessedPath;
+    // Can be null - use some standard texture then.
+    unique_ptr<::Texture> m_Texture;
+};
+
+struct Material
+{
+    enum FLAG
+    {
+        FLAG_TWOSIDED = 0x1,
+        FLAG_ALPHA_MASK = 0x2,
+    };
+
+    uint32_t m_Flags = 0;
+    size_t m_AlbedoTextureIndex = SIZE_MAX;
+    size_t m_NormalTextureIndex = SIZE_MAX;
+    // Use only WRAP or CLAMP.
+    D3D12_TEXTURE_ADDRESS_MODE m_AlbedoTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    D3D12_TEXTURE_ADDRESS_MODE m_NormalTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+    // Valid only when m_Flags & FLAG_ALPHA_MASK.
+    // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
+    float m_AlphaCutoff = 0.5f;
 };
 
 struct Light
@@ -79,6 +101,24 @@ struct Light
     // LIGHT_TYPE_POINT: position (world space)
     vec3 m_DirectionToLight_Position;
 };
+
+struct Mesh
+{
+    wstring m_Title;
+    unique_ptr<::Mesh> m_Mesh;
+    size_t m_MaterialIndex = SIZE_MAX;
+};
+
+struct Entity
+{
+    wstring m_Title;
+    mat4 m_Transform = glm::identity<mat4>();
+    bool m_Visible = true;
+    std::vector<unique_ptr<Entity>> m_Children;
+    std::vector<size_t> m_Meshes; // Indices into Renderer::m_Meshes.
+};
+
+} // namespace Scene
 
 /*
 It offers:
@@ -116,45 +156,12 @@ It creates and keeps ID3D12Device and other key objects.
 class Renderer
 {
 public:
-    struct SceneMesh
-    {
-        wstring m_Title;
-        unique_ptr<Mesh> m_Mesh;
-        size_t m_MaterialIndex = SIZE_MAX;
-    };
-    struct SceneMaterial
-    {
-        enum FLAG
-        {
-            FLAG_TWOSIDED = 0x1,
-            FLAG_ALPHA_MASK = 0x2,
-        };
-
-        uint32_t m_Flags = 0;
-        size_t m_AlbedoTextureIndex = SIZE_MAX;
-        size_t m_NormalTextureIndex = SIZE_MAX;
-        // Use only WRAP or CLAMP.
-        D3D12_TEXTURE_ADDRESS_MODE m_AlbedoTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        D3D12_TEXTURE_ADDRESS_MODE m_NormalTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-        // Valid only when m_Flags & FLAG_ALPHA_MASK.
-        // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
-        float m_AlphaCutoff = 0.5f;
-    };
-    struct SceneTexture
-    {
-        // Just for display to the user.
-        wstring m_Title;
-        wstring m_ProcessedPath;
-        // Can be null - use some standard texture then.
-        unique_ptr<Texture> m_Texture;
-    };
-
     bool m_AmbientEnabled = false;
-    std::vector<Light> m_Lights;
-    Entity m_RootEntity;
-    std::vector<SceneMesh> m_Meshes;
-    std::vector<SceneMaterial> m_Materials;
-    std::vector<SceneTexture> m_Textures;
+    std::vector<Scene::Light> m_Lights;
+    Scene::Entity m_RootEntity;
+    std::vector<Scene::Mesh> m_Meshes;
+    std::vector<Scene::Material> m_Materials;
+    std::vector<Scene::Texture> m_Textures;
 
 	Renderer(IDXGIFactory4* dxgiFactory, IDXGIAdapter1* adapter, HWND wnd);
 	void Init();
@@ -264,7 +271,7 @@ private:
     void ClearGBufferShader();
     void CreateLights();
     void LoadModel(bool refreshAll);
-    void LoadModelNode(Entity& outEntity, const aiScene* scene, const aiNode* node);
+    void LoadModelNode(Scene::Entity& outEntity, const aiScene* scene, const aiNode* node);
     // Always pushes one new object to m_Meshes.
     void LoadModelMesh(const aiScene* scene, const aiMesh* assimpMesh, bool globalXformIsInverted);
     void LoadMaterial(const std::filesystem::path& modelDir, const aiScene* scene, uint32_t materialIndex,
@@ -275,8 +282,8 @@ private:
 
     void WaitForFenceOnCPU(UINT64 value);
 
-    void RenderEntity(CommandList& cmdList, const mat4& parentXform, const Entity& entity);
-    void RenderEntityMesh(CommandList& cmdList, const Entity& entity, size_t meshIndex);
+    void RenderEntity(CommandList& cmdList, const mat4& parentXform, const Scene::Entity& entity);
+    void RenderEntityMesh(CommandList& cmdList, const Scene::Entity& entity, size_t meshIndex);
     void SaveD3D12MAJSONDump();
 };
 
