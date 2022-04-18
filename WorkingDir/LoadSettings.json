@@ -55,6 +55,7 @@
     ],
     "BackFaceCullingMode": 0,*/
 
+    /*
     "Assimp.ModelPath": "e:\\Tmp\\MODELS\\Cauldron-Media-master\\Sponza\\glTF\\Sponza.gltf",
     "Assimp.Scale": 1.0,
     "Assimp.Transform": [
@@ -64,6 +65,7 @@
         0, 0, 0, 1
     ],
     "BackFaceCullingMode": 1
+    */
 
     /*
     "TexturePath": "",
@@ -80,4 +82,25 @@
     ],
     "Assimp.NegateBitangent": true,
     */
+
+    "Assimp.ModelPath": "e:/Tmp/MODELS/Test1.glb",
+    "Assimp.Scale": 0.2,
+    "Assimp.Transform": [
+        1, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 1, 0, 0,
+        0, 0, 0, 1
+    ],
+    "BackFaceCullingMode": 0,
+    "TexturePath": "e:/Tmp/MODELS/testTexture.png"
 }
+
+/*
+    Canonical conversion from Assimp to RegEngine coordinate system:
+    "Assimp.Transform": [
+        1, 0, 0, 0,
+        0, 0, 1, 0,
+        0, 1, 0, 0,
+        0, 0, 0, 1
+    ],
+*/

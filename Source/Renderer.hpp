@@ -133,6 +133,9 @@ public:
         uint32_t m_Flags = 0;
         size_t m_AlbedoTextureIndex = SIZE_MAX;
         size_t m_NormalTextureIndex = SIZE_MAX;
+        // Use only WRAP or CLAMP.
+        D3D12_TEXTURE_ADDRESS_MODE m_AlbedoTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+        D3D12_TEXTURE_ADDRESS_MODE m_NormalTextureAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
         // Valid only when m_Flags & FLAG_ALPHA_MASK.
         // Pixels with albedo.a < m_AlphaCutoff are discarded, according to GLTF specification.
         float m_AlphaCutoff = 0.5f;

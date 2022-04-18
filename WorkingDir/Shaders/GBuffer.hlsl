@@ -59,14 +59,15 @@ VS_OUTPUT MainVS(VS_INPUT input)
 
 Texture2D<float4> albedoTexture : register(t0);
 Texture2D<float4> normalTexture : register(t1);
-SamplerState s : register(s0);
+SamplerState albedoSampler : register(s0);
+SamplerState normalSampler : register(s1);
 
 void MainPS(
 	VS_OUTPUT input,
 	out float4 outAlbedo : SV_Target0,
 	out float4 outNormal_View : SV_Target1)
 {
-	float4 albedoSample = albedoTexture.Sample(s, input.texCoord);
+	float4 albedoSample = albedoTexture.Sample(albedoSampler, input.texCoord);
 
 #if ALPHA_TEST
 	clip(albedoSample.a - perMaterialConstants.AlphaCutoff);
@@ -75,7 +76,7 @@ void MainPS(
 	outAlbedo.rgb = albedoSample.rgb;
 	outAlbedo.a = 1.0;
 
-	float3 normal_Tangent = normalTexture.Sample(s, input.texCoord).rgb * 2.0 - 1.0;
+	float3 normal_Tangent = normalTexture.Sample(normalSampler, input.texCoord).rgb * 2.0 - 1.0;
 	// TODO check which normalize() are required and which are not.
 	normal_Tangent = normalize(normal_Tangent);
 	float3x3 TBN = float3x3(

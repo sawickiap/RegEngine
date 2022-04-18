@@ -550,9 +550,6 @@ void Renderer::Render()
             cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
                 m_StandardRootSignature->GetCBVParamIndex(0),
                 perFrameConstants);
-            cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-                m_StandardRootSignature->GetSamplerParamIndex(0),
-                m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, D3D12_TEXTURE_ADDRESS_MODE_WRAP));
 
             vec3 scaleVec = vec3(g_AssimpScale.GetValue());
             mat4 globalXform = glm::scale(glm::identity<mat4>(), scaleVec);
@@ -1255,6 +1252,23 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
 {
     ERR_TRY;
 
+    SceneMaterial sceneMat;
+
+    auto mapModesToAddressMode = [](D3D12_TEXTURE_ADDRESS_MODE &outAddressMode, const aiTextureMapMode mapModes[3]) -> bool
+    {
+        if(mapModes[0] == aiTextureMapMode_Wrap && mapModes[1] == aiTextureMapMode_Wrap)
+        {
+            outAddressMode = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+            return true;
+        }
+        if(mapModes[0] == aiTextureMapMode_Clamp && mapModes[1] == aiTextureMapMode_Clamp)
+        {
+            outAddressMode = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+            return true;
+        }
+        return false;
+    };
+
     string albedoPath;
     string normalPath;
 
@@ -1270,7 +1284,11 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         const aiReturn ret = material->GetTexture(aiTextureType_DIFFUSE, 0,
             &s, &mapping, &uvindex, &blend, &op, mapmodes);
         if(ret == aiReturn_SUCCESS)
+        {
             albedoPath = s.C_Str();
+            if(!mapModesToAddressMode(sceneMat.m_AlbedoTextureAddressMode, mapmodes))
+                LogWarning(L"Unsupported map modes for diffuse texture.");
+        }
     }
     if(material->GetTextureCount(aiTextureType_NORMALS) >= 1)
     {
@@ -1283,7 +1301,11 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
         const aiReturn ret = material->GetTexture(aiTextureType_NORMALS, 0,
             &s, &mapping, &uvindex, &blend, &op, mapmodes);
         if(ret == aiReturn_SUCCESS)
+        {
             normalPath = s.C_Str();
+            if(!mapModesToAddressMode(sceneMat.m_NormalTextureAddressMode, mapmodes))
+                LogWarning(L"Unsupported map modes for normal texture.");
+        }
     }
     // Method found in a model from Turbosquid made in Maya.
     if(albedoPath.empty())
@@ -1307,6 +1329,7 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     
     if(!albedoPathP.empty() && !albedoPathP.is_absolute())
         albedoPathP = modelDir / albedoPathP;
+    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathW, albedoPathP, true, !refreshAll);
 
     wstring normalPathW;
     std::filesystem::path normalPathP;
@@ -1323,45 +1346,39 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     }
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
+    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathW, normalPathP, false, !refreshAll);
 
     // Twosided. Property found in Sponza scene, as 1-byte buffer = 0 or 1.
-    bool twoSided = false;
     {
         char buf;
-        if(GetFixedBufferMaterialProperty(std::span<char>(&buf, 1), material, "$mat.twosided"))
-            twoSided = (buf != 0);
+        if(GetFixedBufferMaterialProperty(std::span<char>(&buf, 1), material, "$mat.twosided") &&
+            buf != 0)
+        {
+            sceneMat.m_Flags |= SceneMaterial::FLAG_TWOSIDED;
+        }
     }
 
     // Alpha mask. Property found in Sponza scene, as strinrg = "MASK".
-    bool alphaMask = false;
     {
         string s;
         if(GetStringMaterialProperty(s, material, "$mat.gltf.alphaMode"))
         {
             if(s == "MASK")
-                alphaMask = true;
+                sceneMat.m_Flags |= SceneMaterial::FLAG_ALPHA_MASK;
             else if(s != "OPAQUE")
                 LogWarningF(L"Unrecognized material property \"$mat.gltf.alphaMode\" value: {}", str_view(s));
         }
     }
 
     // Alpha cutoff.
-    float alphaCutoff = 0.5f;
-    if(alphaMask)
+    sceneMat.m_AlphaCutoff = 0.5f;
+    if((sceneMat.m_Flags & SceneMaterial::FLAG_ALPHA_MASK) != 0)
     {
         float v;
         if(GetFloatMaterialProperty(v, material, "$mat.gltf.alphaCutoff"))
-            alphaCutoff = v;
+            sceneMat.m_AlphaCutoff = v;
     }
 
-    SceneMaterial sceneMat;
-    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathW, albedoPathP, true, !refreshAll);
-    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathW, normalPathP, false, !refreshAll);
-    if(twoSided)
-        sceneMat.m_Flags |= SceneMaterial::FLAG_TWOSIDED;
-    if(alphaMask)
-        sceneMat.m_Flags |= SceneMaterial::FLAG_ALPHA_MASK;
-    sceneMat.m_AlphaCutoff = alphaCutoff;
     m_Materials.push_back(std::move(sceneMat));
 
     ERR_CATCH_MSG(std::format(L"Cannot load material {}.", materialIndex));
@@ -1542,6 +1559,9 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     }
     cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
         m_StandardRootSignature->GetSRVParamIndex(0), albedoTextureDescriptorHandle);
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+        m_StandardRootSignature->GetSamplerParamIndex(0),
+        m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_AlbedoTextureAddressMode));
 
     Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
         m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
@@ -1558,6 +1578,9 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Entity& entity, size
     }
     cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
         m_StandardRootSignature->GetSRVParamIndex(1), normalTextureDescriptorHandle);
+    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+        m_StandardRootSignature->GetSamplerParamIndex(1),
+        m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_NormalTextureAddressMode));
 
     cmdList.SetPrimitiveTopology(mesh->GetTopology());
 
