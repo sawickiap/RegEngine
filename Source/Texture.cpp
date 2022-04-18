@@ -277,7 +277,7 @@ void Texture::UploadMipLevel(uint32_t mipLevel, const uvec2& size, const D3D12_S
     const uint32_t bytesPerPixel = bitsPerPixel / 8;
 
     // Create source buffer.
-    const size_t srcBufRowPitch = std::max<size_t>(size.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
+    const size_t srcBufRowPitch = AlignUp<size_t>(size.x * bytesPerPixel, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
     const size_t srcBufSize = srcBufRowPitch * size.y;
     ComPtr<D3D12MA::Allocation> srcBuf;
     {
