@@ -49,7 +49,7 @@ public:
     const TimeData& GetTime() const { return m_Time; }
     float GetFPS() const { return m_FPSCalculator.GetFPS(); }
 
-    void Exit(bool failure);
+    void Exit(bool cancelSaving);
     void SetCursor(NativeCursorID id);
 
 private:
@@ -65,7 +65,7 @@ private:
     ImGuiMouseCursor m_LastImGuiMouseCursor = -1; // ImGuiMouseCursor_None
     TimeData m_Time;
     FPSCalculator m_FPSCalculator;
-    bool m_ExitWithFailure = false;
+    bool m_CancelSaving = false;
 
     static LRESULT WINAPI GlobalWndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam);
     static uint32_t GetKeyModifiers(); // Returns bit flags KEY_MODIFIERS.

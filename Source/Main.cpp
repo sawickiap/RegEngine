@@ -209,8 +209,8 @@ Application::Application()
 
 Application::~Application()
 {
-    if(m_ExitWithFailure)
-        LogMessage(L"Exiting with failure. Runtime settings are not saved.");
+    if(m_CancelSaving)
+        LogMessage(L"Exiting without saving.");
     else
         SaveRuntimeSettings();
 
@@ -360,7 +360,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
         {
             OnDestroy();
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true;)
+        CATCH_PRINT_ERROR(m_CancelSaving=true;)
         PostQuitMessage(0);
         return 0;
     case WM_KEYDOWN:
@@ -375,7 +375,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     OnKeyUp(wParam);
             }
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_CancelSaving=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_CHAR:
         try
@@ -402,7 +402,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_CancelSaving=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
@@ -424,7 +424,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_CancelSaving=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
@@ -446,7 +446,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_CancelSaving=true; DestroyWindow(m_Wnd);)
         return 0;
     case WM_MOUSEWHEEL:
         try
@@ -464,7 +464,7 @@ LRESULT Application::WndProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 g_SystemCursors.SetCursorFromID(m_NativeCursorID);
             }
         }
-        CATCH_PRINT_ERROR(m_ExitWithFailure=true; DestroyWindow(m_Wnd);)
+        CATCH_PRINT_ERROR(m_CancelSaving=true; DestroyWindow(m_Wnd);)
         return 0;
     }
     return DefWindowProc(wnd, msg, wParam, lParam);
@@ -543,7 +543,7 @@ int Application::Run()
         LogMessage(L"Application exiting.");
         return (int)msg.wParam;
     }
-    CATCH_PRINT_ERROR(m_ExitWithFailure=true; return EXIT_CODE_RUNTIME_ERROR;)
+    CATCH_PRINT_ERROR(m_CancelSaving = true; return EXIT_CODE_RUNTIME_ERROR;)
 }
 
 void Application::LoopIteration()
@@ -581,10 +581,10 @@ void Application::FrameRandomSleep()
     }
 }
 
-void Application::Exit(bool failure)
+void Application::Exit(bool cancelSaving)
 {
-    if(failure)
-        m_ExitWithFailure = true;
+    if(cancelSaving)
+        m_CancelSaving = true;
     PostMessage(m_Wnd, WM_CLOSE, 0, 0);
 }
 
@@ -624,6 +624,7 @@ int wmain(int argc, wchar_t** argv)
             break;
         case ApplicationParameters::Mode::AssimpPrint:
             AssimpPrint(params.m_Path);
+            app.Exit(true);
             break;
         default:
             assert(0);
