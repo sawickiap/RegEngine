@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Descriptors.hpp"
+#include <unordered_map>
 
 class AssimpInit;
 
@@ -78,9 +79,13 @@ struct Material
     {
         FLAG_TWOSIDED = 0x1,
         FLAG_ALPHA_MASK = 0x2,
+        FLAG_HAS_MATERIAL_COLOR = 0x4,
+        FLAG_HAS_ALBEDO_TEXTURE = 0x8,
+        FLAG_HAS_NORMAL_TEXTURE = 0x10,
     };
 
     uint32_t m_Flags = 0;
+    packed_vec3 m_Color = packed_vec3(1.f, 1.f, 1.f);
     size_t m_AlbedoTextureIndex = SIZE_MAX;
     size_t m_NormalTextureIndex = SIZE_MAX;
     // Use only WRAP or CLAMP.
@@ -232,20 +237,11 @@ private:
     unique_ptr<StandardRootSignature> m_StandardRootSignature;
     unique_ptr<MultiShader> m_GBufferMultiPixelShader;
     uint32_t m_NextD3D12MAJSONDumpIndex = 0;
-    
-    enum GBUFFER_SHADER_VARIANT_BACKFACE_CULLING
-    {
-        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_DEFAULT,
-        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_TWOSIDED,
-        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT,
-    };
-    enum GBUFFER_SHADER_VARIANT_ALPHA_TEST
-    {
-        GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED,
-        GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED,
-        GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT
-    };
-	ComPtr<ID3D12PipelineState> m_GBufferPipelineState[GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT][GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT];
+
+    // Key is combination of Scene::Material::FLAG_*.
+    // Value null means the PSO couldn't be created due to error, which has been printed to the log.
+    using GBufferPipelineStateMapType = std::unordered_map<uint32_t, ComPtr<ID3D12PipelineState>>;
+    GBufferPipelineStateMapType m_GBufferPipelineStates;
     
     unique_ptr<AssimpInit> m_AssimpInit;
     unique_ptr<FlyingCamera> m_Camera;
@@ -261,14 +257,14 @@ private:
 	void CreateSwapChain();
 	void CreateFrameResources();
 	void CreateResources();
-    void CreateGBufferPipelineState();
+    ID3D12PipelineState* GetOrCreateGBufferPipelineState(uint32_t materialFlags);
     void CreateLightingPipelineStates();
     void CreatePostprocessingPipelineState();
     void CreateStandardTextures();
     void InitImGui();
     void ShutdownImGui();
     void ClearModel();
-    void ClearGBufferShader();
+    void ClearGBufferShaders();
     void CreateLights();
     void LoadModel(bool refreshAll);
     void LoadModelNode(Scene::Entity& outEntity, const aiScene* scene, const aiNode* node);

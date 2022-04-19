@@ -3,6 +3,9 @@
 /*
 Macros:
 ALPHA_TEST = 0, 1
+HAS_MATERIAL_COLOR = 0, 1
+HAS_ALBEDO_TEXTURE = 0, 1
+HAS_NORMAL_TEXTURE = 0, 1
 */
 
 struct PerObjectConstants
@@ -17,6 +20,9 @@ struct PerMaterialConstants
 	uint Flags; // Use MATERIAL_FLAG_*
 	float AlphaCutoff; // Valid only when (Flags & MATERIAL_FLAG_ALPHA_MASK)
 	uint2 _padding0;
+
+	float3 Color; // Valid only when (Flags & MATERIAL_FLAG_HAS_MATERIAL_COLOR)
+	uint _padding1;
 };
 ConstantBuffer<PerMaterialConstants> perMaterialConstants : register(b2);
 
@@ -57,25 +63,29 @@ VS_OUTPUT MainVS(VS_INPUT input)
 ////////////////////////////////////////////////////////////////////////////////
 #elif PIXEL_SHADER
 
-Texture2D<float4> albedoTexture : register(t0);
-Texture2D<float4> normalTexture : register(t1);
-SamplerState albedoSampler : register(s0);
-SamplerState normalSampler : register(s1);
+Texture2D<float4> albedoTexture : register(t0); // Valid only when (Flags & MATERIAL_FLAG_HAS_ALBEDO_TEXTURE)
+Texture2D<float4> normalTexture : register(t1); // Valid only when (Flags & MATERIAL_FLAG_HAS_NORMAL_TEXTURE)
+SamplerState albedoSampler : register(s0); // Valid only when (Flags & MATERIAL_FLAG_HAS_ALBEDO_TEXTURE)
+SamplerState normalSampler : register(s1); // Valid only when (Flags & MATERIAL_FLAG_HAS_NORMAL_TEXTURE)
 
 void MainPS(
 	VS_OUTPUT input,
 	out float4 outAlbedo : SV_Target0,
 	out float4 outNormal_View : SV_Target1)
 {
-	float4 albedoSample = albedoTexture.Sample(albedoSampler, input.texCoord);
-
-#if ALPHA_TEST
-	clip(albedoSample.a - perMaterialConstants.AlphaCutoff);
+	float4 albedoColor = 1.0.xxxx;
+#if HAS_MATERIAL_COLOR
+	albedoColor.rgb *= perMaterialConstants.Color;
 #endif
+#if HAS_ALBEDO_TEXTURE
+	albedoColor *= albedoTexture.Sample(albedoSampler, input.texCoord);
+#endif
+#if ALPHA_TEST
+	clip(albedoColor.a - perMaterialConstants.AlphaCutoff);
+#endif
+	outAlbedo = float4(albedoColor.rgb, 1.0);
 
-	outAlbedo.rgb = albedoSample.rgb;
-	outAlbedo.a = 1.0;
-
+#if HAS_NORMAL_TEXTURE
 	float3 normal_Tangent = normalTexture.Sample(normalSampler, input.texCoord).rgb * 2.0 - 1.0;
 	// TODO check which normalize() are required and which are not.
 	normal_Tangent = normalize(normal_Tangent);
@@ -84,14 +94,12 @@ void MainPS(
 		normalize(input.bitangent_Local),
 		normalize(input.normal_Local));
 	float3 normal_Local = mul(normal_Tangent, TBN);
+#else
+	float3 normal_Local = input.normal_Local;
+#endif
 	float3 normal_View = mul((float3x3)perObjectConstants.WorldView, normal_Local);
-	normal_View = normalize(normal_View);
 
-	//TEMP
-	//normal_View = mul((float3x3)perObjectConstants.WorldView, input.normal_Local);
-
-	outNormal_View.rgb = normalize(normal_View);
-	outNormal_View.a = 1.0;
+	outNormal_View.rgb = float4(normalize(normal_View), 1.0);
 }
 
 #endif

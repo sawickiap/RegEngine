@@ -408,6 +408,12 @@ void Game::ShowSceneWindow()
                     s += " TWOSIDED";
                 if(m.m_Flags & Scene::Material::FLAG_ALPHA_MASK)
                     s += std::format(" ALPHA_MASK AlphaCutoff={:.1}", m.m_AlphaCutoff);
+                if(m.m_Flags & Scene::Material::FLAG_HAS_MATERIAL_COLOR)
+                    s += " HAS_MATERIAL_COLOR";
+                if(m.m_Flags & Scene::Material::FLAG_HAS_ALBEDO_TEXTURE)
+                    s += " HAS_ALBEDO_TEXTURE";
+                if(m.m_Flags & Scene::Material::FLAG_HAS_NORMAL_TEXTURE)
+                    s += " HAS_NORMAL_TEXTURE";
                 
                 ImGui::Text("%s", s.c_str());
             }

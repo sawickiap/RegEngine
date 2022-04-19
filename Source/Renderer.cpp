@@ -152,6 +152,9 @@ struct PerMaterialConstants
     uint32_t m_Flags;
     float m_AlphaCutoff;
     uint32_t _padding0[2];
+
+    packed_vec3 m_Color;
+    uint32_t _padding1;
 };
 
 struct LightConstants
@@ -337,7 +340,12 @@ void Renderer::Init()
     m_ShaderCompiler->Init();
 
     {
-        wstr_view MACRO_NAMES[] = { L"ALPHA_TEST" };
+        wstr_view MACRO_NAMES[] = {
+            L"ALPHA_TEST",
+            L"HAS_MATERIAL_COLOR",
+            L"HAS_ALBEDO_TEXTURE",
+            L"HAS_NORMAL_TEXTURE",
+        };
         m_GBufferMultiPixelShader = std::make_unique<MultiShader>();
         m_GBufferMultiPixelShader->Init(ShaderType::Pixel, L"Shaders/GBuffer.hlsl", L"MainPS", MACRO_NAMES);
     }
@@ -386,10 +394,9 @@ void Renderer::Reload(bool refreshAll)
 	m_CmdQueue->Signal(m_Fence.Get(), m_NextFenceValue);
     WaitForFenceOnCPU(m_NextFenceValue++);
     
-    ClearGBufferShader();
+    ClearGBufferShaders();
     ClearModel();
 
-    CreateGBufferPipelineState();
     CreatePostprocessingPipelineState();
     CreateLightingPipelineStates();
     LoadModel(refreshAll);
@@ -821,71 +828,72 @@ void Renderer::CreateResources()
         m_GBuffers[i]->Init(resDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, std::format(L"GBuffer {}", GBUFFER_NAMES[i]));
     }
 
-	CreateGBufferPipelineState();
 	CreateLightingPipelineStates();
 	CreatePostprocessingPipelineState();
 
     ERR_CATCH_FUNC;
 }
 
-void Renderer::CreateGBufferPipelineState()
+ID3D12PipelineState* Renderer::GetOrCreateGBufferPipelineState(uint32_t materialFlags)
 {
     assert(m_ColorRenderTarget);
 
-    ClearGBufferShader();
+    const auto it = m_GBufferPipelineStates.find(materialFlags);
+    if(it != m_GBufferPipelineStates.end())
+        return it->second.Get();
 
-    for(size_t backfaceCullingVariant = 0; backfaceCullingVariant < GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT; ++backfaceCullingVariant)
-    {
-        for(size_t alphaTestVariant = 0; alphaTestVariant < GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT; ++alphaTestVariant)
-        {
-            wstring variantDebugStr = std::format(L"{},{}", backfaceCullingVariant, alphaTestVariant);
+    ComPtr<ID3D12PipelineState>& pso = m_GBufferPipelineStates[materialFlags];
 
-            ERR_TRY
-            ERR_TRY
+    ERR_TRY
+    ERR_TRY
 
-            const uint32_t macroValues[] = {
-                (uint32_t)alphaTestVariant }; // ALPHA_TEST
+    const uint32_t macroValues[] = {
+        (materialFlags & Scene::Material::FLAG_ALPHA_MASK) ? 1u : 0u, // ALPHA_TEST
+        (materialFlags & Scene::Material::FLAG_HAS_MATERIAL_COLOR) ? 1u : 0u, // HAS_MATERIAL_COLOR
+        (materialFlags & Scene::Material::FLAG_HAS_ALBEDO_TEXTURE) ? 1u : 0u, // HAS_ALBEDO_TEXTURE
+        (materialFlags & Scene::Material::FLAG_HAS_NORMAL_TEXTURE) ? 1u : 0u, // HAS_NORMAL_TEXTURE
+    };
 
-            const bool backfaceCullingEnabled = g_BackFaceCullingMode.GetValue() > 0 && backfaceCullingVariant == 0;
+    const bool backfaceCullingEnabled = g_BackFaceCullingMode.GetValue() > 0 &&
+        (materialFlags & Scene::Material::FLAG_TWOSIDED) == 0;
 
-            Shader vs;
-            vs.Init(ShaderType::Vertex, L"Shaders/GBuffer.hlsl", L"MainVS");
+    Shader vs;
+    vs.Init(ShaderType::Vertex, L"Shaders/GBuffer.hlsl", L"MainVS");
 
-            const Shader* ps = m_GBufferMultiPixelShader->GetShader(macroValues);
-            CHECK_BOOL(ps);
+    const Shader* ps = m_GBufferMultiPixelShader->GetShader(macroValues);
+    CHECK_BOOL(ps);
 
-	        D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
-	            .pRootSignature = m_StandardRootSignature->GetRootSignature(),
-	            .VS = {
-                    .pShaderBytecode = vs.GetCode().data(),
-                    .BytecodeLength = vs.GetCode().size()},
-	            .PS = {
-                    .pShaderBytecode = ps->GetCode().data(),
-                    .BytecodeLength = ps->GetCode().size()},
-                .SampleMask = UINT32_MAX,
-	            .InputLayout = {
-                    .pInputElementDescs = Vertex::GetInputElements(),
-                    .NumElements = Vertex::GetInputElementCount()},
-	            .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-	            .NumRenderTargets = (UINT)GBuffer::Count,
-	            .DSVFormat = DEPTH_STENCIL_FORMAT,
-                .SampleDesc = {.Count = 1}};
-            for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
-	            desc.RTVFormats[i] = GBUFFER_FORMATS[i];
-            FillRasterizerDesc(desc.RasterizerState,
-                backfaceCullingEnabled ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE,
-                g_BackFaceCullingMode.GetValue() == 2 ? TRUE : FALSE);
-	        FillBlendDesc_NoBlending(desc.BlendState);
-            FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC desc = {
+	    .pRootSignature = m_StandardRootSignature->GetRootSignature(),
+	    .VS = {
+            .pShaderBytecode = vs.GetCode().data(),
+            .BytecodeLength = vs.GetCode().size()},
+	    .PS = {
+            .pShaderBytecode = ps->GetCode().data(),
+            .BytecodeLength = ps->GetCode().size()},
+        .SampleMask = UINT32_MAX,
+	    .InputLayout = {
+            .pInputElementDescs = Vertex::GetInputElements(),
+            .NumElements = Vertex::GetInputElementCount()},
+	    .PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+	    .NumRenderTargets = (UINT)GBuffer::Count,
+	    .DSVFormat = DEPTH_STENCIL_FORMAT,
+        .SampleDesc = {.Count = 1}};
+    for(size_t i = 0; i < (size_t)GBuffer::Count; ++i)
+	    desc.RTVFormats[i] = GBUFFER_FORMATS[i];
+    FillRasterizerDesc(desc.RasterizerState,
+        backfaceCullingEnabled ? D3D12_CULL_MODE_BACK : D3D12_CULL_MODE_NONE,
+        g_BackFaceCullingMode.GetValue() == 2 ? TRUE : FALSE);
+	FillBlendDesc_NoBlending(desc.BlendState);
+    FillDepthStencilDesc_DepthTest(desc.DepthStencilState, D3D12_DEPTH_WRITE_MASK_ALL, D3D12_COMPARISON_FUNC_GREATER);
 	
-            ComPtr<ID3D12PipelineState>& psoPtr = m_GBufferPipelineState[backfaceCullingVariant][alphaTestVariant];
-            CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, __uuidof(ID3D12PipelineState), &psoPtr));
-            SetD3D12ObjectName(psoPtr, std::format(L"G-buffer pipeline state {}", variantDebugStr));
+    CHECK_HR(m_Device->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pso)));
+    SetD3D12ObjectName(pso, std::format(L"G-buffer pipeline state Flags=0x{:X}", materialFlags));
 
-            ERR_CATCH_MSG(std::format(L"Cannot create G-buffer pipeline state {}.", variantDebugStr));
-            } CATCH_PRINT_ERROR(;);
-        }
-    }
+    return pso.Get();
+
+    ERR_CATCH_MSG(std::format(L"Cannot create G-buffer pipeline state with Flags=0x{:X}.", materialFlags));
+    } CATCH_PRINT_ERROR(return nullptr;);
 }
 
 void Renderer::CreateLightingPipelineStates()
@@ -1082,15 +1090,9 @@ void Renderer::ClearModel()
     m_RootEntity = Scene::Entity{};
 }
 
-void Renderer::ClearGBufferShader()
+void Renderer::ClearGBufferShaders()
 {
-    for(size_t i = 0; i < GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_COUNT; ++i)
-    {
-        for(size_t j = 0; j < GBUFFER_SHADER_VARIANT_ALPHA_TEST_COUNT; ++j)
-        {
-            m_GBufferPipelineState[i][j].Reset();
-        }
-    }
+    m_GBufferPipelineStates.clear();
     m_GBufferMultiPixelShader->Clear();
 }
 
@@ -1329,7 +1331,11 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     
     if(!albedoPathP.empty() && !albedoPathP.is_absolute())
         albedoPathP = modelDir / albedoPathP;
-    sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathW, albedoPathP, true, !refreshAll);
+    if(!albedoPathP.empty())
+    {
+        sceneMat.m_AlbedoTextureIndex = TryLoadTexture(albedoPathW, albedoPathP, true, !refreshAll);
+        sceneMat.m_Flags |= Scene::Material::FLAG_HAS_ALBEDO_TEXTURE;
+    }
 
     wstring normalPathW;
     std::filesystem::path normalPathP;
@@ -1346,7 +1352,11 @@ void Renderer::LoadMaterial(const std::filesystem::path& modelDir, const aiScene
     }
     if(!normalPathP.empty() && !normalPathP.is_absolute())
         normalPathP = modelDir / normalPathP;
-    sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathW, normalPathP, false, !refreshAll);
+    if(!normalPathP.empty())
+    {
+        sceneMat.m_NormalTextureIndex = TryLoadTexture(normalPathW, normalPathP, false, !refreshAll);
+        sceneMat.m_Flags |= Scene::Material::FLAG_HAS_NORMAL_TEXTURE;
+    }
 
     // Twosided. Property found in Sponza scene, as 1-byte buffer = 0 or 1.
     {
@@ -1510,13 +1520,15 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Scene::Entity& entit
     assert(materialIndex < m_Materials.size());
     const Scene::Material& mat = m_Materials[materialIndex];
 
-    const size_t backfaceCullingVariant = g_BackfaceCullingEnabled.GetValue() && (mat.m_Flags & Scene::Material::FLAG_TWOSIDED) == 0 ?
-        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_DEFAULT :
-        GBUFFER_SHADER_VARIANT_BACKFACE_CULLING_TWOSIDED;
-    const size_t alphaTestVariant = (mat.m_Flags & Scene::Material::FLAG_ALPHA_MASK) != 0 ?
-        GBUFFER_SHADER_VARIANT_ALPHA_TEST_ENABLED : 
-        GBUFFER_SHADER_VARIANT_ALPHA_TEST_DISABLED;
-    ID3D12PipelineState* const pso = m_GBufferPipelineState[backfaceCullingVariant][alphaTestVariant].Get();
+    uint32_t materialFlags = mat.m_Flags;
+    if(!g_BackfaceCullingEnabled.GetValue())
+        materialFlags |= Scene::Material::FLAG_TWOSIDED;
+    if(!g_AlbedoTexturesEnabled.GetValue())
+        materialFlags &= ~Scene::Material::FLAG_HAS_ALBEDO_TEXTURE;
+    if(!g_NormalMapsEnabled.GetValue())
+        materialFlags &= ~Scene::Material::FLAG_HAS_NORMAL_TEXTURE;
+
+    ID3D12PipelineState* const pso = GetOrCreateGBufferPipelineState(materialFlags);
 
     if(!pso)
         return;
@@ -1526,13 +1538,22 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Scene::Entity& entit
     {
         PerMaterialConstants perMaterialConstants = {};
         perMaterialConstants.m_Flags = 0;
-        if((mat.m_Flags & Scene::Material::FLAG_TWOSIDED) != 0)
+        if((materialFlags & Scene::Material::FLAG_TWOSIDED) != 0)
             perMaterialConstants.m_Flags |= MATERIAL_FLAG_TWOSIDED;
-        if((mat.m_Flags & Scene::Material::FLAG_ALPHA_MASK) != 0)
+        if((materialFlags & Scene::Material::FLAG_ALPHA_MASK) != 0)
         {
             perMaterialConstants.m_Flags |= MATERIAL_FLAG_ALPHA_MASK;
             perMaterialConstants.m_AlphaCutoff = mat.m_AlphaCutoff;
         }
+        if((materialFlags & Scene::Material::FLAG_HAS_MATERIAL_COLOR) != 0)
+        {
+            perMaterialConstants.m_Flags |= MATERIAL_FLAG_HAS_MATERIAL_COLOR;
+            perMaterialConstants.m_Color = mat.m_Color;
+        }
+        if((materialFlags & Scene::Material::FLAG_HAS_ALBEDO_TEXTURE) != 0)
+            perMaterialConstants.m_Flags |= MATERIAL_FLAG_HAS_ALBEDO_TEXTURE;
+        if((materialFlags & Scene::Material::FLAG_HAS_NORMAL_TEXTURE) != 0)
+            perMaterialConstants.m_Flags |= MATERIAL_FLAG_HAS_NORMAL_TEXTURE;
 
         void* perMaterialConstantsPtr = nullptr;
         D3D12_GPU_DESCRIPTOR_HANDLE perMaterialConstantsDescriptorHandle;
@@ -1544,43 +1565,49 @@ void Renderer::RenderEntityMesh(CommandList& cmdList, const Scene::Entity& entit
             perMaterialConstantsDescriptorHandle);
     }
 
-    Texture* albedoTexture = (mat.m_AlbedoTextureIndex != SIZE_MAX && g_AlbedoTexturesEnabled.GetValue()) ?
-        m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
-    D3D12_GPU_DESCRIPTOR_HANDLE albedoTextureDescriptorHandle;
-    if(albedoTexture)
+    if((materialFlags & Scene::Material::FLAG_HAS_ALBEDO_TEXTURE) != 0)
     {
-        albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
-            m_Textures[mat.m_AlbedoTextureIndex].m_Texture->GetDescriptor());
+        Texture* albedoTexture = (mat.m_AlbedoTextureIndex != SIZE_MAX && g_AlbedoTexturesEnabled.GetValue()) ?
+            m_Textures[mat.m_AlbedoTextureIndex].m_Texture.get() : nullptr;
+        D3D12_GPU_DESCRIPTOR_HANDLE albedoTextureDescriptorHandle;
+        if(albedoTexture)
+        {
+            albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+                m_Textures[mat.m_AlbedoTextureIndex].m_Texture->GetDescriptor());
+        }
+        else
+        {
+            albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+                m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
+        }
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetSRVParamIndex(0), albedoTextureDescriptorHandle);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetSamplerParamIndex(0),
+            m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_AlbedoTextureAddressMode));
     }
-    else
-    {
-        albedoTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
-            m_StandardTextures[(size_t)StandardTexture::Gray]->GetDescriptor());
-    }
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-        m_StandardRootSignature->GetSRVParamIndex(0), albedoTextureDescriptorHandle);
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-        m_StandardRootSignature->GetSamplerParamIndex(0),
-        m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_AlbedoTextureAddressMode));
 
-    Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
-        m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
-    D3D12_GPU_DESCRIPTOR_HANDLE normalTextureDescriptorHandle;
-    if(normalTexture && g_NormalMapsEnabled.GetValue())
+    if((materialFlags & Scene::Material::FLAG_HAS_NORMAL_TEXTURE) != 0)
     {
-        normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
-            m_Textures[mat.m_NormalTextureIndex].m_Texture->GetDescriptor());
+        Texture* normalTexture = mat.m_NormalTextureIndex != SIZE_MAX ?
+            m_Textures[mat.m_NormalTextureIndex].m_Texture.get() : nullptr;
+        D3D12_GPU_DESCRIPTOR_HANDLE normalTextureDescriptorHandle;
+        if(normalTexture)
+        {
+            normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+                m_Textures[mat.m_NormalTextureIndex].m_Texture->GetDescriptor());
+        }
+        else
+        {
+            normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
+                m_StandardTextures[(size_t)StandardTexture::EmptyNormal]->GetDescriptor());
+        }
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetSRVParamIndex(1), normalTextureDescriptorHandle);
+        cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
+            m_StandardRootSignature->GetSamplerParamIndex(1),
+            m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_NormalTextureAddressMode));
     }
-    else
-    {
-        normalTextureDescriptorHandle = m_SRVDescriptorManager->GetGPUHandle(
-            m_StandardTextures[(size_t)StandardTexture::EmptyNormal]->GetDescriptor());
-    }
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-        m_StandardRootSignature->GetSRVParamIndex(1), normalTextureDescriptorHandle);
-    cmdList.GetCmdList()->SetGraphicsRootDescriptorTable(
-        m_StandardRootSignature->GetSamplerParamIndex(1),
-        m_StandardSamplers.GetD3D12(D3D12_FILTER_ANISOTROPIC, mat.m_NormalTextureAddressMode));
 
     cmdList.SetPrimitiveTopology(mesh->GetTopology());
 
