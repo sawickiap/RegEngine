@@ -205,12 +205,12 @@ void Shader::Init(ShaderType type, const wstr_view& filePath, const wstr_view& e
         CHECK_HR(result->GetResult(&m_Pimpl->m_CompiledObject));
         CHECK_BOOL(m_Pimpl->m_CompiledObject && m_Pimpl->m_CompiledObject->GetBufferSize() > 0);
         
-        if(errors && errors->GetBufferSize() > 0)
+        if(!errorsView.empty())
             LogWarningF(L"{}", errorsView);
     }
     else
     {
-        if(errors && errors->GetBufferSize() > 0)
+        if(!errorsView.empty())
             FAIL(std::format(L"{}", errorsView));
         else
             FAIL(L"No error buffer.");

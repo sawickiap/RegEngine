@@ -99,7 +99,7 @@ void MainPS(
 #endif
 	float3 normal_View = mul((float3x3)perObjectConstants.WorldView, normal_Local);
 
-	outNormal_View.rgb = float4(normalize(normal_View), 1.0);
+	outNormal_View = float4(normalize(normal_View), 1.0);
 }
 
 #endif
