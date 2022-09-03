@@ -173,7 +173,7 @@ void CommandLineParser::RegisterOption(uint32_t Id, wchar_t Opt, bool Parameter)
 void CommandLineParser::RegisterOption(uint32_t Id, const wstr_view &Opt, bool Parameter)
 {
 	assert(!Opt.empty());
-    m_LongOpts.push_back(LongOption{Id, wstring{Opt}, Parameter});
+    m_LongOpts.push_back(LongOption{Id, wstring{Opt.data(), Opt.length()}, Parameter});
 }
 
 CommandLineParser::Result CommandLineParser::ReadNext()
