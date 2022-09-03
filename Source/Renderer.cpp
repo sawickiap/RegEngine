@@ -26,6 +26,17 @@ static const D3D_FEATURE_LEVEL MY_D3D_FEATURE_LEVEL = D3D_FEATURE_LEVEL_12_0;
 static const DXGI_FORMAT RENDER_TARGET_FORMAT = DXGI_FORMAT_R8G8B8A8_UNORM;
 static const DXGI_FORMAT DEPTH_STENCIL_FORMAT = DXGI_FORMAT_D32_FLOAT;
 
+static BoolSetting g_D3D12DebugLayer_Enabled(
+    SettingCategory::Startup, "D3D12DebugLayer.Enabled", false);
+static BoolSetting g_D3D12DebugLayer_SynchronizedCommandQueueValidation_Enabled(
+    SettingCategory::Startup, "D3D12DebugLayer.SynchronizedCommandQueueValidation.Enabled", true);
+static BoolSetting g_D3D12DebugLayer_ReportLiveDeviceObjects(
+    SettingCategory::Startup, "D3D12DebugLayer.ReportLiveDeviceObjects", true);
+static BoolSetting g_D3D12DebugLayer_GPUBasedValidation_Enabled(
+    SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.Enabled", false);
+static BoolSetting g_D3D12DebugLayer_GPUBasedValidation_StateTracking_Enabled(
+    SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.StateTracking.Enabled", true);
+
 extern VecSetting<glm::uvec2> g_Size;
 
 enum ASSIMP_LOG_SEVERITY
@@ -309,6 +320,9 @@ void Renderer::Init()
 
     if(g_EnableExperimentalShaderModels.GetValue())
         D3D12EnableExperimentalFeatures(1, &D3D12ExperimentalShaderModels, nullptr, nullptr);
+
+    if(g_D3D12DebugLayer_Enabled.GetValue())
+        EnableDebugLayer();
 
 	CreateDevice();
     CreateMemoryAllocator();
@@ -656,10 +670,54 @@ void Renderer::Render()
     ERR_CATCH_FUNC
 }
 
+void Renderer::EnableDebugLayer()
+{
+    LogInfo(L"Enabling D3D12 Debug Layer");
+    ComPtr<ID3D12Debug> debug;
+    if(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
+    {
+        debug->EnableDebugLayer();
+    }
+    else
+    {
+        LogWarning(L"D3D12GetDebugInterface failed.");
+        return;
+    }
+
+    if(g_D3D12DebugLayer_GPUBasedValidation_Enabled.GetValue() ||
+        !g_D3D12DebugLayer_SynchronizedCommandQueueValidation_Enabled.GetValue())
+    {
+        ComPtr<ID3D12Debug1> debug1;
+        if(SUCCEEDED(debug->QueryInterface(IID_PPV_ARGS(&debug1))))
+        {
+            if(g_D3D12DebugLayer_GPUBasedValidation_Enabled.GetValue())
+                debug1->SetEnableGPUBasedValidation(TRUE);
+            if(!g_D3D12DebugLayer_SynchronizedCommandQueueValidation_Enabled.GetValue())
+                debug1->SetEnableSynchronizedCommandQueueValidation(FALSE);
+        }
+    else
+        LogWarning(L"QueryInterface for ID3D12Debug1 failed.");
+    }
+    
+    if(!g_D3D12DebugLayer_GPUBasedValidation_StateTracking_Enabled.GetValue())
+    {
+        ComPtr<ID3D12Debug2> debug2;
+        if(SUCCEEDED(debug->QueryInterface(IID_PPV_ARGS(&debug2))))
+        {
+            if(!g_D3D12DebugLayer_GPUBasedValidation_StateTracking_Enabled.GetValue())
+                debug2->SetGPUBasedValidationFlags(D3D12_GPU_BASED_VALIDATION_FLAGS_DISABLE_STATE_TRACKING);
+        }
+    else
+        LogWarning(L"QueryInterface for ID3D12Debug2 failed.");
+    }
+}
+
 void Renderer::CreateDevice()
 {
-    CHECK_HR(D3D12CreateDevice(m_Adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&m_Device)));
-    SetD3D12ObjectName(m_Device, L"Device");
+    ID3D12Device* devicePtr;
+    CHECK_HR(D3D12CreateDevice(m_Adapter, MY_D3D_FEATURE_LEVEL, IID_PPV_ARGS(&devicePtr)));
+    m_Device.reset(devicePtr);
+    SetD3D12ObjectName(m_Device.get(), L"Device");
 
     CHECK_HR(m_Device->QueryInterface(IID_PPV_ARGS(&m_Device1)));
     SetD3D12ObjectName(m_Device1, L"Device1");
@@ -670,7 +728,7 @@ void Renderer::CreateMemoryAllocator()
     assert(m_Device && m_Adapter && !m_MemoryAllocator);
 
     D3D12MA::ALLOCATOR_DESC desc = {};
-    desc.pDevice = m_Device.Get();
+    desc.pDevice = m_Device.get();
     desc.pAdapter = m_Adapter;
     desc.Flags = D3D12MA::ALLOCATOR_FLAG_DEFAULT_POOLS_NOT_ZEROED |
         D3D12MA::ALLOCATOR_FLAG_MSAA_TEXTURES_ALWAYS_COMMITTED |
@@ -1067,7 +1125,7 @@ void Renderer::InitImGui()
     m_ImGuiDescriptor = m_SRVDescriptorManager->AllocatePersistent(1);
 
     CHECK_BOOL(ImGui_ImplDX12_Init(
-        m_Device.Get(),
+        m_Device.get(),
         (int)g_FrameCount.GetValue(),
         RENDER_TARGET_FORMAT,
         m_SRVDescriptorManager->GetHeap(),
@@ -1752,4 +1810,22 @@ void AssimpPrint(const wstr_view& filePath)
     PrintAssimpSceneInfo(scene);
 
     ERR_CATCH_MSG(std::format(L"Cannot load model from \"{}\".", filePath));
+}
+
+void D3D12DeviceDeleter::operator()(ID3D12Device* device)
+{
+    if(!device)
+        return;
+
+    if(g_D3D12DebugLayer_Enabled.GetValue() &&
+        g_D3D12DebugLayer_ReportLiveDeviceObjects.GetValue())
+    {
+        ComPtr<ID3D12DebugDevice> debugDevice;
+        if(SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&debugDevice))))
+        {
+            debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
+        }
+    }
+
+    device->Release();
 }

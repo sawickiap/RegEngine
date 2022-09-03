@@ -17,7 +17,7 @@ extern const D3D12_HEAP_PROPERTIES D3D12_HEAP_PROPERTIES_READBACK = CD3DX12_HEAP
 
 
 static BoolSetting g_UseThreadNames(SettingCategory::Startup, "UseThreadNames", true);
-static BoolSetting g_UseD3d12ObjectNames(SettingCategory::Startup, "UseD3d12ObjectNames", true);
+static BoolSetting g_UseD3d12ObjectNames(SettingCategory::Startup, "UseD3D12ObjectNames", true);
 
 void Exception::Print() const
 {

@@ -37,6 +37,12 @@ struct RendererCapabilities
 {
 };
 
+struct D3D12DeviceDeleter
+{
+    void operator()(ID3D12Device* device);
+};
+using D3D12DevicePtr = unique_ptr<ID3D12Device, D3D12DeviceDeleter>;
+
 /*
 The only accepted values are:
     D3D12_FILTER_MIN_MAG_MIP_POINT
@@ -173,7 +179,7 @@ public:
 	~Renderer();
     void Reload(bool refreshAll);
 
-    ID3D12Device* GetDevice() { return m_Device.Get(); };
+    ID3D12Device* GetDevice() { return m_Device.get(); };
     ID3D12Device1* GetDevice1() { return m_Device1.Get(); };
     const RendererCapabilities& GetCapabilities() { return m_Capabilities; }
     D3D12MA::Allocator* GetMemoryAllocator() { return m_MemoryAllocator.Get(); };
@@ -209,7 +215,7 @@ private:
 	IDXGIAdapter1* const m_Adapter;
 	const HWND m_Wnd;
 
-	ComPtr<ID3D12Device> m_Device;
+	D3D12DevicePtr m_Device;
 	ComPtr<ID3D12Device1> m_Device1;
 	RendererCapabilities m_Capabilities;
     ComPtr<D3D12MA::Allocator> m_MemoryAllocator;
@@ -250,6 +256,7 @@ private:
 	ComPtr<ID3D12PipelineState> m_PostprocessingPipelineState;
     Descriptor m_ImGuiDescriptor;
 
+    void EnableDebugLayer();
 	void CreateDevice();
 	void CreateMemoryAllocator();
 	void LoadCapabilities();

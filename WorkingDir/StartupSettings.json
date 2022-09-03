@@ -1,6 +1,25 @@
 {
     "UseThreadNames": true,
-    "UseD3d12ObjectNames": true,
+    "UseD3D12ObjectNames": true,
+
+    // Set to true to enable D3D Debug Layer.
+  
+    "D3D12DebugLayer.Enabled": true,
+    // Set to false to disable synchronized command queue validation.
+    // Should be enabled by default. Disabling it may increase performance.
+    // Requires "D3D12DebugLayer.Enabled": true.
+    "D3D12DebugLayer.SynchronizedCommandQueueValidation.Enabled": true,
+    // Set to true to print the list of alive D3D12 objects before D3D12 device is destroyed, as Debug Layer warnings.
+    // Requires "D3D12DebugLayer.Enabled": true.
+    "D3D12DebugLayer.ReportLiveDeviceObjects": true,
+    // Set to true to enable additional, super slow GPU-based validation.
+    // Requires "D3D12DebugLayer.Enabled": true.
+    "D3D12DebugLayer.GPUBasedValidation.Enabled": false,
+    // Set to false to disable state tracking.
+    // Should be enabled by default. Disabling it may increase performance.
+    // Requires "D3D12DebugLayer.GPUBasedValidation.Enabled": true.
+    "D3D12DebugLayer.GPUBasedValidation.StateTracking.Enabled": true,
+    
     "FrameCount": 3,
     "Size": [ 1920, 1080 ],
     // Set to true to accept unsigned shaders.
