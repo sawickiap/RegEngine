@@ -30,12 +30,26 @@ static BoolSetting g_D3D12DebugLayer_Enabled(
     SettingCategory::Startup, "D3D12DebugLayer.Enabled", false);
 static BoolSetting g_D3D12DebugLayer_SynchronizedCommandQueueValidation_Enabled(
     SettingCategory::Startup, "D3D12DebugLayer.SynchronizedCommandQueueValidation.Enabled", true);
+static BoolSetting g_D3D12DebugLayer_AllowBehaviorChangingDebugAids(
+    SettingCategory::Startup, "D3D12DebugLayer.AllowBehaviorChangingDebugAids", false);
+static BoolSetting g_D3D12DebugLayer_ConservativeResourceStateTracking(
+    SettingCategory::Startup, "D3D12DebugLayer.ConservativeResourceStateTracking", false);
+static BoolSetting g_D3D12DebugLayer_DisableVirtualizedBundlesValidation(
+    SettingCategory::Startup, "D3D12DebugLayer.DisableVirtualizedBundlesValidation", false);
 static BoolSetting g_D3D12DebugLayer_ReportLiveDeviceObjects(
     SettingCategory::Startup, "D3D12DebugLayer.ReportLiveDeviceObjects", true);
+static FloatSetting g_D3D12DebugLayer_SlowdownPerformanceFactor(
+    SettingCategory::Startup, "D3D12DebugLayer.SlowdownPerformanceFactor", 0.f);
 static BoolSetting g_D3D12DebugLayer_GPUBasedValidation_Enabled(
     SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.Enabled", false);
 static BoolSetting g_D3D12DebugLayer_GPUBasedValidation_StateTracking_Enabled(
     SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.StateTracking.Enabled", true);
+static UintSetting g_D3D12DebugLayer_GPUBasedValidation_MaxMessagesPerCommandList(
+    SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.MaxMessagesPerCommandList", 256);
+static UintSetting g_D3D12DebugLayer_GPUBasedValidation_DefaultShaderPatchMode(
+    SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.DefaultShaderPatchMode", 2);
+static UintSetting g_D3D12DebugLayer_GPUBasedValidation_PipelineStateCreateFlags(
+    SettingCategory::Startup, "D3D12DebugLayer.GPUBasedValidation.PipelineStateCreateFlags", 0);
 
 extern VecSetting<glm::uvec2> g_Size;
 
@@ -721,6 +735,54 @@ void Renderer::CreateDevice()
 
     CHECK_HR(m_Device->QueryInterface(IID_PPV_ARGS(&m_Device1)));
     SetD3D12ObjectName(m_Device1, L"Device1");
+
+    if(g_D3D12DebugLayer_Enabled.GetValue())
+        EnableDebugDevice();
+}
+
+void Renderer::EnableDebugDevice()
+{
+    ComPtr<ID3D12DebugDevice1> debugDevice1;
+    if(SUCCEEDED(m_Device->QueryInterface(IID_PPV_ARGS(&debugDevice1))))
+    {
+        uint32_t featureFlags = 0;
+        if(g_D3D12DebugLayer_AllowBehaviorChangingDebugAids.GetValue())
+            featureFlags |= D3D12_DEBUG_FEATURE_ALLOW_BEHAVIOR_CHANGING_DEBUG_AIDS;
+        if(g_D3D12DebugLayer_ConservativeResourceStateTracking.GetValue())
+            featureFlags |= D3D12_DEBUG_FEATURE_CONSERVATIVE_RESOURCE_STATE_TRACKING;
+        if(g_D3D12DebugLayer_DisableVirtualizedBundlesValidation.GetValue())
+            featureFlags |= D3D12_DEBUG_FEATURE_DISABLE_VIRTUALIZED_BUNDLES_VALIDATION;
+        HRESULT hr = debugDevice1->SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_FEATURE_FLAGS,
+            &featureFlags, sizeof featureFlags);
+        if(FAILED(hr))
+            LogWarning(L"ID3D12DebugDevice1::SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_FEATURE_FLAGS) failed.");
+
+        if(g_D3D12DebugLayer_GPUBasedValidation_Enabled.GetValue())
+        {
+            D3D12_DEBUG_DEVICE_GPU_BASED_VALIDATION_SETTINGS GPUBasedValidationSettings = {
+                .MaxMessagesPerCommandList = g_D3D12DebugLayer_GPUBasedValidation_MaxMessagesPerCommandList.GetValue(),
+                .DefaultShaderPatchMode = (D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE)
+                    g_D3D12DebugLayer_GPUBasedValidation_DefaultShaderPatchMode.GetValue(),
+                .PipelineStateCreateFlags = (D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS)
+                    g_D3D12DebugLayer_GPUBasedValidation_PipelineStateCreateFlags.GetValue() };
+            hr = debugDevice1->SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_GPU_BASED_VALIDATION_SETTINGS,
+                &GPUBasedValidationSettings, sizeof GPUBasedValidationSettings);
+            if(FAILED(hr))
+                LogWarning(L"ID3D12DebugDevice1::SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_GPU_BASED_VALIDATION_SETTINGS) failed.");
+        }
+
+        if(g_D3D12DebugLayer_SlowdownPerformanceFactor.GetValue() != 0.f)
+        {
+            D3D12_DEBUG_DEVICE_GPU_SLOWDOWN_PERFORMANCE_FACTOR slowdownPerformanceFactor = {
+                .SlowdownFactor = g_D3D12DebugLayer_SlowdownPerformanceFactor.GetValue() };
+            hr = debugDevice1->SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_GPU_SLOWDOWN_PERFORMANCE_FACTOR,
+                &slowdownPerformanceFactor, sizeof slowdownPerformanceFactor);
+            if(FAILED(hr))
+                LogWarning(L"ID3D12DebugDevice1::SetDebugParameter(D3D12_DEBUG_DEVICE_PARAMETER_GPU_SLOWDOWN_PERFORMANCE_FACTOR) failed.");
+        }
+    }
+    else
+        LogWarning(L"ID3D12Device::QueryInterface for ID3D12DebugDevice1 failed.");
 }
 
 void Renderer::CreateMemoryAllocator()

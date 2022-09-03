@@ -258,6 +258,7 @@ private:
 
     void EnableDebugLayer();
 	void CreateDevice();
+    void EnableDebugDevice();
 	void CreateMemoryAllocator();
 	void LoadCapabilities();
 	void CreateCommandQueues();

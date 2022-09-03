@@ -7,18 +7,36 @@
     "D3D12DebugLayer.Enabled": true,
     // Set to false to disable synchronized command queue validation.
     // Should be enabled by default. Disabling it may increase performance.
-    // Requires "D3D12DebugLayer.Enabled": true.
     "D3D12DebugLayer.SynchronizedCommandQueueValidation.Enabled": true,
+    // 3 extra flags that can be enabled for the Debug Layer device.
+    "D3D12DebugLayer.AllowBehaviorChangingDebugAids": false,
+    "D3D12DebugLayer.ConservativeResourceStateTracking": false,
+    "D3D12DebugLayer.DisableVirtualizedBundlesValidation": false,
     // Set to true to print the list of alive D3D12 objects before D3D12 device is destroyed, as Debug Layer warnings.
-    // Requires "D3D12DebugLayer.Enabled": true.
     "D3D12DebugLayer.ReportLiveDeviceObjects": true,
+    // Extra slowdown of the GPU. Default is 0, which means slowdown is disabled.
+    "D3D12DebugLayer.SlowdownPerformanceFactor": 0.0,
+    
     // Set to true to enable additional, super slow GPU-based validation.
-    // Requires "D3D12DebugLayer.Enabled": true.
     "D3D12DebugLayer.GPUBasedValidation.Enabled": false,
     // Set to false to disable state tracking.
     // Should be enabled by default. Disabling it may increase performance.
-    // Requires "D3D12DebugLayer.GPUBasedValidation.Enabled": true.
     "D3D12DebugLayer.GPUBasedValidation.StateTracking.Enabled": true,
+    "D3D12DebugLayer.GPUBasedValidation.MaxMessagesPerCommandList": 256,
+    /*
+    0 = D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE_NONE = 0
+    1 = D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE_STATE_TRACKING_ONLY
+    2 = D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE_UNGUARDED_VALIDATION (default)
+    3 = D3D12_GPU_BASED_VALIDATION_SHADER_PATCH_MODE_GUARDED_VALIDATION
+    */
+    "D3D12DebugLayer.GPUBasedValidation.DefaultShaderPatchMode": 2,
+    /*
+    D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_TRACKING_ONLY_SHADERS = 0x1
+    D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_UNGUARDED_VALIDATION_SHADERS = 0x2
+    D3D12_GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_GUARDED_VALIDATION_SHADERS = 0x4
+    Default is 0.
+    */
+    "D3D12DebugLayer.GPUBasedValidation.PipelineStateCreateFlags": 0,
     
     "FrameCount": 3,
     "Size": [ 1920, 1080 ],
