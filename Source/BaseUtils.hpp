@@ -378,7 +378,7 @@ enum class LogLevel { Info, Message, Warning, Error, Count };
 void Log(LogLevel level, const wstr_view& msg);
 
 template<typename... Args>
-void LogF(LogLevel level, const wchar_t* format, Args&&... args) { Log(level, std::format(format, args...)); }
+inline void LogF(LogLevel level, const wchar_t* format, Args&&... args) { Log(level, std::vformat(format, std::make_wformat_args(std::forward<Args>(args)...))); }
 
 inline void LogInfo(const wstr_view& msg) { Log(LogLevel::Info, msg); }
 inline void LogMessage(const wstr_view& msg) { Log(LogLevel::Message, msg); }
@@ -386,13 +386,13 @@ inline void LogWarning(const wstr_view& msg) { Log(LogLevel::Warning, msg); }
 inline void LogError(const wstr_view& msg) { Log(LogLevel::Error, msg); }
 
 template<typename... Args>
-void LogInfoF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Info, format, args...); }
+void LogInfoF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Info, format, std::forward<Args>(args)...); }
 template<typename... Args>
-void LogMessageF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Message, format, args...); }
+void LogMessageF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Message, format, std::forward<Args>(args)...); }
 template<typename... Args>
-void LogWarningF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Warning, format, args...); }
+void LogWarningF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Warning, format, std::forward<Args>(args)...); }
 template<typename... Args>
-void LogErrorF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Error, format, args...); }
+void LogErrorF(const wchar_t* format, Args&&... args) { LogF(LogLevel::Error, format, std::forward<Args>(args)...); }
 
 void SetThreadName(DWORD threadId, const str_view& name);
 void SetD3D12ObjectName(ID3D12Object* obj, const wstr_view& name);
