@@ -4,7 +4,7 @@
 
     // Set to true to enable D3D Debug Layer.
   
-    "D3D12DebugLayer.Enabled": true,
+    "D3D12DebugLayer.Enabled": false,
     // Set to false to disable synchronized command queue validation.
     // Should be enabled by default. Disabling it may increase performance.
     "D3D12DebugLayer.SynchronizedCommandQueueValidation.Enabled": true,

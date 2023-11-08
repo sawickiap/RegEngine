@@ -260,8 +260,8 @@ void MultiShader::Init(ShaderType type, const wstr_view& filePath, const wstr_vi
     std::span<const wstr_view> macroNames)
 {
     m_Pimpl->m_Type = type;
-    m_Pimpl->m_FilePath = filePath;
-    m_Pimpl->m_EntryPointName = entryPointName;
+    m_Pimpl->m_FilePath.assign(filePath.data(), filePath.length());
+    m_Pimpl->m_EntryPointName.assign(entryPointName.data(), entryPointName.length());
 
     const size_t macroCount = macroNames.size();
     m_Pimpl->m_MacroNames.resize(macroCount);

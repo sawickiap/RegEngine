@@ -1535,7 +1535,7 @@ size_t Renderer::TryLoadTexture(const wstr_view& title, const std::filesystem::p
     try
     {
         Scene::Texture tex;
-        tex.m_Title = title;
+        tex.m_Title.assign(title.data(), title.length());
         tex.m_ProcessedPath = std::move(processedPath);
         tex.m_Texture = std::make_unique<Texture>();
         uint32_t flags = Texture::FLAG_GENERATE_MIPMAPS | Texture::FLAG_CACHE_SAVE;

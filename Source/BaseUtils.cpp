@@ -141,7 +141,7 @@ CommandLineParser::ShortOption * CommandLineParser::FindShortOpt(wchar_t Opt)
 CommandLineParser::LongOption * CommandLineParser::FindLongOpt(const wstr_view &Opt)
 {
 	for (size_t i = 0; i < m_LongOpts.size(); i++)
-		if (m_LongOpts[i].Opt == Opt)
+		if (wstr_view(m_LongOpts[i].Opt) == Opt)
 			return &m_LongOpts[i];
 	return NULL;
 }
