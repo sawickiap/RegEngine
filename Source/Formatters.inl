@@ -5,7 +5,7 @@ namespace std
 template<>
 struct formatter<str_view, char> : formatter<string_view, char>
 {
-	auto format(const str_view& str, format_context& ctx)
+	auto format(const str_view& str, format_context& ctx) const
 	{
 		return formatter<string_view, char>::format(
 			string_view(str.data(), str.size()), ctx);
@@ -14,7 +14,7 @@ struct formatter<str_view, char> : formatter<string_view, char>
 template<>
 struct formatter<wstr_view, wchar_t> : formatter<wstring_view, wchar_t>
 {
-	auto format(const wstr_view& str, wformat_context& ctx)
+	auto format(const wstr_view& str, wformat_context& ctx) const
 	{
 		return formatter<wstring_view, wchar_t>::format(
 			wstring_view(str.data(), str.size()), ctx);
@@ -26,7 +26,7 @@ struct formatter<wstr_view, wchar_t> : formatter<wstring_view, wchar_t>
 template<>
 struct formatter<str_view, wchar_t> : formatter<wstring_view, wchar_t>
 {
-	auto format(const str_view& str, wformat_context& ctx)
+	auto format(const str_view& str, wformat_context& ctx) const
 	{
 		return formatter<wstring_view, wchar_t>::format(
 			ConvertCharsToUnicode(str, CP_ACP), ctx);
@@ -45,7 +45,7 @@ inline void FormatConstChar(wformat_context& ctx, wchar_t ch)
 template<uint8_t L, typename T, glm::qualifier Q>
 struct formatter<glm::vec<L, T, Q>, wchar_t> : formatter<T, wchar_t>
 {
-    auto format(const glm::vec<L, T, Q>& v, wformat_context& ctx)
+    auto format(const glm::vec<L, T, Q>& v, wformat_context& ctx) const
     {
         ctx.advance_to(formatter<T, wchar_t>::format(v.x, ctx));
         for(uint8_t i = 1; i < L; ++i)
@@ -62,7 +62,7 @@ struct formatter<glm::vec<L, T, Q>, wchar_t> : formatter<T, wchar_t>
 template<uint8_t C, uint8_t R, typename T, glm::qualifier Q>
 struct formatter<glm::mat<C, R, T, Q>, wchar_t> : formatter<T, wchar_t>
 {
-    auto format(const glm::mat<C, R, T, Q>& m, wformat_context& ctx)
+    auto format(const glm::mat<C, R, T, Q>& m, wformat_context& ctx) const
     {
         for(uint8_t r = 0; r < R; ++r)
         {

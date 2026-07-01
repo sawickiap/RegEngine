@@ -378,7 +378,7 @@ enum class LogLevel { Info, Message, Warning, Error, Count };
 void Log(LogLevel level, const wstr_view& msg);
 
 template<typename... Args>
-inline void LogF(LogLevel level, const wchar_t* format, Args&&... args) { Log(level, std::vformat(format, std::make_wformat_args(std::forward<Args>(args)...))); }
+inline void LogF(LogLevel level, const wchar_t* format, Args&&... args) { Log(level, std::vformat(format, std::make_wformat_args(args...))); }
 
 inline void LogInfo(const wstr_view& msg) { Log(LogLevel::Info, msg); }
 inline void LogMessage(const wstr_view& msg) { Log(LogLevel::Message, msg); }
